@@ -1,0 +1,1660 @@
+"use client";
+
+import * as React from "react";
+import { useNotesRemote } from "@/lib/use-notes-remote";
+import { SignoutButton } from "@/components/signout-button";
+import { Button, Card, Input, Textarea, Badge } from "@/components/ui";
+import { cn } from "@/lib/cn";
+import type { Note, Category } from "@/lib/api-types";
+import {
+  Plus,
+  Search,
+  Pin,
+  MessageCircle,
+  FileText,
+  Sparkles,
+  ChevronRight,
+  X,
+  Download,
+  BookOpen,
+  Send,
+  Loader2,
+  Tag,
+} from "lucide-react";
+
+export function NoteApp({ userId }: { userId: string }) {
+  const {
+    categories,
+    notes,
+    loading,
+    plan,
+    upgradeModal,
+    setUpgradeModal,
+    categoryError,
+    clearCategoryError,
+    actions,
+    FREE_NOTE_LIMIT,
+  } = useNotesRemote(userId);
+
+  const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | "all" | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = React.useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [semanticSearch, setSemanticSearch] = React.useState(false);
+  const [chatOpen, setChatOpen] = React.useState(false);
+  const [chatMessages, setChatMessages] = React.useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [chatInput, setChatInput] = React.useState("");
+  const [chatLoading, setChatLoading] = React.useState(false);
+  const [studyModal, setStudyModal] = React.useState<{ noteId: string } | null>(null);
+  const [studyMode, setStudyMode] = React.useState<"menu" | "flashcards" | "quiz">("menu");
+  const [flashcards, setFlashcards] = React.useState<{ front: string; back: string }[]>([]);
+  const [quizQuestions, setQuizQuestions] = React.useState<
+    { question: string; options: string[]; correctIndex: number }[]
+  >([]);
+  const [quizIndex, setQuizIndex] = React.useState(0);
+  const [quizScore, setQuizScore] = React.useState<number | null>(null);
+  const [quizSelected, setQuizSelected] = React.useState<number | null>(null);
+  const [cardIndex, setCardIndex] = React.useState(0);
+  const [cardFlipped, setCardFlipped] = React.useState(false);
+  const [exportMenu, setExportMenu] = React.useState<string | null>(null);
+  const [suggestBanner, setSuggestBanner] = React.useState<{ categoryId: string; name: string } | null>(null);
+  const [newNoteIds, setNewNoteIds] = React.useState<Set<string>>(new Set());
+  const [writingUndo, setWritingUndo] = React.useState<{ prev: string } | null>(null);
+  const [summaryCache, setSummaryCache] = React.useState<Record<string, string>>({});
+  const [summaryLoading, setSummaryLoading] = React.useState<Set<string>>(new Set());
+  const [semanticIds, setSemanticIds] = React.useState<string[]>([]);
+  const [draftNote, setDraftNote] = React.useState<Note | null>(null);
+  const [summaryBelow, setSummaryBelow] = React.useState<string | null>(null);
+  const [summarizeLoading, setSummarizeLoading] = React.useState(false);
+  const [writingLoading, setWritingLoading] = React.useState(false);
+  const [autoCategorizeLoading, setAutoCategorizeLoading] = React.useState(false);
+  const [studyLoading, setStudyLoading] = React.useState<"flashcards" | "quiz" | null>(null);
+  const [studyError, setStudyError] = React.useState<string | null>(null);
+  const [improveLoading, setImproveLoading] = React.useState(false);
+  const [extractLoading, setExtractLoading] = React.useState(false);
+  const [titleLoading, setTitleLoading] = React.useState(false);
+  const [tagsLoading, setTagsLoading] = React.useState(false);
+  const [extractTasksModal, setExtractTasksModal] = React.useState<string[] | null>(null);
+  const [suggestTagsChips, setSuggestTagsChips] = React.useState<string[] | null>(null);
+  const [toolbarError, setToolbarError] = React.useState<string | null>(null);
+  const [improveToast, setImproveToast] = React.useState(false);
+
+  const defaultCategoryId = categories[0]?.id ?? null;
+  React.useEffect(() => {
+    if (selectedCategoryId === null && defaultCategoryId) {
+      setSelectedCategoryId("all");
+    }
+  }, [defaultCategoryId, selectedCategoryId]);
+
+  const hasBootstrapped = React.useRef(false);
+  React.useEffect(() => {
+    if (!loading && categories.length === 0 && userId && !hasBootstrapped.current) {
+      hasBootstrapped.current = true;
+      actions.createCategory("General").then((c) => c && setSelectedCategoryId(c.id));
+    }
+  }, [loading, categories.length, userId]);
+
+  // When draft has "pending" category and categories load, update draft
+  React.useEffect(() => {
+    if (draftNote?.category_id === "pending" && categories[0]) {
+      setDraftNote((d) => (d ? { ...d, category_id: categories[0].id } : null));
+    }
+  }, [draftNote?.category_id, categories]);
+
+  const filteredNotes = React.useMemo(() => {
+    let list = notes;
+    if (selectedCategoryId && selectedCategoryId !== "all") {
+      list = list.filter((n) => n.category_id === selectedCategoryId);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      if (semanticSearch && plan === "pro") {
+        return list.filter((n) => semanticIds.includes(n.id)).sort((a, b) => {
+          const ai = semanticIds.indexOf(a.id);
+          const bi = semanticIds.indexOf(b.id);
+          if (ai >= 0 && bi >= 0) return ai - bi;
+          if (ai >= 0) return -1;
+          if (bi >= 0) return 1;
+          return 0;
+        });
+      }
+      list = list.filter(
+        (n) =>
+          n.title.toLowerCase().includes(q) ||
+          n.content.toLowerCase().includes(q) ||
+          (n.tags ?? []).some((t) => t.toLowerCase().includes(q))
+      );
+    }
+    return list.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      const aTime = a.updated_at ?? a.created_at ?? "";
+      const bTime = b.updated_at ?? b.created_at ?? "";
+      return bTime.localeCompare(aTime);
+    });
+  }, [notes, selectedCategoryId, searchQuery, semanticSearch, plan, semanticIds]);
+
+  React.useEffect(() => {
+    if (!searchQuery.trim() || !semanticSearch || plan !== "pro") {
+      setSemanticIds([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/search/semantic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchQuery }),
+      });
+      if (cancelled) return;
+      const json = (await res.json()) as { notes?: { id: string }[] };
+      if (res.ok && json.notes) {
+        setSemanticIds(json.notes.map((n) => n.id));
+      } else {
+        setSemanticIds([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [searchQuery, semanticSearch, plan]);
+
+  const selectedNote =
+    selectedNoteId && draftNote && selectedNoteId === draftNote.id
+      ? draftNote
+      : selectedNoteId
+        ? notes.find((n) => n.id === selectedNoteId) ?? null
+        : null;
+  const [editTitle, setEditTitle] = React.useState("");
+  const [editContent, setEditContent] = React.useState("");
+  const editTitleRef = React.useRef(editTitle);
+  const editContentRef = React.useRef(editContent);
+  const skipSyncRef = React.useRef(false);
+  React.useEffect(() => {
+    editTitleRef.current = editTitle;
+    editContentRef.current = editContent;
+  }, [editTitle, editContent]);
+  React.useEffect(() => {
+    if (skipSyncRef.current) {
+      skipSyncRef.current = false;
+      return;
+    }
+    if (selectedNote && !draftNote) {
+      setEditTitle(selectedNote.title);
+      setEditContent(selectedNote.content);
+    }
+  }, [selectedNote?.id, selectedNote?.title, selectedNote?.content, draftNote]);
+
+  React.useEffect(() => {
+    setSummaryBelow(null);
+  }, [selectedNoteId]);
+
+  const saveDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    if (!selectedNoteId || !selectedNote || draftNote) return;
+    saveDebounce.current = setTimeout(() => {
+      actions.update(selectedNoteId, { title: editTitle, content: editContent });
+      if (newNoteIds.has(selectedNoteId) && editContent.trim().length > 50 && plan === "pro") {
+        const catIds = categories.map((c) => c.id);
+        const catNames = categories.map((c) => c.name);
+        fetch("/api/ai/anthropic/suggest-category", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: editContent,
+            categoryIds: catIds,
+            categoryNames: catNames,
+          }),
+        })
+          .then((r) => r.json())
+          .then((j: { category?: { id: string; name: string } }) => {
+            if (j.category && !suggestBanner) {
+              setSuggestBanner({ categoryId: j.category.id, name: j.category.name });
+            }
+          })
+          .catch(() => {});
+        setNewNoteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(selectedNoteId);
+          return next;
+        });
+      }
+    }, 500);
+    return () => {
+      if (saveDebounce.current) clearTimeout(saveDebounce.current);
+    };
+  }, [editTitle, editContent, selectedNoteId, selectedNote, draftNote, actions, categories, plan, newNoteIds, suggestBanner]);
+
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "n" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        handleNewNote();
+      }
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        (document.querySelector('[data-search-input]') as HTMLInputElement)?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [defaultCategoryId, categories, notes, plan]);
+
+  function handleNewNote() {
+    if (plan !== "pro" && notes.length >= FREE_NOTE_LIMIT) {
+      setUpgradeModal({ show: true, message: "You've reached the free limit — upgrade to Pro for unlimited notes" });
+      return;
+    }
+    const draftId = `draft-${Date.now()}`;
+    const categoryId = defaultCategoryId ?? "pending";
+    const draft: Note = {
+      id: draftId,
+      user_id: userId,
+      category_id: categoryId,
+      title: "Untitled",
+      content: "",
+      pinned: false,
+      tags: [],
+    };
+    setDraftNote(draft);
+    setSelectedNoteId(draftId);
+    setEditTitle("Untitled");
+    setEditContent("");
+    setNewNoteIds((prev) => new Set(prev).add(draftId));
+
+    // Persist in background — don't block the editor
+    (async () => {
+      let catId = categoryId;
+      if (catId === "pending") {
+        const cat = await actions.createCategory("General");
+        if (!cat) return;
+        catId = cat.id;
+        setDraftNote((d) => (d ? { ...d, category_id: catId } : null));
+      }
+      const note = await actions.create(catId, "Untitled");
+      if (note) {
+        setNewNoteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(draftId);
+          next.add(note.id);
+          return next;
+        });
+        skipSyncRef.current = true;
+        actions.update(note.id, {
+          title: editTitleRef.current,
+          content: editContentRef.current,
+        });
+        setSelectedNoteId(note.id);
+        setSelectedCategoryId(note.category_id);
+        setDraftNote(null);
+      }
+    })();
+  }
+
+  async function startCheckout() {
+    setUpgradeModal({ show: false });
+    const res = await fetch("/api/stripe/checkout", { method: "POST" });
+    const json = (await res.json()) as { url?: string };
+    if (json?.url) window.location.href = json.url;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0f]">
+        <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex h-dvh bg-[#0a0a0f]">
+      {/* Background gradient (landing-style) */}
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute -top-24 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/15 via-blue-500/10 to-fuchsia-500/10 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 h-[400px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-blue-500/5 via-purple-600/10 to-emerald-500/5 blur-3xl" />
+      </div>
+
+      {/* Sidebar */}
+      <aside className="relative z-10 flex w-64 flex-shrink-0 flex-col border-r border-white/10 bg-black/30 backdrop-blur-xl">
+        <div className="flex items-center gap-3 border-b border-white/10 p-4">
+          <div className="h-9 w-9 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+            <img src="/noteai-icon.svg" alt="NoteAI" className="h-full w-full" />
+          </div>
+          <div className="leading-tight">
+            <div className="text-base font-semibold tracking-tight text-white/95">NoteAI</div>
+            <div className="text-xs text-white/60">AI note-taking</div>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          <button
+            onClick={handleNewNote}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+          >
+            <Plus className="h-4 w-4" />
+            New Note
+          </button>
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur">
+            <Search className="h-4 w-4 shrink-0 text-white/50" />
+            <input
+              data-search-input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search notes..."
+              className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/40"
+            />
+            {plan === "pro" && (
+              <button
+                onClick={() => setSemanticSearch((s) => !s)}
+                className={cn(
+                  "rounded-lg px-2 py-0.5 text-xs font-medium transition",
+                  semanticSearch ? "bg-purple-500/20 text-purple-300" : "text-white/50 hover:text-white/70"
+                )}
+              >
+                Semantic
+              </button>
+            )}
+          </div>
+          {categoryError && (
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+              <span>{categoryError}</span>
+              <button onClick={clearCategoryError} className="shrink-0 text-red-300 hover:text-white">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Categories</div>
+          <nav className="space-y-0.5">
+            <CategoryTab
+              id="all"
+              name="All Notes"
+              selected={selectedCategoryId === "all"}
+              onClick={() => setSelectedCategoryId("all")}
+            />
+            {categories.map((c) => (
+              <CategoryTab
+                key={c.id}
+                id={c.id}
+                name={c.name}
+                selected={selectedCategoryId === c.id}
+                onClick={() => setSelectedCategoryId(c.id)}
+                onRename={() => {
+                  const name = prompt("Rename category:", c.name);
+                  if (name?.trim()) actions.updateCategory(c.id, name.trim());
+                }}
+                onDelete={() => {
+                  if (confirm("Delete this category? Notes will move to another.")) {
+                    actions.deleteCategory(c.id);
+                    if (selectedCategoryId === c.id) setSelectedCategoryId("all");
+                  }
+                }}
+              />
+            ))}
+            <button
+              onClick={async () => {
+                clearCategoryError();
+                const name = prompt("Category name:");
+                if (name?.trim()) {
+                  const cat = await actions.createCategory(name.trim());
+                  if (cat) setSelectedCategoryId(cat.id);
+                }
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-white/60 hover:bg-white/5 hover:text-white/80"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add category
+            </button>
+          </nav>
+        </div>
+        <div className="border-t border-white/10 p-3">
+          <button
+            onClick={async () => {
+              if (plan !== "pro") {
+                setUpgradeModal({ show: true, message: "AI chat is a Pro feature — upgrade to Pro to chat across all your notes" });
+                return;
+              }
+              setChatOpen(true);
+            }}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+          >
+            <MessageCircle className="h-4 w-4" />
+            AI Chat
+          </button>
+          <div className="mt-2">
+            <SignoutButton />
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content: grid of note cards OR editor panel */}
+      <main className="relative z-10 flex flex-1 flex-col overflow-hidden">
+        {selectedNoteId ? (
+          /* Editor panel (full) */
+          <div className="flex flex-1 flex-col overflow-hidden p-6">
+          <EditorPanel
+            selectedNote={selectedNote!}
+            categories={categories}
+            plan={plan}
+            editTitle={editTitle}
+            setEditTitle={setEditTitle}
+            editContent={editContent}
+            setEditContent={setEditContent}
+            suggestBanner={suggestBanner}
+            writingUndo={writingUndo}
+            onBack={() => {
+              if (draftNote) setDraftNote(null);
+              setSelectedNoteId(null);
+            }}
+            onUpdate={(patch) => {
+              if (draftNote && selectedNoteId === draftNote.id) {
+                setDraftNote((d) => (d ? { ...d, ...patch } : null));
+              } else if (selectedNoteId) {
+                actions.update(selectedNoteId, patch);
+              }
+            }}
+            onSuggestApply={() => {
+              if (suggestBanner && selectedNote) {
+                if (draftNote && selectedNote.id === draftNote.id) {
+                  setDraftNote((d) => (d ? { ...d, category_id: suggestBanner!.categoryId } : null));
+                } else {
+                  actions.update(selectedNote.id, { category_id: suggestBanner.categoryId });
+                }
+                setSuggestBanner(null);
+              }
+            }}
+            onSuggestDismiss={() => setSuggestBanner(null)}
+            onWritingUndo={() => {
+              if (selectedNoteId && writingUndo) {
+                setEditContent(writingUndo.prev);
+                if (!draftNote || selectedNoteId !== draftNote.id) {
+                  actions.update(selectedNoteId, { content: writingUndo.prev });
+                } else {
+                  setDraftNote((d) => (d ? { ...d, content: writingUndo!.prev } : null));
+                }
+                setWritingUndo(null);
+              }
+            }}
+            onWritingDismiss={() => setWritingUndo(null)}
+            onSummarize={async () => {
+              const res = await fetch("/api/ai", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "summarize", content: editContent }),
+              });
+              const json = (await res.json()) as { result?: string };
+              if (json.result) setEditContent((c) => c + "\n\n---\nSummary: " + json.result);
+            }}
+            onImprove={async () => {
+              setToolbarError(null);
+              setImproveLoading(true);
+              try {
+                const res = await fetch("/api/ai/anthropic/improve", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ content: editContent }),
+                });
+                const json = (await res.json()) as { improved?: string; error?: string };
+                if (json.improved) {
+                  setEditContent(json.improved);
+                  if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
+                    if (draftNote && selectedNote.id === draftNote.id) {
+                      setDraftNote((d) => (d ? { ...d, content: json.improved! } : null));
+                    } else {
+                      actions.update(selectedNote.id, { content: json.improved });
+                    }
+                  }
+                  setImproveToast(true);
+                  setTimeout(() => setImproveToast(false), 3000);
+                } else {
+                  setToolbarError(json.error ?? "Failed to improve note");
+                }
+              } catch {
+                setToolbarError("Something went wrong. Please try again.");
+              } finally {
+                setImproveLoading(false);
+              }
+            }}
+            onExtract={async () => {
+              setToolbarError(null);
+              setExtractLoading(true);
+              setExtractTasksModal(null);
+              try {
+                const res = await fetch("/api/ai/anthropic/extract-tasks", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ content: editContent }),
+                });
+                const json = (await res.json()) as { tasks?: string[]; error?: string };
+                if (json.tasks?.length) {
+                  setExtractTasksModal(json.tasks);
+                } else if (json.error) {
+                  setToolbarError(json.error);
+                } else {
+                  setExtractTasksModal(["No tasks found in this note."]);
+                }
+              } catch {
+                setToolbarError("Something went wrong. Please try again.");
+              } finally {
+                setExtractLoading(false);
+              }
+            }}
+            onGenerateTitle={async () => {
+              setToolbarError(null);
+              setTitleLoading(true);
+              try {
+                const res = await fetch("/api/ai/anthropic/generate-title", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ content: editContent }),
+                });
+                const json = (await res.json()) as { title?: string; error?: string };
+                if (json.title) {
+                  setEditTitle(json.title);
+                  if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
+                    if (draftNote && selectedNote.id === draftNote.id) {
+                      setDraftNote((d) => (d ? { ...d, title: json.title! } : null));
+                    } else {
+                      actions.update(selectedNote.id, { title: json.title });
+                    }
+                  }
+                } else {
+                  setToolbarError(json.error ?? "Failed to generate title");
+                }
+              } catch {
+                setToolbarError("Something went wrong. Please try again.");
+              } finally {
+                setTitleLoading(false);
+              }
+            }}
+            onSuggestTags={async () => {
+              setToolbarError(null);
+              setTagsLoading(true);
+              setSuggestTagsChips(null);
+              try {
+                const res = await fetch("/api/ai/anthropic/suggest-tags", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ content: editContent }),
+                });
+                const json = (await res.json()) as { tags?: string[]; error?: string };
+                if (json.tags?.length) {
+                  setSuggestTagsChips(json.tags);
+                } else if (json.error) {
+                  setToolbarError(json.error);
+                } else {
+                  setToolbarError("No tags could be suggested for this note.");
+                }
+              } catch {
+                setToolbarError("Something went wrong. Please try again.");
+              } finally {
+                setTagsLoading(false);
+              }
+            }}
+            onWritingAssistant={async () => {
+              setWritingLoading(true);
+              try {
+                const res = await fetch("/api/ai/anthropic/expand-bullets", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ content: editContent }),
+                });
+                const json = (await res.json()) as { expanded?: string; code?: string; error?: string };
+                if (json.code && res.status === 402) {
+                  setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                  return;
+                }
+                if (json.expanded && selectedNote) {
+                  setWritingUndo({ prev: editContent });
+                  setEditContent(json.expanded);
+                  if (draftNote && selectedNote.id === draftNote.id) {
+                    setDraftNote((d) => (d ? { ...d, content: json.expanded! } : null));
+                  } else {
+                    actions.update(selectedNote.id, { content: json.expanded });
+                  }
+                } else if (json.error) {
+                  setUpgradeModal({ show: true, message: json.error });
+                }
+              } catch {
+                setUpgradeModal({ show: true, message: "Writing assistant failed" });
+              } finally {
+                setWritingLoading(false);
+              }
+            }}
+            writingLoading={writingLoading}
+            onStudy={() => {
+              if (plan !== "pro") {
+                setUpgradeModal({ show: true, message: "Study Mode is a Pro feature — upgrade to Pro" });
+                return;
+              }
+              setStudyModal({ noteId: selectedNote!.id });
+              setStudyMode("menu");
+            }}
+            onClaudeSummarize={async () => {
+              setSummarizeLoading(true);
+              setSummaryBelow(null);
+              try {
+                const res = await fetch("/api/ai/anthropic/summarize", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ content: editContent }),
+                });
+                const json = (await res.json()) as { summary?: string; code?: string; error?: string };
+                if (json.code && res.status === 402) {
+                  setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                  return;
+                }
+                if (json.summary) setSummaryBelow(json.summary);
+                else if (json.error) setSummaryBelow(`Error: ${json.error}`);
+              } catch {
+                setSummaryBelow("Error: Failed to summarize");
+              } finally {
+                setSummarizeLoading(false);
+              }
+            }}
+            summaryBelow={summaryBelow}
+            summaryLoading={summarizeLoading}
+            onAutoCategorize={async () => {
+              if (categories.length < 2) return;
+              setAutoCategorizeLoading(true);
+              setSuggestBanner(null);
+              try {
+                const res = await fetch("/api/ai/anthropic/suggest-category", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    content: editContent,
+                    categoryIds: categories.map((c) => c.id),
+                    categoryNames: categories.map((c) => c.name),
+                  }),
+                });
+                const json = (await res.json()) as { category?: { id: string; name: string }; code?: string; error?: string };
+                if (json.code && res.status === 402) {
+                  setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                  return;
+                }
+                if (json.category) setSuggestBanner({ categoryId: json.category.id, name: json.category.name });
+                else if (json.error) setUpgradeModal({ show: true, message: json.error });
+              } catch {
+                setUpgradeModal({ show: true, message: "Failed to suggest category" });
+              } finally {
+                setAutoCategorizeLoading(false);
+              }
+            }}
+            autoCategorizeLoading={autoCategorizeLoading}
+            improveLoading={improveLoading}
+            extractLoading={extractLoading}
+            titleLoading={titleLoading}
+            tagsLoading={tagsLoading}
+            extractTasksModal={extractTasksModal}
+            suggestTagsChips={suggestTagsChips}
+            toolbarError={toolbarError}
+            onExtractTasksClose={() => setExtractTasksModal(null)}
+            onSuggestTagAccept={(tag) => {
+              if (selectedNote) {
+                const current = selectedNote.tags ?? [];
+                const next = [...new Set([...current, tag])];
+                if (draftNote && selectedNote.id === draftNote.id) {
+                  setDraftNote((d) => (d ? { ...d, tags: next } : null));
+                } else {
+                  actions.update(selectedNote.id, { tags: next });
+                }
+              }
+              setSuggestTagsChips((t) => (t ? t.filter((x) => x !== tag) : null));
+            }}
+            onSuggestTagDismiss={() => setSuggestTagsChips(null)}
+            onToolbarErrorDismiss={() => setToolbarError(null)}
+            setUpgradeModal={setUpgradeModal}
+          />
+          </div>
+        ) : (
+          /* Grid of note cards */
+          <div className="flex flex-1 flex-col overflow-hidden p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h1 className="text-xl font-semibold text-white">
+                {selectedCategoryId === "all" ? "All Notes" : categories.find((c) => c.id === selectedCategoryId)?.name ?? "Notes"}
+              </h1>
+              <span className="text-sm text-white/50">⌘N new · ⌘K search</span>
+            </div>
+            {filteredNotes.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-12">
+                <FileText className="h-12 w-12 text-white/30" />
+                <p className="mt-4 text-white/60">No notes yet</p>
+                <p className="mt-1 text-sm text-white/40">Click New Note to create your first note</p>
+                <Button onClick={handleNewNote} className="mt-6">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Note
+                </Button>
+              </div>
+            ) : (
+              <div className="grid flex-1 content-start gap-4 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {filteredNotes.map((note) => (
+                  <NoteCard
+                    key={note.id}
+                    note={note}
+                    categories={categories}
+                    plan={plan}
+                    summary={summaryCache[note.id]}
+                    summaryLoading={summaryLoading.has(note.id)}
+                    onSelect={() => setSelectedNoteId(note.id)}
+                    onUpdateCategory={(catId) => actions.update(note.id, { category_id: catId })}
+                    onTogglePin={() => actions.update(note.id, { pinned: !note.pinned })}
+                    onDelete={() => {
+                      actions.delete(note.id);
+                      if (selectedNoteId === note.id) setSelectedNoteId(null);
+                    }}
+                    onSummarize={async () => {
+                      setSummaryLoading((s) => new Set(s).add(note.id));
+                      const res = await fetch("/api/ai/anthropic/summarize", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ content: note.content }),
+                      });
+                      setSummaryLoading((s) => {
+                        const next = new Set(s);
+                        next.delete(note.id);
+                        return next;
+                      });
+                      const json = (await res.json()) as { summary?: string; code?: string; error?: string };
+                      if (json.code && res.status === 402) {
+                        setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                        return;
+                      }
+                      if (json.summary) setSummaryCache((c) => ({ ...c, [note.id]: json.summary! }));
+                    }}
+                    onExportPdf={async () => {
+                      if (plan !== "pro") {
+                        setUpgradeModal({ show: true, message: "Export is a Pro feature — upgrade to Pro" });
+                        return;
+                      }
+                      const { default: jsPDF } = await import("jspdf");
+                      const doc = new jsPDF();
+                      doc.setFontSize(16);
+                      doc.text(note.title, 20, 20);
+                      doc.setFontSize(11);
+                      const lines = doc.splitTextToSize(note.content || "", 170);
+                      doc.text(lines, 20, 30);
+                      doc.save(`${note.title || "note"}.pdf`);
+                    }}
+                    onExportMd={() => {
+                      if (plan !== "pro") {
+                        setUpgradeModal({ show: true, message: "Export is a Pro feature — upgrade to Pro" });
+                        return;
+                      }
+                      const blob = new Blob([`# ${note.title}\n\n${note.content || ""}`], { type: "text/markdown" });
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `${note.title || "note"}.md`;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    }}
+                    onStudy={() => {
+                      if (plan !== "pro") {
+                        setUpgradeModal({ show: true, message: "Study Mode is a Pro feature — upgrade to Pro" });
+                        return;
+                      }
+                      setStudyModal({ noteId: note.id });
+                      setStudyMode("menu");
+                    }}
+                    exportOpen={exportMenu === note.id}
+                    onExportToggle={() => setExportMenu((m) => (m === note.id ? null : note.id))}
+                    setUpgradeModal={setUpgradeModal}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Chat sidebar */}
+      {chatOpen && (
+        <div className="flex w-80 flex-col border-l border-white/10 bg-black/20">
+          <div className="flex items-center justify-between border-b border-white/10 p-2">
+            <span className="font-semibold text-white">AI Chat</span>
+            <button onClick={() => setChatOpen(false)} className="text-white/60 hover:text-white">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            {chatMessages.map((m, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-sm",
+                  m.role === "user" ? "ml-4 bg-white/10" : "mr-4 bg-white/5"
+                )}
+              >
+                {m.content}
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="flex items-center gap-2 text-white/60">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Thinking…</span>
+              </div>
+            )}
+          </div>
+          <form
+            className="flex gap-2 border-t border-white/10 p-2"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!chatInput.trim() || chatLoading) return;
+              const msg = chatInput.trim();
+              setChatInput("");
+              setChatMessages((m) => [...m, { role: "user", content: msg }]);
+              setChatLoading(true);
+              setChatMessages((m) => [...m, { role: "assistant", content: "" }]);
+              try {
+                const res = await fetch("/api/ai/anthropic/chat/stream", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ message: msg }),
+                });
+                if (!res.ok) {
+                  const json = (await res.json()) as { code?: string; error?: string };
+                  if (json.code && res.status === 402) {
+                    setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                  } else {
+                    setChatMessages((m) => {
+                      const next = [...m];
+                      const last = next[next.length - 1];
+                      if (last?.role === "assistant") next[next.length - 1] = { ...last, content: json.error ?? "Sorry, I couldn't respond." };
+                      return next;
+                    });
+                  }
+                  return;
+                }
+                const reader = res.body?.getReader();
+                if (!reader) {
+                  setChatMessages((m) => {
+                    const next = [...m];
+                    const last = next[next.length - 1];
+                    if (last?.role === "assistant") next[next.length - 1] = { ...last, content: "Sorry, I couldn't respond." };
+                    return next;
+                  });
+                  return;
+                }
+                const decoder = new TextDecoder();
+                let full = "";
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  const chunk = decoder.decode(value, { stream: true });
+                  const lines = chunk.split("\n");
+                  for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                      const data = line.slice(6);
+                      if (data === "[DONE]") continue;
+                      try {
+                        const parsed = JSON.parse(data) as { text?: string };
+                        if (parsed.text) {
+                          full += parsed.text;
+                          setChatMessages((m) => {
+                            const next = [...m];
+                            const last = next[next.length - 1];
+                            if (last?.role === "assistant") next[next.length - 1] = { ...last, content: full };
+                            return next;
+                          });
+                        }
+                      } catch {
+                        // skip
+                      }
+                    }
+                  }
+                }
+              } catch {
+                setChatMessages((m) => {
+                  const next = [...m];
+                  const last = next[next.length - 1];
+                  if (last?.role === "assistant") next[next.length - 1] = { ...last, content: "Sorry, I couldn't respond." };
+                  return next;
+                });
+              } finally {
+                setChatLoading(false);
+              }
+            }}
+          >
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Ask about your notes..."
+              className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40"
+            />
+            <Button type="submit" size="sm">
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        </div>
+      )}
+
+      {/* Study modal */}
+      {studyModal && (
+        <StudyModal
+          noteId={studyModal.noteId}
+          noteContent={draftNote && studyModal.noteId === draftNote.id ? editContent : undefined}
+          noteTitle={draftNote && studyModal.noteId === draftNote.id ? editTitle : undefined}
+          mode={studyMode}
+          flashcards={flashcards}
+          quizQuestions={quizQuestions}
+          cardIndex={cardIndex}
+          cardFlipped={cardFlipped}
+          quizIndex={quizIndex}
+          quizScore={quizScore}
+          quizSelected={quizSelected}
+          loading={studyLoading}
+          error={studyError}
+          onClose={() => {
+            setStudyModal(null);
+            setStudyMode("menu");
+            setFlashcards([]);
+            setQuizQuestions([]);
+            setCardIndex(0);
+            setCardFlipped(false);
+            setQuizIndex(0);
+            setQuizScore(null);
+            setQuizSelected(null);
+            setStudyLoading(null);
+            setStudyError(null);
+          }}
+          onSelectMode={(m) => setStudyMode(m)}
+          onLoadFlashcards={async () => {
+            setStudyError(null);
+            setStudyLoading("flashcards");
+            try {
+              const res = await fetch(`/api/study/${studyModal.noteId}`);
+              const json = (await res.json()) as { flashcards?: { cards?: { front: string; back: string }[] } | null; code?: string; error?: string };
+              if (json?.code && res.status === 402) {
+                setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                return;
+              }
+              const payload = json?.flashcards;
+              const cards = (payload && typeof payload === "object" && "cards" in payload ? payload.cards : null) ?? null;
+              if (cards?.length) {
+                setFlashcards(cards);
+                setStudyMode("flashcards");
+              } else {
+                const body: { kind: "flashcards"; content?: string; title?: string } = { kind: "flashcards" };
+                if (draftNote && studyModal.noteId === draftNote.id) {
+                  body.content = editContent;
+                  body.title = editTitle;
+                }
+                const post = await fetch(`/api/study/${studyModal.noteId}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(body),
+                });
+                const j = (await post.json()) as { cards?: { front: string; back: string }[]; code?: string; error?: string };
+                if (j.code && post.status === 402) {
+                  setUpgradeModal({ show: true, message: j.error ?? "Upgrade to Pro" });
+                  return;
+                }
+                if (j.error) setStudyError(j.error);
+                setFlashcards(j.cards ?? []);
+                setStudyMode("flashcards");
+              }
+            } catch {
+              setStudyError("Failed to generate flashcards");
+            } finally {
+              setStudyLoading(null);
+            }
+          }}
+          onLoadQuiz={async () => {
+            setStudyError(null);
+            setStudyLoading("quiz");
+            try {
+              const res = await fetch(`/api/study/${studyModal.noteId}`);
+              const json = (await res.json()) as { quiz?: { questions?: { question: string; options: string[]; correctIndex: number }[] } | null; code?: string; error?: string };
+              if (json?.code && res.status === 402) {
+                setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                return;
+              }
+              const payload = json?.quiz;
+              const qs = (payload && typeof payload === "object" && "questions" in payload ? payload.questions : null) ?? null;
+              if (qs?.length) {
+                setQuizQuestions(qs);
+                setStudyMode("quiz");
+              } else {
+                const body: { kind: "quiz"; content?: string; title?: string } = { kind: "quiz" };
+                if (draftNote && studyModal.noteId === draftNote.id) {
+                  body.content = editContent;
+                  body.title = editTitle;
+                }
+                const post = await fetch(`/api/study/${studyModal.noteId}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(body),
+                });
+                const j = (await post.json()) as { questions?: { question: string; options: string[]; correctIndex: number }[]; code?: string; error?: string };
+                if (j.code && post.status === 402) {
+                  setUpgradeModal({ show: true, message: j.error ?? "Upgrade to Pro" });
+                  return;
+                }
+                if (j.error) setStudyError(j.error);
+                setQuizQuestions(j.questions ?? []);
+                setStudyMode("quiz");
+              }
+            } catch {
+              setStudyError("Failed to generate quiz");
+            } finally {
+              setStudyLoading(null);
+            }
+          }}
+          onCardPrev={() => setCardIndex((i) => Math.max(0, i - 1))}
+          onCardNext={() => setCardIndex((i) => Math.min(flashcards.length - 1, i + 1))}
+          onCardFlip={() => setCardFlipped((f) => !f)}
+          onQuizSelect={(i) => {
+            if (quizSelected !== null) return;
+            setQuizSelected(i);
+            const q = quizQuestions[quizIndex];
+            if (q && i === q.correctIndex) {
+              setQuizScore((s) => (s ?? 0) + 1);
+            }
+          }}
+          onQuizNext={() => {
+            if (quizIndex < quizQuestions.length - 1) {
+              setQuizIndex((i) => i + 1);
+              setQuizSelected(null);
+            } else {
+              setQuizScore((s) => s ?? 0);
+            }
+          }}
+          setUpgradeModal={setUpgradeModal}
+        />
+      )}
+
+      {/* Upgrade modal */}
+      {upgradeModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <Card className="mx-4 max-w-sm p-6">
+            <h3 className="text-lg font-semibold text-white">Upgrade to Pro</h3>
+            <p className="mt-2 text-sm text-white/70">
+              {upgradeModal.message ?? "Upgrade to Pro for more features."}
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button onClick={startCheckout} className="flex-1">
+                Upgrade to Pro
+              </Button>
+              <Button variant="ghost" onClick={() => setUpgradeModal({ show: false })}>
+                Maybe later
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Improve toast */}
+      {improveToast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-4 py-2.5 text-sm text-white shadow-lg backdrop-blur">
+          Notes improved
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditorPanel({
+  selectedNote,
+  categories,
+  plan,
+  editTitle,
+  setEditTitle,
+  editContent,
+  setEditContent,
+  suggestBanner,
+  writingUndo,
+  summaryBelow,
+  summaryLoading,
+  autoCategorizeLoading,
+  writingLoading,
+  improveLoading,
+  extractLoading,
+  titleLoading,
+  tagsLoading,
+  extractTasksModal,
+  suggestTagsChips,
+  toolbarError,
+  onBack,
+  onUpdate,
+  onSuggestApply,
+  onSuggestDismiss,
+  onWritingUndo,
+  onWritingDismiss,
+  onSummarize,
+  onImprove,
+  onExtract,
+  onGenerateTitle,
+  onSuggestTags,
+  onWritingAssistant,
+  onStudy,
+  onClaudeSummarize,
+  onAutoCategorize,
+  onExtractTasksClose,
+  onSuggestTagAccept,
+  onSuggestTagDismiss,
+  onToolbarErrorDismiss,
+  setUpgradeModal,
+}: {
+  selectedNote: Note;
+  categories: Category[];
+  plan: string;
+  editTitle: string;
+  setEditTitle: (v: string) => void;
+  editContent: string;
+  setEditContent: (v: string) => void;
+  suggestBanner: { categoryId: string; name: string } | null;
+  writingUndo: { prev: string } | null;
+  summaryBelow: string | null;
+  summaryLoading: boolean;
+  autoCategorizeLoading: boolean;
+  writingLoading: boolean;
+  improveLoading: boolean;
+  extractLoading: boolean;
+  titleLoading: boolean;
+  tagsLoading: boolean;
+  extractTasksModal: string[] | null;
+  suggestTagsChips: string[] | null;
+  toolbarError: string | null;
+  onBack: () => void;
+  onUpdate: (patch: Partial<Pick<Note, "title" | "content" | "category_id" | "tags">>) => void;
+  onSuggestApply: () => void;
+  onSuggestDismiss: () => void;
+  onWritingUndo: () => void;
+  onWritingDismiss: () => void;
+  onSummarize: () => void;
+  onImprove: () => void;
+  onExtract: () => void;
+  onGenerateTitle: () => void;
+  onSuggestTags: () => void;
+  onWritingAssistant: () => void;
+  onStudy: () => void;
+  onClaudeSummarize: () => void;
+  onAutoCategorize: () => void;
+  onExtractTasksClose: () => void;
+  onSuggestTagAccept: (tag: string) => void;
+  onSuggestTagDismiss: () => void;
+  onToolbarErrorDismiss: () => void;
+  setUpgradeModal: (x: { show: boolean; message?: string }) => void;
+}) {
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/70 hover:bg-white/5 hover:text-white"
+        >
+          <ChevronRight className="h-4 w-4 rotate-180" />
+          Back
+        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={selectedNote.category_id}
+            onChange={(e) => onUpdate({ category_id: e.target.value })}
+            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
+          >
+            {selectedNote.category_id === "pending" && !categories.some((c) => c.id === "pending") && (
+              <option value="pending">General (creating…)</option>
+            )}
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" variant="ghost" onClick={onClaudeSummarize} disabled={summaryLoading}>
+            {summaryLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+            Summarize
+          </Button>
+          {plan === "pro" && categories.length >= 2 && (
+            <Button size="sm" variant="ghost" onClick={onAutoCategorize} disabled={autoCategorizeLoading}>
+              {autoCategorizeLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tag className="mr-1.5 h-3.5 w-3.5" />}
+              Auto-categorize
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={onStudy}>
+            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+            Study
+          </Button>
+          {plan === "pro" && (
+            <Button size="sm" variant="ghost" onClick={onWritingAssistant} disabled={writingLoading}>
+              {writingLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
+              Writing assistant
+            </Button>
+          )}
+        </div>
+      </div>
+      {suggestBanner && (
+        <div className="flex items-center justify-between border-b border-white/10 bg-purple-500/10 px-4 py-2 text-sm">
+          <span className="text-white/90">
+            We suggest: <strong>{suggestBanner.name}</strong> — Apply?
+          </span>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={onSuggestApply}>Apply</Button>
+            <Button size="sm" variant="ghost" onClick={onSuggestDismiss}>Dismiss</Button>
+          </div>
+        </div>
+      )}
+      {writingUndo && (
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-2 text-sm">
+          <span className="text-white/70">Writing assistant applied. Undo?</span>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={onWritingUndo}>Undo</Button>
+            <Button size="sm" variant="ghost" onClick={onWritingDismiss}>Dismiss</Button>
+          </div>
+        </div>
+      )}
+      {/* Title */}
+      <div className="border-b border-white/10 px-6 py-4">
+        <input
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          className="w-full bg-transparent text-2xl font-semibold text-white outline-none placeholder:text-white/40"
+          placeholder="Note title"
+        />
+      </div>
+      {/* Body */}
+      <div className="flex flex-1 flex-col overflow-hidden p-6">
+        <textarea
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          className="min-h-[300px] w-full flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/40 focus:ring-2 focus:ring-purple-500/40"
+          placeholder="Write your note..."
+        />
+        {summaryBelow && (
+          <div className="mt-4 rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-purple-300">Summary</p>
+            <p className="mt-1 text-sm leading-relaxed text-white/90">{summaryBelow}</p>
+          </div>
+        )}
+        {toolbarError && (
+          <div className="mt-4 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+            <p className="text-sm text-red-200">{toolbarError}</p>
+            <button onClick={onToolbarErrorDismiss} className="text-red-300 hover:text-white">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        {suggestTagsChips && suggestTagsChips.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-white/60">Suggested tags:</span>
+            {suggestTagsChips.map((tag) => (
+              <Badge
+                key={tag}
+                className="cursor-pointer text-xs transition hover:bg-purple-500/40"
+                onClick={() => onSuggestTagAccept(tag)}
+              >
+                + {tag}
+              </Badge>
+            ))}
+            <button
+              onClick={onSuggestTagDismiss}
+              className="rounded px-2 py-0.5 text-xs text-white/50 hover:text-white/80"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button size="sm" variant="ghost" onClick={onImprove} disabled={improveLoading}>
+            {improveLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Improve
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onExtract} disabled={extractLoading}>
+            {extractLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Extract Tasks
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onGenerateTitle} disabled={titleLoading}>
+            {titleLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Generate Title
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onSuggestTags} disabled={tagsLoading}>
+            {tagsLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Suggest Tags
+          </Button>
+        </div>
+      </div>
+      {extractTasksModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <Card className="mx-4 max-w-md p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Extracted Tasks</h3>
+              <button onClick={onExtractTasksClose} className="text-white/60 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {extractTasksModal.map((task, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-white/90">
+                  <span className="mt-0.5 text-purple-400">•</span>
+                  <span>{task}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NoteCard({
+  note,
+  categories,
+  plan,
+  summary,
+  summaryLoading,
+  onSelect,
+  onUpdateCategory,
+  onTogglePin,
+  onDelete,
+  onSummarize,
+  onExportPdf,
+  onExportMd,
+  onStudy,
+  exportOpen,
+  onExportToggle,
+  setUpgradeModal,
+}: {
+  note: Note;
+  categories: Category[];
+  plan: string;
+  summary?: string;
+  summaryLoading: boolean;
+  onSelect: () => void;
+  onUpdateCategory: (id: string) => void;
+  onTogglePin: () => void;
+  onDelete: () => void;
+  onSummarize: () => void;
+  onExportPdf: () => void;
+  onExportMd: () => void;
+  onStudy: () => void;
+  exportOpen: boolean;
+  onExportToggle: () => void;
+  setUpgradeModal: (x: { show: boolean; message?: string }) => void;
+}) {
+  const categoryName = categories.find((c) => c.id === note.category_id)?.name ?? "General";
+  const date = note.updated_at ?? note.created_at ?? "";
+  const formattedDate = date ? new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+  const preview = (note.content || "").replace(/\n/g, " ").slice(0, 120) + ((note.content?.length ?? 0) > 120 ? "…" : "");
+
+  return (
+    <div
+      onClick={onSelect}
+      className="group cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-500/30 hover:bg-white/10"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="flex-1 truncate font-semibold text-white">{note.title || "Untitled"}</h3>
+        <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          <button onClick={(e) => { e.stopPropagation(); onTogglePin(); }} className="rounded p-1 text-white/50 hover:text-amber-400">
+            <Pin className={cn("h-3.5 w-3.5", note.pinned && "fill-amber-400 text-amber-400")} />
+          </button>
+          <div className="relative">
+            <button onClick={(e) => { e.stopPropagation(); onExportToggle(); }} className="rounded p-1 text-white/50 hover:text-white">
+              <Download className="h-3.5 w-3.5" />
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-full z-10 mt-1 min-w-[140px] rounded-lg border border-white/10 bg-black/95 py-1 shadow-xl">
+                <button onClick={(e) => { e.stopPropagation(); onExportPdf(); }} className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10">
+                  Export PDF
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); onExportMd(); }} className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10">
+                  Export Markdown
+                </button>
+              </div>
+            )}
+          </div>
+          <button onClick={(e) => { e.stopPropagation(); onStudy(); }} className="rounded p-1 text-white/50 hover:text-white">
+            <BookOpen className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <p className="mt-2 line-clamp-2 text-sm text-white/60">{preview || "No content"}</p>
+      <div className="mt-3 flex items-center justify-between">
+        <span className="rounded-full bg-purple-500/20 px-2.5 py-0.5 text-xs font-medium text-purple-300">
+          {categoryName}
+        </span>
+        <span className="text-xs text-white/50">{formattedDate}</span>
+      </div>
+      {(note.tags ?? []).length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {note.tags.map((t) => (
+            <Badge key={t} className="text-xs">{t}</Badge>
+          ))}
+        </div>
+      )}
+      {summary && <p className="mt-2 line-clamp-2 text-xs text-white/50">{summary}</p>}
+      {summaryLoading && <Loader2 className="mt-2 h-3 w-3 animate-spin text-white/50" />}
+      {!summary && !summaryLoading && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onSummarize(); }}
+          className="mt-2 text-xs text-purple-400 hover:underline"
+        >
+          Summarize
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CategoryTab({
+  id,
+  name,
+  selected,
+  onClick,
+  onRename,
+  onDelete,
+}: {
+  id: string;
+  name: string;
+  selected: boolean;
+  onClick: () => void;
+  onRename?: () => void;
+  onDelete?: () => void;
+}) {
+  const [menu, setMenu] = React.useState(false);
+  const isAll = id === "all";
+  return (
+    <div className="group relative">
+      <button
+        onClick={onClick}
+        className={cn(
+          "flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm",
+          selected ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white/90"
+        )}
+      >
+        <span className="truncate">{name}</span>
+        {!isAll && (onRename || onDelete) && (
+          <ChevronRight
+            className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenu((m) => !m);
+            }}
+          />
+        )}
+      </button>
+      {menu && !isAll && (
+        <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-white/10 bg-black/90 py-1 shadow-lg">
+          {onRename && (
+            <button onClick={() => { onRename(); setMenu(false); }} className="block w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10">
+              Rename
+            </button>
+          )}
+          {onDelete && (
+            <button onClick={() => { onDelete(); setMenu(false); }} className="block w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-white/10">
+              Delete
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudyModal({
+  noteId,
+  noteContent,
+  noteTitle,
+  mode,
+  flashcards,
+  quizQuestions,
+  cardIndex,
+  cardFlipped,
+  quizIndex,
+  quizScore,
+  quizSelected,
+  loading,
+  error,
+  onClose,
+  onSelectMode,
+  onLoadFlashcards,
+  onLoadQuiz,
+  onCardPrev,
+  onCardNext,
+  onCardFlip,
+  onQuizSelect,
+  onQuizNext,
+  setUpgradeModal,
+}: {
+  noteId: string;
+  noteContent?: string;
+  noteTitle?: string;
+  mode: string;
+  flashcards: { front: string; back: string }[];
+  quizQuestions: { question: string; options: string[]; correctIndex: number }[];
+  cardIndex: number;
+  cardFlipped: boolean;
+  quizIndex: number;
+  quizScore: number | null;
+  quizSelected: number | null;
+  loading: "flashcards" | "quiz" | null;
+  error: string | null;
+  onClose: () => void;
+  onSelectMode: (m: "flashcards" | "quiz") => void;
+  onLoadFlashcards: () => void;
+  onLoadQuiz: () => void;
+  onCardPrev: () => void;
+  onCardNext: () => void;
+  onCardFlip: () => void;
+  onQuizSelect: (i: number) => void;
+  onQuizNext: () => void;
+  setUpgradeModal: (x: { show: boolean; message?: string }) => void;
+}) {
+  const q = quizQuestions[quizIndex];
+  const total = quizQuestions.length;
+  const done = quizIndex >= total - 1 && quizSelected !== null;
+  const finalScore = quizScore ?? 0;
+
+  if (mode === "menu") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <Card className="mx-4 max-w-sm p-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">Study Mode</h3>
+            <button onClick={onClose} className="text-white/60 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {error && (
+            <p className="mt-2 text-sm text-red-400">{error}</p>
+          )}
+          <div className="mt-4 space-y-2">
+            <Button onClick={onLoadFlashcards} className="w-full" disabled={!!loading}>
+              {loading === "flashcards" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Generate Flashcards
+            </Button>
+            <Button onClick={onLoadQuiz} variant="ghost" className="w-full" disabled={!!loading}>
+              {loading === "quiz" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Generate Quiz
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (mode === "flashcards" && flashcards.length > 0) {
+    const card = flashcards[cardIndex];
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <Card className="mx-4 max-w-lg p-6">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/60">
+              {cardIndex + 1} of {flashcards.length}
+            </span>
+            <button onClick={onClose} className="text-white/60 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div
+            onClick={onCardFlip}
+            className="mt-4 min-h-[120px] cursor-pointer rounded-xl border border-white/10 bg-white/5 p-4 text-white"
+          >
+            {cardFlipped ? card.back : card.front}
+          </div>
+          <div className="mt-4 flex justify-between">
+            <Button variant="ghost" onClick={onCardPrev} disabled={cardIndex === 0}>
+              Previous
+            </Button>
+            <Button variant="ghost" onClick={onCardNext} disabled={cardIndex === flashcards.length - 1}>
+              Next
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (mode === "quiz" && quizQuestions.length > 0 && q) {
+    if (done) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <Card className="mx-4 max-w-sm p-6 text-center">
+            <h3 className="text-xl font-semibold text-white">
+              {finalScore}/{total} — {finalScore === total ? "Perfect!" : finalScore >= total - 1 ? "Great job!" : "Keep practicing!"}
+            </h3>
+            <div className="mt-4 flex gap-2">
+              <Button onClick={onClose}>Done</Button>
+            </div>
+          </Card>
+        </div>
+      );
+    }
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <Card className="mx-4 max-w-lg p-6">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/60">
+              Question {quizIndex + 1} of {total}
+            </span>
+            <button onClick={onClose} className="text-white/60 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="mt-4 font-medium text-white">{q.question}</p>
+          <div className="mt-4 space-y-2">
+            {q.options.map((opt, i) => (
+              <button
+                key={i}
+                onClick={() => onQuizSelect(i)}
+                disabled={quizSelected !== null}
+                className={cn(
+                  "w-full rounded-lg border px-4 py-2 text-left text-sm transition",
+                  quizSelected === null && "border-white/10 hover:bg-white/5",
+                  quizSelected === i && i === q.correctIndex && "border-green-500 bg-green-500/20 text-green-300",
+                  quizSelected === i && i !== q.correctIndex && "border-red-500 bg-red-500/20 text-red-300",
+                  quizSelected !== null && i === q.correctIndex && "border-green-500 bg-green-500/20 text-green-300"
+                )}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+          {quizSelected !== null && (
+            <Button className="mt-4 w-full" onClick={onQuizNext}>
+              {quizIndex < total - 1 ? "Next" : "See score"}
+            </Button>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  return null;
+}

@@ -1,0 +1,76 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+
+const FREE_NOTE_LIMIT = 50;
+
+export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json([], { status: 200 });
+  }
+  if (!supabaseAdmin) {
+    return NextResponse.json([], { status: 200 });
+  }
+  const { data, error } = await supabaseAdmin
+    .from("notes")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .order("pinned", { ascending: false })
+    .order("updated_at", { ascending: false });
+  if (error) return NextResponse.json([], { status: 200 });
+  return NextResponse.json(data ?? []);
+}
+
+export async function POST(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
+  const { category_id, title } = (await req.json()) as {
+    category_id?: string;
+    title?: string;
+  };
+  if (!category_id) {
+    return NextResponse.json({ error: "category_id required" }, { status: 400 });
+  }
+  const { data: planRow } = await supabaseAdmin
+    .from("user_plans")
+    .select("plan")
+    .eq("user_id", session.user.id)
+    .single();
+  const plan = planRow?.plan === "pro" ? "pro" : "free";
+  if (plan !== "pro") {
+    const { count } = await supabaseAdmin
+      .from("notes")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", session.user.id);
+    if ((count ?? 0) >= FREE_NOTE_LIMIT) {
+      return NextResponse.json(
+        {
+          error: "You've reached the free limit — upgrade to Pro for unlimited notes",
+          code: "FREE_LIMIT_NOTES",
+        },
+        { status: 402 }
+      );
+    }
+  }
+  const { data, error } = await supabaseAdmin
+    .from("notes")
+    .insert({
+      user_id: session.user.id,
+      category_id,
+      title: title ?? "Untitled",
+      content: "",
+      pinned: false,
+      tags: [],
+    })
+    .select()
+    .single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
