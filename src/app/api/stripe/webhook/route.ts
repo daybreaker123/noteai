@@ -3,6 +3,9 @@ import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { getSubscriptionPeriodEndUnix } from "@/lib/stripe-subscription";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { prisma } from "@/lib/prisma";
+import { sendProUpgradeEmail } from "@/lib/email/send-transactional";
+import type { BillingCycleLabel } from "@/lib/email/pro-upgrade-html";
 
 export const runtime = "nodejs";
 
@@ -149,6 +152,38 @@ export async function POST(req: Request) {
       );
       if (error) {
         return NextResponse.json({ error: "Failed to update plan" }, { status: 500 });
+      }
+
+      if (session.mode === "subscription") {
+        try {
+          const userRow = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { email: true, name: true },
+          });
+          const cust = session.customer_details;
+          const detailsEmail =
+            cust && typeof cust === "object" && "email" in cust && cust.email
+              ? String(cust.email).trim()
+              : "";
+          const to =
+            userRow?.email?.trim() ||
+            (session.customer_email ? String(session.customer_email).trim() : "") ||
+            detailsEmail ||
+            null;
+          if (to) {
+            const rawInterval = session.metadata?.billing_interval?.trim();
+            const billingCycle: BillingCycleLabel = rawInterval === "year" ? "annual" : "monthly";
+            void sendProUpgradeEmail({
+              to,
+              name: userRow?.name ?? null,
+              amountCents: session.amount_total,
+              currency: session.currency,
+              billingCycle,
+            });
+          }
+        } catch (emailErr) {
+          console.error(`${LOG} Pro upgrade email failed (non-fatal):`, emailErr);
+        }
       }
     } else if (event.type === "customer.subscription.updated") {
       const sub = event.data.object as Stripe.Subscription;

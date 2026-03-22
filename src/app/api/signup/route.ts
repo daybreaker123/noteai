@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sendWelcomeEmail } from "@/lib/email/send-transactional";
 
 const LOG = "[api/signup]";
 
@@ -57,6 +58,10 @@ export async function POST(req: Request) {
     });
 
     console.info(`${LOG} user created`, { id: user.id, email: user.email, dbHost: safeDbHost() });
+
+    if (user.email) {
+      void sendWelcomeEmail(user.email, user.name);
+    }
 
     return NextResponse.json({
       id: user.id,

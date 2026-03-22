@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
 import { Button, Card, Badge, Input } from "@/components/ui";
+import { DeleteAccountModal } from "@/components/delete-account-modal";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import type { PlanLimits } from "@/lib/plan-limits";
 
@@ -111,6 +112,9 @@ export function ProfilePage() {
   const [cancelLoading, setCancelLoading] = React.useState(false);
   const [cancelMsg, setCancelMsg] = React.useState<string | null>(null);
   const [cancelErr, setCancelErr] = React.useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteLoading, setDeleteLoading] = React.useState(false);
+  const [deleteErr, setDeleteErr] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoadError(null);
@@ -168,6 +172,25 @@ export function ProfilePage() {
     }
   }
 
+  async function deleteAccount() {
+    setDeleteLoading(true);
+    setDeleteErr(null);
+    try {
+      const res = await fetch("/api/me/account", {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setDeleteErr(json.error ?? "Could not delete account");
+        return;
+      }
+      await signOut({ callbackUrl: "/", redirect: true });
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   async function cancelSubscription() {
     if (!confirm("Cancel Pro at the end of the current billing period? You’ll keep access until then.")) {
       return;
@@ -221,6 +244,16 @@ export function ProfilePage() {
       : "—";
 
   return (
+    <>
+      <DeleteAccountModal
+        open={deleteOpen}
+        onClose={() => {
+          if (!deleteLoading) setDeleteOpen(false);
+        }}
+        onConfirm={deleteAccount}
+        loading={deleteLoading}
+        error={deleteErr}
+      />
     <main className="min-h-dvh bg-[#0a0a0f] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-purple-500/[0.07] blur-[100px]" />
@@ -400,7 +433,7 @@ export function ProfilePage() {
               Member since{" "}
               <span className="font-medium text-white/90">{memberSince}</span>
             </p>
-            <div className="mt-6">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Button
                 type="button"
                 className="border-white/20 bg-transparent hover:bg-white/10"
@@ -408,10 +441,22 @@ export function ProfilePage() {
               >
                 Sign out
               </Button>
+              <Button
+                type="button"
+                variant="danger"
+                className="border-red-600/80 bg-red-600/90 text-white hover:bg-red-700"
+                onClick={() => {
+                  setDeleteErr(null);
+                  setDeleteOpen(true);
+                }}
+              >
+                Delete Account
+              </Button>
             </div>
           </Card>
         </div>
       </div>
     </main>
+    </>
   );
 }

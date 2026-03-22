@@ -525,8 +525,14 @@ export function Landing() {
               <Link href="/login" className="transition hover:text-white/80">
                 Log in
               </Link>
+              <Link href="/terms" className="transition hover:text-white/80">
+                Terms of Service
+              </Link>
               <Link href="/privacy" className="transition hover:text-white/80">
                 Privacy Policy
+              </Link>
+              <Link href="/cookies" className="transition hover:text-white/80">
+                Cookie Policy
               </Link>
             </div>
           </div>

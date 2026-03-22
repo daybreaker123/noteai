@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "./prisma";
 import { getNextAuthUrl } from "./auth-url";
+import { sendWelcomeEmail } from "@/lib/email/send-transactional";
 
 /** Trim so pasted env values with accidental whitespace still work. */
 const googleId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -62,6 +63,14 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
+  events: {
+    createUser: async ({ user }) => {
+      const email = user.email?.trim();
+      if (email) {
+        void sendWelcomeEmail(email, user.name ?? null);
+      }
+    },
+  },
   callbacks: {
     async redirect({ url, baseUrl }) {
       // Prefer NEXTAUTH_URL so production (e.g. Vercel) never uses a mis-inferred http://localhost base.
