@@ -26,3 +26,15 @@ body {
 .note-editor-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
+
+/* Landing page: hide scrollbar while keeping normal document scroll */
+html.landing-hide-scrollbar,
+body.landing-hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE / legacy Edge */
+}
+
+html.landing-hide-scrollbar::-webkit-scrollbar,
+body.landing-hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

@@ -64,6 +64,16 @@ function Section({
 export function Landing() {
   const [billingInterval, setBillingInterval] = React.useState<BillingInterval>("month");
 
+  React.useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("landing-hide-scrollbar");
+    document.body.classList.add("landing-hide-scrollbar");
+    return () => {
+      root.classList.remove("landing-hide-scrollbar");
+      document.body.classList.remove("landing-hide-scrollbar");
+    };
+  }, []);
+
   return (
     <main className="min-h-dvh bg-[#0a0a0f] text-white antialiased">
       {/* Subtle gradient orbs - minimal */}
