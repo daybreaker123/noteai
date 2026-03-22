@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "./prisma";
+import { getNextAuthUrl } from "./auth-url";
 
 /** Trim so pasted env values with accidental whitespace still work. */
 const googleId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -13,7 +14,7 @@ const googleConfigured = Boolean(googleId && googleSecret);
 /**
  * Google Cloud Console → OAuth client → Authorized redirect URIs must include exactly:
  *   `${NEXTAUTH_URL}/api/auth/callback/google`
- * e.g. http://localhost:3000/api/auth/callback/google
+ * (Use your real deployment URL in production, e.g. https://app.example.com/api/auth/callback/google)
  */
 
 export const authOptions: NextAuthOptions = {
@@ -63,7 +64,8 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async redirect({ url, baseUrl }) {
-      const baseNorm = baseUrl.replace(/\/$/, "");
+      // Prefer NEXTAUTH_URL so production (e.g. Vercel) never uses a mis-inferred http://localhost base.
+      const baseNorm = (getNextAuthUrl() ?? baseUrl).replace(/\/$/, "");
       const baseOrigin = new URL(baseNorm).origin;
       // Relative URLs (e.g. /auth/callback?next=... after Google OAuth)
       if (url.startsWith("/")) return `${baseNorm}${url}`;

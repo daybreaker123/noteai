@@ -11,7 +11,7 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Invalid email or password",
   OAuthSignin: "Could not start Google sign-in. Check NEXTAUTH_URL and Google OAuth settings.",
   OAuthCallback:
-    "Google sign-in failed after redirect. In Google Cloud Console, set Authorized redirect URI to: http://localhost:3000/api/auth/callback/google (or your app URL + /api/auth/callback/google).",
+    "Google sign-in failed after redirect. In Google Cloud Console, add Authorized redirect URI: {your NEXTAUTH_URL}/api/auth/callback/google (must match exactly, including https).",
   OAuthAccountNotLinked:
     "This email is already used with another sign-in method. Log in with your password or link accounts in settings.",
   AccessDenied: "Access was denied.",

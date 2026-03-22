@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { stripe } from "@/lib/stripe";
 import { authOptions } from "@/lib/auth";
+import { getNextAuthUrl } from "@/lib/auth-url";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,9 @@ function readEnv() {
   const annualPriceId = process.env.STRIPE_ANNUAL_PRICE_ID?.trim() ?? "";
   const appUrlRaw = process.env.NEXT_PUBLIC_APP_URL?.trim();
   const appUrl =
-    appUrlRaw && appUrlRaw.length > 0 ? appUrlRaw.replace(/\/$/, "") : "http://localhost:3000";
+    getNextAuthUrl() ||
+    (appUrlRaw && appUrlRaw.length > 0 ? appUrlRaw.replace(/\/$/, "") : "") ||
+    (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "");
   const hasStripeSecret = Boolean(process.env.STRIPE_SECRET_KEY?.trim());
   return { monthlyPriceId, annualPriceId, appUrl, hasStripeSecret };
 }
@@ -48,6 +51,17 @@ export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Please log in to upgrade" }, { status: 401 });
+  }
+
+  if (!appUrl) {
+    console.error(`${LOG_PREFIX} Missing app URL: set NEXTAUTH_URL or NEXT_PUBLIC_APP_URL`);
+    return NextResponse.json(
+      {
+        error:
+          "Server URL not configured — set NEXTAUTH_URL (or NEXT_PUBLIC_APP_URL) to your deployment origin.",
+      },
+      { status: 503 }
+    );
   }
 
   const missingPriceEnv =
