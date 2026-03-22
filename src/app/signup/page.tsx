@@ -5,10 +5,21 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { SignupPanel } from "@/components/signup-panel";
+import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 
 function SignupContent() {
   const searchParams = useSearchParams();
-  const targetUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const explicitNext = searchParams.get("callbackUrl");
+  const plan = searchParams.get("plan");
+  const interval = searchParams.get("interval");
+  const billingSuffix =
+    plan === "pro" && interval === "year"
+      ? "?interval=year"
+      : plan === "pro" && interval === "month"
+        ? "?interval=month"
+        : "";
+  const targetUrl =
+    explicitNext ?? (plan === "pro" ? `/billing${billingSuffix}` : "/dashboard");
   const callbackUrl = `/auth/callback?next=${encodeURIComponent(targetUrl)}`;
   const [error, setError] = useState("");
 
@@ -52,15 +63,15 @@ function SignupContent() {
     <main className="flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0f] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex justify-center">
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/noteai-icon.svg" alt="NoteAI" className="h-10 w-10" />
-            <span className="text-xl font-semibold text-white">NoteAI</span>
-          </Link>
+          <StudaraWordmarkLink href="/" />
         </div>
         <SignupPanel onSubmit={handleSubmit} error={error} callbackUrl={callbackUrl} />
         <p className="mt-4 text-center text-sm text-white/60">
           Already have an account?{" "}
-          <Link href={`/login?callbackUrl=${encodeURIComponent(targetUrl)}`} className="text-[var(--accent)] hover:underline">
+          <Link
+            href={`/login?callbackUrl=${encodeURIComponent(targetUrl)}`}
+            className="text-[var(--accent)] hover:underline"
+          >
             Log in
           </Link>
         </p>

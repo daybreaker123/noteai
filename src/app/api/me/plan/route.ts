@@ -3,19 +3,39 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+export const runtime = "nodejs";
+
+/**
+ * Same `user_plans` lookup as `/api/me/profile`: `select('plan').eq('user_id', session.user.id).single()`
+ */
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const sessionUserId = session?.user?.id?.trim() ?? null;
+
+  if (!sessionUserId) {
     return NextResponse.json({ plan: "free" });
   }
   if (!supabaseAdmin) {
     return NextResponse.json({ plan: "free" });
   }
-  const { data } = await supabaseAdmin
+
+  const { data, error: planError } = await supabaseAdmin
     .from("user_plans")
     .select("plan")
-    .eq("user_id", session.user.id)
+    .eq("user_id", sessionUserId)
     .single();
-  const plan = data?.plan === "pro" ? "pro" : "free";
+
+  let planValue: string | null = null;
+  if (!planError || planError.code === "PGRST116") {
+    planValue = data?.plan != null && typeof data.plan === "string" ? data.plan : null;
+  } else {
+    console.error("[api/me/plan] user_plans plan query failed:", planError.message);
+  }
+
+  const raw = planValue != null ? planValue.trim().toLowerCase() : "";
+  const plan = raw === "pro" ? "pro" : "free";
+
+  console.log("[api/me/plan]", { sessionUserId, planRaw: planValue, plan });
+
   return NextResponse.json({ plan });
 }

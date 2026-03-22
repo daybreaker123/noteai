@@ -11,7 +11,7 @@ export function useNotesRemote(userId: string | null) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState<"free" | "pro">("free");
-  const [upgradeModal, setUpgradeModal] = useState<{ show: boolean; message?: string }>({ show: false });
+  const [upgradeModal, setUpgradeModal] = useState<{ show: boolean; message?: string; feature?: string }>({ show: false });
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const fetchPlan = useCallback(async () => {
@@ -60,7 +60,7 @@ export function useNotesRemote(userId: string | null) {
   const actions = {
     refresh: load,
 
-    async create(categoryId: string, title?: string): Promise<Note | null> {
+    async create(categoryId: string | null, title?: string): Promise<Note | null> {
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,16 +75,21 @@ export function useNotesRemote(userId: string | null) {
     },
 
     async update(id: string, patch: Partial<Pick<Note, "title" | "content" | "category_id" | "pinned" | "tags">>) {
-      const res = await fetch(`/api/notes/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      const json = (await res.json().catch(() => null)) as Note | ApiError;
-      if (handleApiError(res, json as ApiError)) return;
-      if (!res.ok) return;
-      const note = json as Note;
-      setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
+      if (!id || id.startsWith("draft-")) return;
+      try {
+        const res = await fetch(`/api/notes/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        const json = (await res.json().catch(() => null)) as Note | ApiError;
+        if (handleApiError(res, json as ApiError)) return;
+        if (!res.ok) return;
+        const note = json as Note;
+        setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
+      } catch {
+        // Network error (e.g. "Failed to fetch") - silently skip to avoid breaking the UI
+      }
     },
 
     async delete(id: string) {
@@ -93,13 +98,15 @@ export function useNotesRemote(userId: string | null) {
       setNotes((prev) => prev.filter((n) => n.id !== id));
     },
 
-    async createCategory(name: string): Promise<Category | null> {
+    async createCategory(name: string, color?: string): Promise<Category | null> {
       setCategoryError(null);
       try {
+        const body: { name: string; color?: string } = { name };
+        if (color) body.color = color;
         const res = await fetch("/api/categories", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name }),
+          body: JSON.stringify(body),
         });
         const json = (await res.json().catch(() => null)) as Category | ApiError;
         if (handleApiError(res, json as ApiError)) return null;

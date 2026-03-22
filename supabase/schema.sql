@@ -1,4 +1,4 @@
--- NoteAI Supabase schema
+-- Studara Supabase schema
 -- Run this in your Supabase SQL editor
 
 -- Enable pgvector for semantic search
@@ -9,17 +9,18 @@ create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
   user_id text not null,
   name text not null,
+  color text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
 create index if not exists idx_categories_user_id on public.categories(user_id);
 
--- Notes (per user, linked to category)
+-- Notes (per user, linked to category; category_id null = uncategorized)
 create table if not exists public.notes (
   id uuid primary key default gen_random_uuid(),
   user_id text not null,
-  category_id uuid not null references public.categories(id) on delete restrict,
+  category_id uuid references public.categories(id) on delete set null,
   title text not null default '',
   content text not null default '',
   pinned boolean not null default false,
@@ -37,16 +38,45 @@ create index if not exists idx_notes_embedding on public.notes using ivfflat (em
 create table if not exists public.user_plans (
   user_id text primary key,
   plan text not null default 'free' check (plan in ('free', 'pro')),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  stripe_subscription_id text,
+  subscription_current_period_end timestamptz,
+  subscription_cancel_at_period_end boolean not null default false
 );
 
--- AI usage (monthly summarization count for free users)
+-- AI usage (monthly counts for free users: summarizations, improvements, tutor)
 create table if not exists public.ai_usage (
   user_id text not null,
   month text not null,
   summarizations int not null default 0,
+  improvements int not null default 0,
+  tutor_messages int not null default 0,
+  tutor_images int not null default 0,
   primary key (user_id, month)
 );
+
+-- AI Tutor conversations + messages (per user)
+create table if not exists public.tutor_conversations (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  title text not null default 'New chat',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_tutor_conversations_user on public.tutor_conversations(user_id);
+
+create table if not exists public.tutor_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.tutor_conversations(id) on delete cascade,
+  user_id text not null,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  attachments jsonb,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_tutor_messages_conversation on public.tutor_messages(conversation_id, created_at);
 
 -- Study sets (flashcards + quizzes cached per note)
 create table if not exists public.study_sets (
@@ -79,6 +109,24 @@ drop trigger if exists notes_updated_at on public.notes;
 create trigger notes_updated_at
   before update on public.notes
   for each row execute function public.set_updated_at();
+
+drop trigger if exists tutor_conversations_updated_at on public.tutor_conversations;
+create trigger tutor_conversations_updated_at
+  before update on public.tutor_conversations
+  for each row execute function public.set_updated_at();
+
+create or replace function public.touch_tutor_conversation_from_message()
+returns trigger as $$
+begin
+  update public.tutor_conversations set updated_at = now() where id = new.conversation_id;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists tutor_messages_touch_conversation on public.tutor_messages;
+create trigger tutor_messages_touch_conversation
+  after insert on public.tutor_messages
+  for each row execute function public.touch_tutor_conversation_from_message();
 
 -- Semantic search function (pgvector)
 create or replace function public.match_notes(

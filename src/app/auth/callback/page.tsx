@@ -3,13 +3,50 @@
 import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
+/** Only allow same-origin path redirects (avoid open redirects). */
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+  return raw;
+}
+
 function AuthCallbackContent() {
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = safeNextPath(searchParams.get("next"));
 
   useEffect(() => {
-    const target = next.startsWith("/") ? next : `/${next}`;
-    window.location.replace(target);
+    let cancelled = false;
+
+    async function go() {
+      const target = next.startsWith("/") ? next : `/${next}`;
+      // Wait until the session cookie is visible to /api/auth before hitting
+      // middleware-protected routes (avoids first hop without session).
+      let hasSession = false;
+      for (let i = 0; i < 30; i++) {
+        if (cancelled) return;
+        try {
+          const r = await fetch("/api/auth/session", { credentials: "include" });
+          const data = (await r.json()) as { user?: unknown };
+          if (data?.user) {
+            hasSession = true;
+            break;
+          }
+        } catch {
+          /* retry */
+        }
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      if (cancelled) return;
+      if (!hasSession) {
+        window.location.replace("/login?error=OAuthCallback");
+        return;
+      }
+      window.location.replace(target);
+    }
+
+    void go();
+    return () => {
+      cancelled = true;
+    };
   }, [next]);
 
   return (

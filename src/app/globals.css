@@ -13,4 +13,16 @@
 body {
   background: #0a0a0f;
   color: var(--text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Note editor: hide scrollbar while keeping content scrollable */
+.note-editor-scrollbar {
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.note-editor-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }

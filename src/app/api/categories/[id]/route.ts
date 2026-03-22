@@ -42,20 +42,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
   const { id } = await params;
-  const { data: cats } = await supabaseAdmin
-    .from("categories")
-    .select("id")
-    .eq("user_id", session.user.id);
-  const other = cats?.find((c) => c.id !== id);
-  if (!other) {
-    return NextResponse.json(
-      { error: "Cannot delete the only category" },
-      { status: 400 }
-    );
-  }
+  // Set category_id to null on all notes in this category (uncategorize them)
   await supabaseAdmin
     .from("notes")
-    .update({ category_id: other.id })
+    .update({ category_id: null })
     .eq("category_id", id)
     .eq("user_id", session.user.id);
   const { error } = await supabaseAdmin

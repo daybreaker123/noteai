@@ -16,17 +16,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
   const { id } = await params;
+  if (!id || id.startsWith("draft-") || id === "undefined") {
+    return NextResponse.json({ error: "Invalid note id" }, { status: 400 });
+  }
   const body = (await req.json()) as {
     title?: string;
     content?: string;
-    category_id?: string;
+    category_id?: string | null;
     pinned?: boolean;
     tags?: string[];
   };
   const update: Record<string, unknown> = {};
   if (body.title !== undefined) update.title = body.title;
   if (body.content !== undefined) update.content = body.content;
-  if (body.category_id !== undefined) update.category_id = body.category_id;
+  if (body.category_id !== undefined) {
+    update.category_id = body.category_id === "" || body.category_id === null ? null : body.category_id;
+  }
   if (body.pinned !== undefined) update.pinned = body.pinned;
   if (body.tags !== undefined) update.tags = body.tags;
   if (Object.keys(update).length === 0) {
@@ -74,6 +79,9 @@ export async function DELETE(
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
   const { id } = await params;
+  if (!id || id.startsWith("draft-") || id === "undefined") {
+    return NextResponse.json({ error: "Invalid note id" }, { status: 400 });
+  }
   const { error } = await supabaseAdmin
     .from("notes")
     .delete()

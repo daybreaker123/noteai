@@ -5,6 +5,19 @@ import { getCsrfToken } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { LoginPanel } from "@/components/login-panel";
+import { StudaraWordmarkLink } from "@/components/studara-wordmark";
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  CredentialsSignin: "Invalid email or password",
+  OAuthSignin: "Could not start Google sign-in. Check NEXTAUTH_URL and Google OAuth settings.",
+  OAuthCallback:
+    "Google sign-in failed after redirect. In Google Cloud Console, set Authorized redirect URI to: http://localhost:3000/api/auth/callback/google (or your app URL + /api/auth/callback/google).",
+  OAuthAccountNotLinked:
+    "This email is already used with another sign-in method. Log in with your password or link accounts in settings.",
+  AccessDenied: "Access was denied.",
+  Configuration:
+    "Server auth misconfiguration. Ensure NEXTAUTH_SECRET, NEXTAUTH_URL, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET are set.",
+};
 
 function LoginContent() {
   const searchParams = useSearchParams();
@@ -12,8 +25,8 @@ function LoginContent() {
   // Redirect via intermediate page so session cookie is established before middleware runs
   const callbackUrl = `/auth/callback?next=${encodeURIComponent(targetUrl)}`;
   const urlError = searchParams.get("error");
-  const [error, setError] = useState(
-    urlError === "CredentialsSignin" ? "Invalid email or password" : ""
+  const [error, setError] = useState(() =>
+    urlError ? OAUTH_ERROR_MESSAGES[urlError] ?? `Sign-in error: ${urlError}` : ""
   );
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
 
@@ -22,7 +35,14 @@ function LoginContent() {
   }, []);
 
   useEffect(() => {
-    setError(urlError === "CredentialsSignin" ? "Invalid email or password" : "");
+    if (!urlError) {
+      setError("");
+      return;
+    }
+    setError(
+      OAUTH_ERROR_MESSAGES[urlError] ??
+        (urlError === "CredentialsSignin" ? OAUTH_ERROR_MESSAGES.CredentialsSignin : `Sign-in error: ${urlError}`)
+    );
   }, [urlError]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -56,10 +76,7 @@ function LoginContent() {
     <main className="flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0f] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex justify-center">
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/noteai-icon.svg" alt="NoteAI" className="h-10 w-10" />
-            <span className="text-xl font-semibold text-white">NoteAI</span>
-          </Link>
+          <StudaraWordmarkLink href="/" />
         </div>
         <LoginPanel
           onSubmit={handleSubmit}

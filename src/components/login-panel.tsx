@@ -1,8 +1,8 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { Button, Input } from "@/components/ui";
 import { Card } from "@/components/ui";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
 export function LoginPanel({
   onSubmit,
@@ -57,16 +57,7 @@ export function LoginPanel({
           {useFormPost && !csrfToken ? "Loading…" : "Log in"}
         </Button>
       </form>
-      <div className="mt-4 border-t border-white/10 pt-4">
-        <Button
-          type="button"
-          variant="ghost"
-          className="w-full"
-          onClick={() => signIn("google", { callbackUrl })}
-        >
-          Continue with Google
-        </Button>
-      </div>
+      <GoogleSignInButton callbackUrl={callbackUrl} />
     </Card>
   );
 }

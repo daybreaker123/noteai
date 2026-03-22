@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 148 40" fill="none">
+  <defs>
+    <linearGradient id="slg" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon: note card with gradient -->
+  <g transform="translate(0, 4)">
+    <rect x="0" y="4" width="32" height="26" rx="6" fill="white" fill-opacity="0.06"/>
+    <rect x="0" y="0" width="32" height="26" rx="6" fill="url(#slg)"/>
+    <path d="M8 9h16M8 14h12M8 19h14" stroke="white" stroke-opacity="0.95" stroke-width="1.75" stroke-linecap="round"/>
+  </g>
+  <!-- Wordmark -->
+  <text
+    x="42"
+    y="27"
+    font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    font-size="21"
+    font-weight="600"
+    letter-spacing="-0.03em"
+    fill="rgba(250, 250, 250, 0.96)"
+  >
+    studara
+  </text>
+</svg>

@@ -32,12 +32,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
   const { category_id, title } = (await req.json()) as {
-    category_id?: string;
+    category_id?: string | null;
     title?: string;
   };
-  if (!category_id) {
-    return NextResponse.json({ error: "category_id required" }, { status: 400 });
-  }
+  /** Omit or null = uncategorized (matches "All Notes" new note). */
+  const categoryId = category_id === undefined || category_id === null || category_id === "" ? null : category_id;
   const { data: planRow } = await supabaseAdmin
     .from("user_plans")
     .select("plan")
@@ -63,7 +62,7 @@ export async function POST(req: Request) {
     .from("notes")
     .insert({
       user_id: session.user.id,
-      category_id,
+      category_id: categoryId,
       title: title ?? "Untitled",
       content: "",
       pinned: false,

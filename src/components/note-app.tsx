@@ -1,10 +1,14 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useNotesRemote } from "@/lib/use-notes-remote";
 import { SignoutButton } from "@/components/signout-button";
+import { CreateCategoryModal } from "@/components/create-category-modal";
+import { DeleteCategoryModal } from "@/components/delete-category-modal";
 import { Button, Card, Input, Textarea, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import type { Note, Category } from "@/lib/api-types";
 import {
   Plus,
@@ -20,7 +24,18 @@ import {
   Send,
   Loader2,
   Tag,
+  GraduationCap,
+  UserCircle,
 } from "lucide-react";
+
+const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
+  study: "Study Mode turns your notes into flashcards and quizzes. Generate practice questions and test your knowledge with AI.",
+  chat: "AI Chat lets you ask questions across all your notes. Get answers powered by your entire knowledge base.",
+  export: "Export your notes as PDF or Markdown for sharing, printing, or use in other apps.",
+  semantic: "Semantic search finds notes by meaning, not just keywords. Search for concepts and ideas.",
+  writing: "The Writing Assistant expands bullet points into full paragraphs and improves clarity and structure.",
+  autoCategorize: "Auto-categorization suggests the best category for your note using AI.",
+};
 
 export function NoteApp({ userId }: { userId: string }) {
   const {
@@ -39,7 +54,6 @@ export function NoteApp({ userId }: { userId: string }) {
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | "all" | null>(null);
   const [selectedNoteId, setSelectedNoteId] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [semanticSearch, setSemanticSearch] = React.useState(false);
   const [chatOpen, setChatOpen] = React.useState(false);
   const [chatMessages, setChatMessages] = React.useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [chatInput, setChatInput] = React.useState("");
@@ -77,6 +91,9 @@ export function NoteApp({ userId }: { userId: string }) {
   const [suggestTagsChips, setSuggestTagsChips] = React.useState<string[] | null>(null);
   const [toolbarError, setToolbarError] = React.useState<string | null>(null);
   const [improveToast, setImproveToast] = React.useState(false);
+  const [createCategoryModalOpen, setCreateCategoryModalOpen] = React.useState(false);
+  const [createCategoryLoading, setCreateCategoryLoading] = React.useState(false);
+  const [deleteCategoryModal, setDeleteCategoryModal] = React.useState<{ id: string; name: string } | null>(null);
 
   const defaultCategoryId = categories[0]?.id ?? null;
   React.useEffect(() => {
@@ -84,6 +101,11 @@ export function NoteApp({ userId }: { userId: string }) {
       setSelectedCategoryId("all");
     }
   }, [defaultCategoryId, selectedCategoryId]);
+
+  const selectedCategoryIdRef = React.useRef(selectedCategoryId);
+  React.useEffect(() => {
+    selectedCategoryIdRef.current = selectedCategoryId;
+  }, [selectedCategoryId]);
 
   const hasBootstrapped = React.useRef(false);
   React.useEffect(() => {
@@ -93,13 +115,6 @@ export function NoteApp({ userId }: { userId: string }) {
     }
   }, [loading, categories.length, userId]);
 
-  // When draft has "pending" category and categories load, update draft
-  React.useEffect(() => {
-    if (draftNote?.category_id === "pending" && categories[0]) {
-      setDraftNote((d) => (d ? { ...d, category_id: categories[0].id } : null));
-    }
-  }, [draftNote?.category_id, categories]);
-
   const filteredNotes = React.useMemo(() => {
     let list = notes;
     if (selectedCategoryId && selectedCategoryId !== "all") {
@@ -107,7 +122,7 @@ export function NoteApp({ userId }: { userId: string }) {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      if (semanticSearch && plan === "pro") {
+      if (plan === "pro" && semanticIds.length > 0) {
         return list.filter((n) => semanticIds.includes(n.id)).sort((a, b) => {
           const ai = semanticIds.indexOf(a.id);
           const bi = semanticIds.indexOf(b.id);
@@ -131,10 +146,10 @@ export function NoteApp({ userId }: { userId: string }) {
       const bTime = b.updated_at ?? b.created_at ?? "";
       return bTime.localeCompare(aTime);
     });
-  }, [notes, selectedCategoryId, searchQuery, semanticSearch, plan, semanticIds]);
+  }, [notes, selectedCategoryId, searchQuery, plan, semanticIds]);
 
   React.useEffect(() => {
-    if (!searchQuery.trim() || !semanticSearch || plan !== "pro") {
+    if (!searchQuery.trim() || plan !== "pro") {
       setSemanticIds([]);
       return;
     }
@@ -154,7 +169,7 @@ export function NoteApp({ userId }: { userId: string }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [searchQuery, semanticSearch, plan]);
+  }, [searchQuery, plan]);
 
   const selectedNote =
     selectedNoteId && draftNote && selectedNoteId === draftNote.id
@@ -242,12 +257,15 @@ export function NoteApp({ userId }: { userId: string }) {
       setUpgradeModal({ show: true, message: "You've reached the free limit — upgrade to Pro for unlimited notes" });
       return;
     }
+    const sid = selectedCategoryIdRef.current;
+    /** Sidebar category filter: specific id, or "all" / null → uncategorized */
+    const targetCategoryId: string | null = sid && sid !== "all" ? sid : null;
+
     const draftId = `draft-${Date.now()}`;
-    const categoryId = defaultCategoryId ?? "pending";
     const draft: Note = {
       id: draftId,
       user_id: userId,
-      category_id: categoryId,
+      category_id: targetCategoryId,
       title: "Untitled",
       content: "",
       pinned: false,
@@ -261,14 +279,7 @@ export function NoteApp({ userId }: { userId: string }) {
 
     // Persist in background — don't block the editor
     (async () => {
-      let catId = categoryId;
-      if (catId === "pending") {
-        const cat = await actions.createCategory("General");
-        if (!cat) return;
-        catId = cat.id;
-        setDraftNote((d) => (d ? { ...d, category_id: catId } : null));
-      }
-      const note = await actions.create(catId, "Untitled");
+      const note = await actions.create(targetCategoryId, "Untitled");
       if (note) {
         setNewNoteIds((prev) => {
           const next = new Set(prev);
@@ -282,17 +293,20 @@ export function NoteApp({ userId }: { userId: string }) {
           content: editContentRef.current,
         });
         setSelectedNoteId(note.id);
-        setSelectedCategoryId(note.category_id);
+        setSelectedCategoryId(note.category_id ?? "all");
         setDraftNote(null);
       }
     })();
   }
 
-  async function startCheckout() {
-    setUpgradeModal({ show: false });
-    const res = await fetch("/api/stripe/checkout", { method: "POST" });
-    const json = (await res.json()) as { url?: string };
-    if (json?.url) window.location.href = json.url;
+  /** Sidebar category pick: leave note editor and show the grid for that category. */
+  function selectSidebarCategory(categoryId: string | "all") {
+    setSelectedCategoryId(categoryId);
+    setSelectedNoteId(null);
+    setDraftNote(null);
+    setChatOpen(false);
+    setStudyModal(null);
+    setSuggestBanner(null);
   }
 
   if (loading) {
@@ -312,17 +326,12 @@ export function NoteApp({ userId }: { userId: string }) {
       </div>
 
       {/* Sidebar */}
-      <aside className="relative z-10 flex w-64 flex-shrink-0 flex-col border-r border-white/10 bg-black/30 backdrop-blur-xl">
-        <div className="flex items-center gap-3 border-b border-white/10 p-4">
-          <div className="h-9 w-9 overflow-hidden rounded-xl border border-white/10 bg-white/5">
-            <img src="/noteai-icon.svg" alt="NoteAI" className="h-full w-full" />
-          </div>
-          <div className="leading-tight">
-            <div className="text-base font-semibold tracking-tight text-white/95">NoteAI</div>
-            <div className="text-xs text-white/60">AI note-taking</div>
-          </div>
+      <aside className="relative z-20 flex h-dvh w-64 flex-shrink-0 flex-col border-r border-white/10 bg-black/30 backdrop-blur-xl">
+        <div className="flex shrink-0 flex-col gap-2 border-b border-white/10 p-4">
+          <StudaraWordmarkLink href="/notes" />
+          <div className="text-xs text-white/60">AI note-taking</div>
         </div>
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex shrink-0 flex-col p-3">
           <button
             onClick={handleNewNote}
             className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
@@ -339,17 +348,6 @@ export function NoteApp({ userId }: { userId: string }) {
               placeholder="Search notes..."
               className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/40"
             />
-            {plan === "pro" && (
-              <button
-                onClick={() => setSemanticSearch((s) => !s)}
-                className={cn(
-                  "rounded-lg px-2 py-0.5 text-xs font-medium transition",
-                  semanticSearch ? "bg-purple-500/20 text-purple-300" : "text-white/50 hover:text-white/70"
-                )}
-              >
-                Semantic
-              </button>
-            )}
           </div>
           {categoryError && (
             <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
@@ -360,53 +358,63 @@ export function NoteApp({ userId }: { userId: string }) {
             </div>
           )}
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Categories</div>
-          <nav className="space-y-0.5">
+        </div>
+        <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+          <div className="space-y-0.5">
             <CategoryTab
               id="all"
               name="All Notes"
               selected={selectedCategoryId === "all"}
-              onClick={() => setSelectedCategoryId("all")}
+              onClick={() => selectSidebarCategory("all")}
             />
             {categories.map((c) => (
               <CategoryTab
                 key={c.id}
                 id={c.id}
                 name={c.name}
+                color={c.color}
                 selected={selectedCategoryId === c.id}
-                onClick={() => setSelectedCategoryId(c.id)}
+                onClick={() => selectSidebarCategory(c.id)}
                 onRename={() => {
                   const name = prompt("Rename category:", c.name);
                   if (name?.trim()) actions.updateCategory(c.id, name.trim());
                 }}
-                onDelete={() => {
-                  if (confirm("Delete this category? Notes will move to another.")) {
-                    actions.deleteCategory(c.id);
-                    if (selectedCategoryId === c.id) setSelectedCategoryId("all");
-                  }
-                }}
+                onDelete={() => setDeleteCategoryModal({ id: c.id, name: c.name })}
               />
             ))}
             <button
-              onClick={async () => {
+              onClick={() => {
                 clearCategoryError();
-                const name = prompt("Category name:");
-                if (name?.trim()) {
-                  const cat = await actions.createCategory(name.trim());
-                  if (cat) setSelectedCategoryId(cat.id);
-                }
+                setCreateCategoryModalOpen(true);
               }}
               className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-white/60 hover:bg-white/5 hover:text-white/80"
             >
               <Plus className="h-3.5 w-3.5" />
               Add category
             </button>
-          </nav>
-        </div>
-        <div className="border-t border-white/10 p-3">
+          </div>
+        </nav>
+        <div className="flex shrink-0 flex-col border-t border-white/10 p-3">
+          {plan !== "pro" ? (
+            <Link
+              href="/billing"
+              className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+            >
+              <Sparkles className="h-4 w-4" />
+              Upgrade to Pro
+            </Link>
+          ) : null}
+          <Link
+            href="/tutor"
+            className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+          >
+            <GraduationCap className="h-4 w-4" />
+            AI Tutor
+          </Link>
           <button
             onClick={async () => {
               if (plan !== "pro") {
-                setUpgradeModal({ show: true, message: "AI chat is a Pro feature — upgrade to Pro to chat across all your notes" });
+                setUpgradeModal({ show: true, feature: "chat" });
                 return;
               }
               setChatOpen(true);
@@ -416,6 +424,13 @@ export function NoteApp({ userId }: { userId: string }) {
             <MessageCircle className="h-4 w-4" />
             AI Chat
           </button>
+          <Link
+            href="/profile"
+            className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+          >
+            <UserCircle className="h-4 w-4" />
+            Profile
+          </Link>
           <div className="mt-2">
             <SignoutButton />
           </div>
@@ -489,7 +504,11 @@ export function NoteApp({ userId }: { userId: string }) {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ content: editContent }),
                 });
-                const json = (await res.json()) as { improved?: string; error?: string };
+                const json = (await res.json()) as { improved?: string; error?: string; code?: string };
+                if (json.code && res.status === 402) {
+                  setUpgradeModal({ show: true, message: json.error ?? "You've used all 5 free improvements this month — upgrade to Pro for unlimited access." });
+                  return;
+                }
                 if (json.improved) {
                   setEditContent(json.improved);
                   if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
@@ -587,6 +606,10 @@ export function NoteApp({ userId }: { userId: string }) {
               }
             }}
             onWritingAssistant={async () => {
+              if (plan !== "pro") {
+                setUpgradeModal({ show: true, feature: "writing" });
+                return;
+              }
               setWritingLoading(true);
               try {
                 const res = await fetch("/api/ai/anthropic/expand-bullets", {
@@ -596,7 +619,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 });
                 const json = (await res.json()) as { expanded?: string; code?: string; error?: string };
                 if (json.code && res.status === 402) {
-                  setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                  setUpgradeModal({ show: true, feature: "writing" });
                   return;
                 }
                 if (json.expanded && selectedNote) {
@@ -619,7 +642,7 @@ export function NoteApp({ userId }: { userId: string }) {
             writingLoading={writingLoading}
             onStudy={() => {
               if (plan !== "pro") {
-                setUpgradeModal({ show: true, message: "Study Mode is a Pro feature — upgrade to Pro" });
+                setUpgradeModal({ show: true, feature: "study" });
                 return;
               }
               setStudyModal({ noteId: selectedNote!.id });
@@ -651,6 +674,10 @@ export function NoteApp({ userId }: { userId: string }) {
             summaryLoading={summarizeLoading}
             onAutoCategorize={async () => {
               if (categories.length < 2) return;
+              if (plan !== "pro") {
+                setUpgradeModal({ show: true, feature: "autoCategorize" });
+                return;
+              }
               setAutoCategorizeLoading(true);
               setSuggestBanner(null);
               try {
@@ -665,7 +692,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 });
                 const json = (await res.json()) as { category?: { id: string; name: string }; code?: string; error?: string };
                 if (json.code && res.status === 402) {
-                  setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                  setUpgradeModal({ show: true, feature: "autoCategorize" });
                   return;
                 }
                 if (json.category) setSuggestBanner({ categoryId: json.category.id, name: json.category.name });
@@ -759,7 +786,7 @@ export function NoteApp({ userId }: { userId: string }) {
                     }}
                     onExportPdf={async () => {
                       if (plan !== "pro") {
-                        setUpgradeModal({ show: true, message: "Export is a Pro feature — upgrade to Pro" });
+                        setUpgradeModal({ show: true, feature: "export" });
                         return;
                       }
                       const { default: jsPDF } = await import("jspdf");
@@ -773,7 +800,7 @@ export function NoteApp({ userId }: { userId: string }) {
                     }}
                     onExportMd={() => {
                       if (plan !== "pro") {
-                        setUpgradeModal({ show: true, message: "Export is a Pro feature — upgrade to Pro" });
+                        setUpgradeModal({ show: true, feature: "export" });
                         return;
                       }
                       const blob = new Blob([`# ${note.title}\n\n${note.content || ""}`], { type: "text/markdown" });
@@ -785,7 +812,7 @@ export function NoteApp({ userId }: { userId: string }) {
                     }}
                     onStudy={() => {
                       if (plan !== "pro") {
-                        setUpgradeModal({ show: true, message: "Study Mode is a Pro feature — upgrade to Pro" });
+                        setUpgradeModal({ show: true, feature: "study" });
                         return;
                       }
                       setStudyModal({ noteId: note.id });
@@ -849,7 +876,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 if (!res.ok) {
                   const json = (await res.json()) as { code?: string; error?: string };
                   if (json.code && res.status === 402) {
-                    setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                    setUpgradeModal({ show: true, feature: "chat" });
                   } else {
                     setChatMessages((m) => {
                       const next = [...m];
@@ -960,7 +987,7 @@ export function NoteApp({ userId }: { userId: string }) {
               const res = await fetch(`/api/study/${studyModal.noteId}`);
               const json = (await res.json()) as { flashcards?: { cards?: { front: string; back: string }[] } | null; code?: string; error?: string };
               if (json?.code && res.status === 402) {
-                setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                setUpgradeModal({ show: true, feature: "study" });
                 return;
               }
               const payload = json?.flashcards;
@@ -981,7 +1008,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 });
                 const j = (await post.json()) as { cards?: { front: string; back: string }[]; code?: string; error?: string };
                 if (j.code && post.status === 402) {
-                  setUpgradeModal({ show: true, message: j.error ?? "Upgrade to Pro" });
+                  setUpgradeModal({ show: true, feature: "study" });
                   return;
                 }
                 if (j.error) setStudyError(j.error);
@@ -1001,7 +1028,7 @@ export function NoteApp({ userId }: { userId: string }) {
               const res = await fetch(`/api/study/${studyModal.noteId}`);
               const json = (await res.json()) as { quiz?: { questions?: { question: string; options: string[]; correctIndex: number }[] } | null; code?: string; error?: string };
               if (json?.code && res.status === 402) {
-                setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+                setUpgradeModal({ show: true, feature: "study" });
                 return;
               }
               const payload = json?.quiz;
@@ -1022,7 +1049,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 });
                 const j = (await post.json()) as { questions?: { question: string; options: string[]; correctIndex: number }[]; code?: string; error?: string };
                 if (j.code && post.status === 402) {
-                  setUpgradeModal({ show: true, message: j.error ?? "Upgrade to Pro" });
+                  setUpgradeModal({ show: true, feature: "study" });
                   return;
                 }
                 if (j.error) setStudyError(j.error);
@@ -1060,16 +1087,23 @@ export function NoteApp({ userId }: { userId: string }) {
 
       {/* Upgrade modal */}
       {upgradeModal.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <Card className="mx-4 max-w-sm p-6">
             <h3 className="text-lg font-semibold text-white">Upgrade to Pro</h3>
             <p className="mt-2 text-sm text-white/70">
-              {upgradeModal.message ?? "Upgrade to Pro for more features."}
+              {upgradeModal.feature && PRO_FEATURE_DESCRIPTIONS[upgradeModal.feature]
+                ? `${PRO_FEATURE_DESCRIPTIONS[upgradeModal.feature]} This feature is Pro only.`
+                : upgradeModal.message ?? "Upgrade to Pro for more features."}
             </p>
-            <div className="mt-4 flex gap-2">
-              <Button onClick={startCheckout} className="flex-1">
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                href="/billing"
+                onClick={() => setUpgradeModal({ show: false })}
+                className="flex flex-1 min-w-[140px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+              >
+                <Sparkles className="h-4 w-4" />
                 Upgrade to Pro
-              </Button>
+              </Link>
               <Button variant="ghost" onClick={() => setUpgradeModal({ show: false })}>
                 Maybe later
               </Button>
@@ -1084,6 +1118,36 @@ export function NoteApp({ userId }: { userId: string }) {
           Notes improved
         </div>
       )}
+
+      {/* Delete category modal */}
+      <DeleteCategoryModal
+        open={!!deleteCategoryModal}
+        categoryName={deleteCategoryModal?.name ?? ""}
+        onClose={() => setDeleteCategoryModal(null)}
+        onConfirm={() => {
+          if (deleteCategoryModal) {
+            actions.deleteCategory(deleteCategoryModal.id);
+            if (selectedCategoryId === deleteCategoryModal.id) setSelectedCategoryId("all");
+          }
+        }}
+      />
+
+      {/* Create category modal */}
+      <CreateCategoryModal
+        open={createCategoryModalOpen}
+        onClose={() => setCreateCategoryModalOpen(false)}
+        loading={createCategoryLoading}
+        onCreate={async (name, color) => {
+          setCreateCategoryLoading(true);
+          try {
+            const cat = await actions.createCategory(name, color);
+            if (cat) setSelectedCategoryId(cat.id);
+            return !!cat;
+          } finally {
+            setCreateCategoryLoading(false);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -1169,7 +1233,7 @@ function EditorPanel({
   onSuggestTagAccept: (tag: string) => void;
   onSuggestTagDismiss: () => void;
   onToolbarErrorDismiss: () => void;
-  setUpgradeModal: (x: { show: boolean; message?: string }) => void;
+  setUpgradeModal: (x: { show: boolean; message?: string; feature?: string }) => void;
 }) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
@@ -1184,13 +1248,14 @@ function EditorPanel({
         </button>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            value={selectedNote.category_id}
-            onChange={(e) => onUpdate({ category_id: e.target.value })}
+            value={selectedNote.category_id ?? ""}
+            onChange={(e) => onUpdate({ category_id: e.target.value || null })}
             className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
           >
             {selectedNote.category_id === "pending" && !categories.some((c) => c.id === "pending") && (
               <option value="pending">General (creating…)</option>
             )}
+            <option value="">Uncategorized</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -1201,7 +1266,7 @@ function EditorPanel({
             {summaryLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
             Summarize
           </Button>
-          {plan === "pro" && categories.length >= 2 && (
+          {categories.length >= 2 && (
             <Button size="sm" variant="ghost" onClick={onAutoCategorize} disabled={autoCategorizeLoading}>
               {autoCategorizeLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tag className="mr-1.5 h-3.5 w-3.5" />}
               Auto-categorize
@@ -1211,12 +1276,10 @@ function EditorPanel({
             <BookOpen className="mr-1.5 h-3.5 w-3.5" />
             Study
           </Button>
-          {plan === "pro" && (
-            <Button size="sm" variant="ghost" onClick={onWritingAssistant} disabled={writingLoading}>
-              {writingLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
-              Writing assistant
-            </Button>
-          )}
+          <Button size="sm" variant="ghost" onClick={onWritingAssistant} disabled={writingLoading}>
+            {writingLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
+            Writing assistant
+          </Button>
         </div>
       </div>
       {suggestBanner && (
@@ -1253,7 +1316,7 @@ function EditorPanel({
         <textarea
           value={editContent}
           onChange={(e) => setEditContent(e.target.value)}
-          className="min-h-[300px] w-full flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/40 focus:ring-2 focus:ring-purple-500/40"
+          className="note-editor-scrollbar min-h-[300px] w-full flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/40 focus:ring-2 focus:ring-purple-500/40"
           placeholder="Write your note..."
         />
         {summaryBelow && (
@@ -1366,9 +1429,11 @@ function NoteCard({
   onStudy: () => void;
   exportOpen: boolean;
   onExportToggle: () => void;
-  setUpgradeModal: (x: { show: boolean; message?: string }) => void;
+  setUpgradeModal: (x: { show: boolean; message?: string; feature?: string }) => void;
 }) {
-  const categoryName = categories.find((c) => c.id === note.category_id)?.name ?? "General";
+  const category = note.category_id ? categories.find((c) => c.id === note.category_id) : null;
+  const categoryName = category?.name ?? "Uncategorized";
+  const categoryColor = category?.color;
   const date = note.updated_at ?? note.created_at ?? "";
   const formattedDate = date ? new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
   const preview = (note.content || "").replace(/\n/g, " ").slice(0, 120) + ((note.content?.length ?? 0) > 120 ? "…" : "");
@@ -1376,7 +1441,11 @@ function NoteCard({
   return (
     <div
       onClick={onSelect}
-      className="group cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-500/30 hover:bg-white/10"
+      className={cn(
+        "group cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-500/30 hover:bg-white/10",
+        categoryColor && "border-l-4"
+      )}
+      style={categoryColor ? { borderLeftColor: categoryColor } : undefined}
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="flex-1 truncate font-semibold text-white">{note.title || "Untitled"}</h3>
@@ -1406,7 +1475,20 @@ function NoteCard({
       </div>
       <p className="mt-2 line-clamp-2 text-sm text-white/60">{preview || "No content"}</p>
       <div className="mt-3 flex items-center justify-between">
-        <span className="rounded-full bg-purple-500/20 px-2.5 py-0.5 text-xs font-medium text-purple-300">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
+            categoryColor ? "text-white/90" : categoryName === "Uncategorized" ? "bg-white/10 text-white/60" : "bg-purple-500/20 text-purple-300"
+          )}
+          style={categoryColor ? { backgroundColor: `${categoryColor}30`, color: categoryColor } : undefined}
+        >
+          {categoryColor && (
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: categoryColor }}
+              aria-hidden
+            />
+          )}
           {categoryName}
         </span>
         <span className="text-xs text-white/50">{formattedDate}</span>
@@ -1435,6 +1517,7 @@ function NoteCard({
 function CategoryTab({
   id,
   name,
+  color,
   selected,
   onClick,
   onRename,
@@ -1442,6 +1525,7 @@ function CategoryTab({
 }: {
   id: string;
   name: string;
+  color?: string;
   selected: boolean;
   onClick: () => void;
   onRename?: () => void;
@@ -1454,11 +1538,20 @@ function CategoryTab({
       <button
         onClick={onClick}
         className={cn(
-          "flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm",
+          "flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm",
           selected ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white/90"
         )}
       >
-        <span className="truncate">{name}</span>
+        {color ? (
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: color }}
+            aria-hidden
+          />
+        ) : (
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-white/20" aria-hidden />
+        )}
+        <span className="min-w-0 flex-1 truncate">{name}</span>
         {!isAll && (onRename || onDelete) && (
           <ChevronRight
             className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover:opacity-100"
@@ -1534,7 +1627,7 @@ function StudyModal({
   onCardFlip: () => void;
   onQuizSelect: (i: number) => void;
   onQuizNext: () => void;
-  setUpgradeModal: (x: { show: boolean; message?: string }) => void;
+  setUpgradeModal: (x: { show: boolean; message?: string; feature?: string }) => void;
 }) {
   const q = quizQuestions[quizIndex];
   const total = quizQuestions.length;

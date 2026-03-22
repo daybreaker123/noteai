@@ -5,17 +5,39 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "./prisma";
 
+/** Trim so pasted env values with accidental whitespace still work. */
+const googleId = process.env.GOOGLE_CLIENT_ID?.trim();
+const googleSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+const googleConfigured = Boolean(googleId && googleSecret);
+
+/**
+ * Google Cloud Console → OAuth client → Authorized redirect URIs must include exactly:
+ *   `${NEXTAUTH_URL}/api/auth/callback/google`
+ * e.g. http://localhost:3000/api/auth/callback/google
+ */
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
+  secret: process.env.NEXTAUTH_SECRET?.trim(),
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
   },
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-    }),
+    ...(googleConfigured
+      ? [
+          // Link Google to an existing user with the same verified email (e.g. password signup first).
+          // Set on the provider object and in GoogleProvider() options so merge keeps it on InternalProvider.
+          {
+            ...GoogleProvider({
+              clientId: googleId!,
+              clientSecret: googleSecret!,
+              allowDangerousEmailAccountLinking: true,
+            }),
+            allowDangerousEmailAccountLinking: true,
+          },
+        ]
+      : []),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -40,6 +62,19 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      const baseNorm = baseUrl.replace(/\/$/, "");
+      const baseOrigin = new URL(baseNorm).origin;
+      // Relative URLs (e.g. /auth/callback?next=... after Google OAuth)
+      if (url.startsWith("/")) return `${baseNorm}${url}`;
+      try {
+        const target = new URL(url);
+        if (target.origin === baseOrigin) return url;
+      } catch {
+        /* ignore invalid */
+      }
+      return baseNorm;
+    },
     async jwt({ token, user }) {
       if (user) token.id = user.id;
       return token;

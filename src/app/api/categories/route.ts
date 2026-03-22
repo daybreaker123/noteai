@@ -34,9 +34,9 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-  let body: { name?: string };
+  let body: { name?: string; color?: string };
   try {
-    body = (await req.json()) as { name?: string };
+    body = (await req.json()) as { name?: string; color?: string };
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
@@ -73,12 +73,14 @@ export async function POST(req: Request) {
       { status: 402 }
     );
   }
+  const insertPayload: { user_id: string; name: string; color?: string } = {
+    user_id: userId,
+    name,
+  };
+  if (body?.color?.trim()) insertPayload.color = body.color.trim();
   const { data, error } = await supabaseAdmin
     .from("categories")
-    .insert({
-      user_id: userId,
-      name,
-    })
+    .insert(insertPayload)
     .select()
     .single();
   if (error) {
