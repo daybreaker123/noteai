@@ -52,6 +52,8 @@ create table if not exists public.ai_usage (
   improvements int not null default 0,
   tutor_messages int not null default 0,
   tutor_images int not null default 0,
+  study_multiple int not null default 0,
+  pro_estimated_api_cents int not null default 0,
   primary key (user_id, month)
 );
 
@@ -78,18 +80,20 @@ create table if not exists public.tutor_messages (
 
 create index if not exists idx_tutor_messages_conversation on public.tutor_messages(conversation_id, created_at);
 
--- Study sets (flashcards + quizzes cached per note)
+-- Study sets (saved flashcards + quizzes; multiple rows per user)
 create table if not exists public.study_sets (
   id uuid primary key default gen_random_uuid(),
   user_id text not null,
-  note_id uuid not null,
+  note_id uuid,
   kind text not null check (kind in ('flashcards', 'quiz')),
+  title text not null default 'Study set',
+  note_ids jsonb not null default '[]'::jsonb,
   payload jsonb not null,
-  created_at timestamptz default now(),
-  unique(user_id, note_id, kind)
+  created_at timestamptz default now()
 );
 
 create index if not exists idx_study_sets_user_note on public.study_sets(user_id, note_id);
+create index if not exists idx_study_sets_user_created on public.study_sets(user_id, created_at desc);
 
 -- Updated_at trigger
 create or replace function public.set_updated_at()

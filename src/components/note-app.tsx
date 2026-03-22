@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useNotesRemote } from "@/lib/use-notes-remote";
 import { SignoutButton } from "@/components/signout-button";
 import { CreateCategoryModal } from "@/components/create-category-modal";
 import { DeleteCategoryModal } from "@/components/delete-category-modal";
+import { DeleteNoteModal } from "@/components/delete-note-modal";
 import { Button, Card, Input, Textarea, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
-import type { Note, Category } from "@/lib/api-types";
+import type { Note, Category, StudySetSummary } from "@/lib/api-types";
 import {
   Plus,
   Search,
@@ -26,6 +28,8 @@ import {
   Tag,
   GraduationCap,
   UserCircle,
+  Trash2,
+  Library,
 } from "lucide-react";
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -43,6 +47,8 @@ export function NoteApp({ userId }: { userId: string }) {
     notes,
     loading,
     plan,
+    proHeavyUsage,
+    refreshPlan,
     upgradeModal,
     setUpgradeModal,
     categoryError,
@@ -58,7 +64,15 @@ export function NoteApp({ userId }: { userId: string }) {
   const [chatMessages, setChatMessages] = React.useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [chatInput, setChatInput] = React.useState("");
   const [chatLoading, setChatLoading] = React.useState(false);
-  const [studyModal, setStudyModal] = React.useState<{ noteId: string } | null>(null);
+  type StudyModalState =
+    | { kind: "single"; noteId: string }
+    | { kind: "multi"; noteIds: string[] }
+    | { kind: "saved"; setId: string; title: string };
+  const [studyModal, setStudyModal] = React.useState<StudyModalState | null>(null);
+  const [savedStudySets, setSavedStudySets] = React.useState<StudySetSummary[]>([]);
+  const [gridSelectMode, setGridSelectMode] = React.useState(false);
+  const [gridSelectedIds, setGridSelectedIds] = React.useState<Set<string>>(() => new Set());
+  const [multiStudyError, setMultiStudyError] = React.useState<string | null>(null);
   const [studyMode, setStudyMode] = React.useState<"menu" | "flashcards" | "quiz">("menu");
   const [flashcards, setFlashcards] = React.useState<{ front: string; back: string }[]>([]);
   const [quizQuestions, setQuizQuestions] = React.useState<
@@ -94,6 +108,27 @@ export function NoteApp({ userId }: { userId: string }) {
   const [createCategoryModalOpen, setCreateCategoryModalOpen] = React.useState(false);
   const [createCategoryLoading, setCreateCategoryLoading] = React.useState(false);
   const [deleteCategoryModal, setDeleteCategoryModal] = React.useState<{ id: string; name: string } | null>(null);
+  const [deleteNoteModal, setDeleteNoteModal] = React.useState<{
+    id: string;
+    title?: string;
+    fromEditor?: boolean;
+  } | null>(null);
+  const [deleteNoteLoading, setDeleteNoteLoading] = React.useState(false);
+
+  const refreshStudySets = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/study-sets");
+      if (!res.ok) return;
+      const json = (await res.json()) as { sets?: StudySetSummary[] };
+      setSavedStudySets(Array.isArray(json.sets) ? json.sets : []);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!loading && userId) void refreshStudySets();
+  }, [loading, userId, refreshStudySets]);
 
   const defaultCategoryId = categories[0]?.id ?? null;
   React.useEffect(() => {
@@ -307,6 +342,182 @@ export function NoteApp({ userId }: { userId: string }) {
     setChatOpen(false);
     setStudyModal(null);
     setSuggestBanner(null);
+    exitGridSelection();
+  }
+
+  async function confirmDeleteNote() {
+    if (!deleteNoteModal) return;
+    const { id } = deleteNoteModal;
+    setDeleteNoteLoading(true);
+    try {
+      if (id.startsWith("draft-")) {
+        setDraftNote(null);
+        setSelectedNoteId(null);
+        setNewNoteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        setExportMenu((m) => (m === id ? null : m));
+        if (studyModal?.kind === "single" && studyModal.noteId === id) setStudyModal(null);
+        if (studyModal?.kind === "multi" && studyModal.noteIds.includes(id)) setStudyModal(null);
+        setDeleteNoteModal(null);
+        return;
+      }
+      const ok = await actions.delete(id);
+      if (!ok) return;
+      setSelectedNoteId(null);
+      setDraftNote(null);
+      setSummaryCache((c) => {
+        const next = { ...c };
+        delete next[id];
+        return next;
+      });
+      setSemanticIds((ids) => ids.filter((x) => x !== id));
+      setExportMenu((m) => (m === id ? null : m));
+      if (studyModal?.kind === "single" && studyModal.noteId === id) setStudyModal(null);
+      if (studyModal?.kind === "multi" && studyModal.noteIds.includes(id)) setStudyModal(null);
+      setGridSelectedIds((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      setDeleteNoteModal(null);
+    } finally {
+      setDeleteNoteLoading(false);
+    }
+  }
+
+  function exitGridSelection() {
+    setGridSelectMode(false);
+    setGridSelectedIds(new Set());
+    setMultiStudyError(null);
+  }
+
+  function startGridSelection() {
+    setGridSelectMode(true);
+    setGridSelectedIds(new Set());
+    setMultiStudyError(null);
+  }
+
+  function toggleGridNoteSelected(noteId: string) {
+    setGridSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(noteId)) next.delete(noteId);
+      else next.add(noteId);
+      return next;
+    });
+  }
+
+  async function generateMultiStudy(kind: "flashcards" | "quiz") {
+    setMultiStudyError(null);
+    const ids = [...gridSelectedIds].filter((id) => !id.startsWith("draft-"));
+    if (ids.length === 0) {
+      setMultiStudyError("Select at least one note.");
+      return;
+    }
+    setStudyError(null);
+    setStudyLoading(kind);
+    try {
+      const res = await fetch("/api/study/multi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, noteIds: ids }),
+      });
+      const json = (await res.json()) as {
+        cards?: { front: string; back: string }[];
+        questions?: { question: string; options: string[]; correctIndex: number }[];
+        code?: string;
+        error?: string;
+      };
+      if (json?.code === "FREE_LIMIT_STUDY_MULTIPLE" && res.status === 402) {
+        setUpgradeModal({
+          show: true,
+          message:
+            "You've used your free Study Multiple session this month — upgrade to Pro for unlimited multi-note study sessions.",
+        });
+        return;
+      }
+      if (json?.code && res.status === 402) {
+        setUpgradeModal({ show: true, feature: "study" });
+        return;
+      }
+      if (!res.ok) {
+        setMultiStudyError(json.error ?? "Generation failed");
+        return;
+      }
+      if (kind === "flashcards") {
+        setFlashcards(json.cards ?? []);
+        setStudyMode("flashcards");
+        setCardIndex(0);
+        setCardFlipped(false);
+      } else {
+        setQuizQuestions(json.questions ?? []);
+        setStudyMode("quiz");
+        setQuizIndex(0);
+        setQuizScore(null);
+        setQuizSelected(null);
+      }
+      setStudyModal({ kind: "multi", noteIds: ids });
+      exitGridSelection();
+      void refreshStudySets();
+    } catch {
+      setMultiStudyError(kind === "flashcards" ? "Failed to generate flashcards" : "Failed to generate quiz");
+    } finally {
+      setStudyLoading(null);
+    }
+  }
+
+  async function openSavedStudySet(row: StudySetSummary) {
+    setStudyError(null);
+    setStudyLoading(row.kind === "flashcards" ? "flashcards" : "quiz");
+    try {
+      const res = await fetch(`/api/study-sets/${row.id}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        kind: "flashcards" | "quiz";
+        title?: string;
+        payload: { cards?: { front: string; back: string }[]; questions?: { question: string; options: string[]; correctIndex: number }[] };
+      };
+      if (data.kind === "flashcards") {
+        setFlashcards(data.payload?.cards ?? []);
+        setStudyMode("flashcards");
+        setCardIndex(0);
+        setCardFlipped(false);
+      } else {
+        setQuizQuestions(data.payload?.questions ?? []);
+        setStudyMode("quiz");
+        setQuizIndex(0);
+        setQuizScore(null);
+        setQuizSelected(null);
+      }
+      setStudyModal({ kind: "saved", setId: row.id, title: data.title ?? row.title });
+    } catch {
+      setStudyError("Could not open study set");
+    } finally {
+      setStudyLoading(null);
+    }
+  }
+
+  async function deleteSavedStudySet(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const res = await fetch(`/api/study-sets/${id}`, { method: "DELETE" });
+    if (!res.ok) return;
+    if (studyModal?.kind === "saved" && studyModal.setId === id) {
+      setStudyModal(null);
+      setStudyMode("menu");
+      setFlashcards([]);
+      setQuizQuestions([]);
+      setCardIndex(0);
+      setCardFlipped(false);
+      setQuizIndex(0);
+      setQuizScore(null);
+      setQuizSelected(null);
+      setStudyLoading(null);
+      setStudyError(null);
+    }
+    void refreshStudySets();
   }
 
   if (loading) {
@@ -393,6 +604,56 @@ export function NoteApp({ userId }: { userId: string }) {
               Add category
             </button>
           </div>
+          <div className="mt-5 border-t border-white/10 pt-4">
+            <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wider text-white/50">
+              <Library className="h-3.5 w-3.5" />
+              Study Sets
+            </div>
+            <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+              {savedStudySets.length === 0 ? (
+                <p className="px-2 py-1 text-xs text-white/40">No saved sets yet</p>
+              ) : (
+                savedStudySets.map((s) => (
+                  <div
+                    key={s.id}
+                    className="group flex w-full items-start gap-1 rounded-lg border border-transparent px-1.5 py-1.5 text-left transition hover:border-white/10 hover:bg-white/5"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatOpen(false);
+                        void openSavedStudySet(s);
+                      }}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <span className="line-clamp-2 text-xs font-medium text-white/90">{s.title}</span>
+                      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-white/45">
+                        <span>{s.kind === "flashcards" ? "Flashcards" : "Quiz"}</span>
+                        <span>·</span>
+                        <span>{s.item_count} {s.kind === "flashcards" ? "cards" : "questions"}</span>
+                        <span>·</span>
+                        <span>
+                          {new Date(s.created_at).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => deleteSavedStudySet(s.id, e)}
+                      className="shrink-0 rounded p-1 text-white/40 transition hover:bg-red-500/20 hover:text-red-300"
+                      title="Delete study set"
+                      aria-label="Delete study set"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </nav>
         <div className="flex shrink-0 flex-col border-t border-white/10 p-3">
           {plan !== "pro" ? (
@@ -439,6 +700,14 @@ export function NoteApp({ userId }: { userId: string }) {
 
       {/* Main content: grid of note cards OR editor panel */}
       <main className="relative z-10 flex flex-1 flex-col overflow-hidden">
+        {plan === "pro" && proHeavyUsage ? (
+          <div
+            role="status"
+            className="shrink-0 border-b border-amber-400/25 bg-amber-500/15 px-4 py-2.5 text-center text-sm text-amber-50/95"
+          >
+            You&apos;re a heavy user this month — you may experience slightly slower responses as we manage server load.
+          </div>
+        ) : null}
         {selectedNoteId ? (
           /* Editor panel (full) */
           <div className="flex flex-1 flex-col overflow-hidden p-6">
@@ -645,7 +914,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 setUpgradeModal({ show: true, feature: "study" });
                 return;
               }
-              setStudyModal({ noteId: selectedNote!.id });
+              setStudyModal({ kind: "single", noteId: selectedNote!.id });
               setStudyMode("menu");
             }}
             onClaudeSummarize={async () => {
@@ -727,17 +996,81 @@ export function NoteApp({ userId }: { userId: string }) {
             onSuggestTagDismiss={() => setSuggestTagsChips(null)}
             onToolbarErrorDismiss={() => setToolbarError(null)}
             setUpgradeModal={setUpgradeModal}
+            onDeleteRequest={() => {
+              if (selectedNote) {
+                setDeleteNoteModal({
+                  id: selectedNote.id,
+                  title: selectedNote.title || "Untitled",
+                  fromEditor: true,
+                });
+              }
+            }}
           />
           </div>
         ) : (
           /* Grid of note cards */
           <div className="flex flex-1 flex-col overflow-hidden p-6">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h1 className="text-xl font-semibold text-white">
-                {selectedCategoryId === "all" ? "All Notes" : categories.find((c) => c.id === selectedCategoryId)?.name ?? "Notes"}
+                {gridSelectMode
+                  ? "Select notes"
+                  : selectedCategoryId === "all"
+                    ? "All Notes"
+                    : categories.find((c) => c.id === selectedCategoryId)?.name ?? "Notes"}
               </h1>
-              <span className="text-sm text-white/50">⌘N new · ⌘K search</span>
+              {gridSelectMode ? (
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <span className="text-sm font-medium tabular-nums text-white/90">
+                    {gridSelectedIds.size} selected
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => generateMultiStudy("flashcards")}
+                    disabled={!!studyLoading || gridSelectedIds.size === 0}
+                    className="gap-1.5"
+                  >
+                    {studyLoading === "flashcards" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5" />
+                    )}
+                    Generate Flashcards
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => generateMultiStudy("quiz")}
+                    disabled={!!studyLoading || gridSelectedIds.size === 0}
+                    className="gap-1.5"
+                  >
+                    {studyLoading === "quiz" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    Generate Quiz
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={exitGridSelection} disabled={!!studyLoading}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    size="sm"
+                    onClick={startGridSelection}
+                    className="gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/15"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Study Multiple
+                  </Button>
+                  <span className="text-sm text-white/50">⌘N new · ⌘K search</span>
+                </div>
+              )}
             </div>
+            {multiStudyError && (
+              <p className="mb-3 text-sm text-red-400">{multiStudyError}</p>
+            )}
             {filteredNotes.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-12">
                 <FileText className="h-12 w-12 text-white/30" />
@@ -756,15 +1089,17 @@ export function NoteApp({ userId }: { userId: string }) {
                     note={note}
                     categories={categories}
                     plan={plan}
+                    selectMode={gridSelectMode}
+                    selected={gridSelectedIds.has(note.id)}
+                    onToggleSelect={() => toggleGridNoteSelected(note.id)}
                     summary={summaryCache[note.id]}
                     summaryLoading={summaryLoading.has(note.id)}
                     onSelect={() => setSelectedNoteId(note.id)}
                     onUpdateCategory={(catId) => actions.update(note.id, { category_id: catId })}
                     onTogglePin={() => actions.update(note.id, { pinned: !note.pinned })}
-                    onDelete={() => {
-                      actions.delete(note.id);
-                      if (selectedNoteId === note.id) setSelectedNoteId(null);
-                    }}
+                    onRequestDelete={() =>
+                      setDeleteNoteModal({ id: note.id, title: note.title || "Untitled" })
+                    }
                     onSummarize={async () => {
                       setSummaryLoading((s) => new Set(s).add(note.id));
                       const res = await fetch("/api/ai/anthropic/summarize", {
@@ -815,7 +1150,7 @@ export function NoteApp({ userId }: { userId: string }) {
                         setUpgradeModal({ show: true, feature: "study" });
                         return;
                       }
-                      setStudyModal({ noteId: note.id });
+                      setStudyModal({ kind: "single", noteId: note.id });
                       setStudyMode("menu");
                     }}
                     exportOpen={exportMenu === note.id}
@@ -934,6 +1269,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 });
               } finally {
                 setChatLoading(false);
+                void refreshPlan();
               }
             }}
           >
@@ -953,9 +1289,10 @@ export function NoteApp({ userId }: { userId: string }) {
       {/* Study modal */}
       {studyModal && (
         <StudyModal
-          noteId={studyModal.noteId}
-          noteContent={draftNote && studyModal.noteId === draftNote.id ? editContent : undefined}
-          noteTitle={draftNote && studyModal.noteId === draftNote.id ? editTitle : undefined}
+          studyScope={
+            studyModal.kind === "saved" ? "saved" : studyModal.kind === "multi" ? "multi" : "single"
+          }
+          savedSetTitle={studyModal.kind === "saved" ? studyModal.title : undefined}
           mode={studyMode}
           flashcards={flashcards}
           quizQuestions={quizQuestions}
@@ -981,10 +1318,12 @@ export function NoteApp({ userId }: { userId: string }) {
           }}
           onSelectMode={(m) => setStudyMode(m)}
           onLoadFlashcards={async () => {
+            if (studyModal.kind !== "single") return;
+            const nid = studyModal.noteId;
             setStudyError(null);
             setStudyLoading("flashcards");
             try {
-              const res = await fetch(`/api/study/${studyModal.noteId}`);
+              const res = await fetch(`/api/study/${nid}`);
               const json = (await res.json()) as { flashcards?: { cards?: { front: string; back: string }[] } | null; code?: string; error?: string };
               if (json?.code && res.status === 402) {
                 setUpgradeModal({ show: true, feature: "study" });
@@ -997,11 +1336,11 @@ export function NoteApp({ userId }: { userId: string }) {
                 setStudyMode("flashcards");
               } else {
                 const body: { kind: "flashcards"; content?: string; title?: string } = { kind: "flashcards" };
-                if (draftNote && studyModal.noteId === draftNote.id) {
+                if (draftNote && nid === draftNote.id) {
                   body.content = editContent;
                   body.title = editTitle;
                 }
-                const post = await fetch(`/api/study/${studyModal.noteId}`, {
+                const post = await fetch(`/api/study/${nid}`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(body),
@@ -1014,6 +1353,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 if (j.error) setStudyError(j.error);
                 setFlashcards(j.cards ?? []);
                 setStudyMode("flashcards");
+                void refreshStudySets();
               }
             } catch {
               setStudyError("Failed to generate flashcards");
@@ -1022,10 +1362,12 @@ export function NoteApp({ userId }: { userId: string }) {
             }
           }}
           onLoadQuiz={async () => {
+            if (studyModal.kind !== "single") return;
+            const nid = studyModal.noteId;
             setStudyError(null);
             setStudyLoading("quiz");
             try {
-              const res = await fetch(`/api/study/${studyModal.noteId}`);
+              const res = await fetch(`/api/study/${nid}`);
               const json = (await res.json()) as { quiz?: { questions?: { question: string; options: string[]; correctIndex: number }[] } | null; code?: string; error?: string };
               if (json?.code && res.status === 402) {
                 setUpgradeModal({ show: true, feature: "study" });
@@ -1038,11 +1380,11 @@ export function NoteApp({ userId }: { userId: string }) {
                 setStudyMode("quiz");
               } else {
                 const body: { kind: "quiz"; content?: string; title?: string } = { kind: "quiz" };
-                if (draftNote && studyModal.noteId === draftNote.id) {
+                if (draftNote && nid === draftNote.id) {
                   body.content = editContent;
                   body.title = editTitle;
                 }
-                const post = await fetch(`/api/study/${studyModal.noteId}`, {
+                const post = await fetch(`/api/study/${nid}`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(body),
@@ -1055,6 +1397,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 if (j.error) setStudyError(j.error);
                 setQuizQuestions(j.questions ?? []);
                 setStudyMode("quiz");
+                void refreshStudySets();
               }
             } catch {
               setStudyError("Failed to generate quiz");
@@ -1081,7 +1424,6 @@ export function NoteApp({ userId }: { userId: string }) {
               setQuizScore((s) => s ?? 0);
             }
           }}
-          setUpgradeModal={setUpgradeModal}
         />
       )}
 
@@ -1118,6 +1460,13 @@ export function NoteApp({ userId }: { userId: string }) {
           Notes improved
         </div>
       )}
+
+      <DeleteNoteModal
+        open={!!deleteNoteModal}
+        loading={deleteNoteLoading}
+        onClose={() => !deleteNoteLoading && setDeleteNoteModal(null)}
+        onConfirm={confirmDeleteNote}
+      />
 
       {/* Delete category modal */}
       <DeleteCategoryModal
@@ -1193,6 +1542,7 @@ function EditorPanel({
   onSuggestTagDismiss,
   onToolbarErrorDismiss,
   setUpgradeModal,
+  onDeleteRequest,
 }: {
   selectedNote: Note;
   categories: Category[];
@@ -1234,6 +1584,7 @@ function EditorPanel({
   onSuggestTagDismiss: () => void;
   onToolbarErrorDismiss: () => void;
   setUpgradeModal: (x: { show: boolean; message?: string; feature?: string }) => void;
+  onDeleteRequest: () => void;
 }) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
@@ -1246,7 +1597,7 @@ function EditorPanel({
           <ChevronRight className="h-4 w-4 rotate-180" />
           Back
         </button>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
           <select
             value={selectedNote.category_id ?? ""}
             onChange={(e) => onUpdate({ category_id: e.target.value || null })}
@@ -1281,6 +1632,15 @@ function EditorPanel({
             Writing assistant
           </Button>
         </div>
+        <button
+          type="button"
+          onClick={onDeleteRequest}
+          className="shrink-0 rounded-lg p-2 text-white/50 transition hover:bg-red-500/15 hover:text-red-300"
+          title="Delete note"
+          aria-label="Delete note"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
       </div>
       {suggestBanner && (
         <div className="flex items-center justify-between border-b border-white/10 bg-purple-500/10 px-4 py-2 text-sm">
@@ -1400,12 +1760,15 @@ function NoteCard({
   note,
   categories,
   plan,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
   summary,
   summaryLoading,
   onSelect,
   onUpdateCategory,
   onTogglePin,
-  onDelete,
+  onRequestDelete,
   onSummarize,
   onExportPdf,
   onExportMd,
@@ -1417,12 +1780,15 @@ function NoteCard({
   note: Note;
   categories: Category[];
   plan: string;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   summary?: string;
   summaryLoading: boolean;
   onSelect: () => void;
   onUpdateCategory: (id: string) => void;
   onTogglePin: () => void;
-  onDelete: () => void;
+  onRequestDelete: () => void;
   onSummarize: () => void;
   onExportPdf: () => void;
   onExportMd: () => void;
@@ -1438,17 +1804,103 @@ function NoteCard({
   const formattedDate = date ? new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
   const preview = (note.content || "").replace(/\n/g, " ").slice(0, 120) + ((note.content?.length ?? 0) > 120 ? "…" : "");
 
-  return (
+  const [ctxMenu, setCtxMenu] = React.useState<{ x: number; y: number } | null>(null);
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const pointerCloseRef = React.useRef<(() => void) | null>(null);
+
+  function openMenuAt(clientX: number, clientY: number) {
+    const pad = 8;
+    const mw = 160;
+    const mh = 48;
+    const x = Math.max(pad, Math.min(clientX, window.innerWidth - mw - pad));
+    const y = Math.max(pad, Math.min(clientY, window.innerHeight - mh - pad));
+    setCtxMenu({ x, y });
+  }
+
+  React.useEffect(() => {
+    if (!ctxMenu) return;
+    const t = window.setTimeout(() => {
+      const close = () => setCtxMenu(null);
+      pointerCloseRef.current = close;
+      document.addEventListener("pointerdown", close);
+    }, 200);
+    return () => {
+      clearTimeout(t);
+      if (pointerCloseRef.current) {
+        document.removeEventListener("pointerdown", pointerCloseRef.current);
+        pointerCloseRef.current = null;
+      }
+    };
+  }, [ctxMenu]);
+
+  function clearLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    touchStartRef.current = null;
+  }
+
+  const card = (
     <div
-      onClick={onSelect}
+      onClick={() => {
+        if (selectMode) {
+          onToggleSelect?.();
+          return;
+        }
+        onSelect();
+      }}
+      onContextMenu={(e) => {
+        if (selectMode) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openMenuAt(e.clientX, e.clientY);
+      }}
+      onTouchStart={(e) => {
+        if (selectMode) return;
+        const t = e.touches[0];
+        touchStartRef.current = { x: t.clientX, y: t.clientY };
+        longPressTimer.current = setTimeout(() => {
+          openMenuAt(t.clientX, t.clientY);
+        }, 550);
+      }}
+      onTouchMove={(e) => {
+        const start = touchStartRef.current;
+        if (!start) return;
+        const t = e.touches[0];
+        const dx = Math.abs(t.clientX - start.x);
+        const dy = Math.abs(t.clientY - start.y);
+        if (dx > 14 || dy > 14) clearLongPress();
+      }}
+      onTouchEnd={clearLongPress}
+      onTouchCancel={clearLongPress}
       className={cn(
-        "group cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-500/30 hover:bg-white/10",
+        "group rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-500/30 hover:bg-white/10",
+        selectMode ? "cursor-default" : "cursor-pointer",
+        selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30",
         categoryColor && "border-l-4"
       )}
       style={categoryColor ? { borderLeftColor: categoryColor } : undefined}
     >
+      <div className="flex items-start gap-3">
+        {selectMode && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleSelect?.();
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-white/30 bg-white/10 text-purple-500 focus:ring-purple-500"
+            aria-label={selected ? "Deselect note" : "Select note"}
+          />
+        )}
+        <div className="min-w-0 flex-1">
       <div className="flex items-start justify-between gap-2">
         <h3 className="flex-1 truncate font-semibold text-white">{note.title || "Untitled"}</h3>
+        {!selectMode && (
         <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
           <button onClick={(e) => { e.stopPropagation(); onTogglePin(); }} className="rounded p-1 text-white/50 hover:text-amber-400">
             <Pin className={cn("h-3.5 w-3.5", note.pinned && "fill-amber-400 text-amber-400")} />
@@ -1472,6 +1924,7 @@ function NoteCard({
             <BookOpen className="h-3.5 w-3.5" />
           </button>
         </div>
+        )}
       </div>
       <p className="mt-2 line-clamp-2 text-sm text-white/60">{preview || "No content"}</p>
       <div className="mt-3 flex items-center justify-between">
@@ -1502,7 +1955,7 @@ function NoteCard({
       )}
       {summary && <p className="mt-2 line-clamp-2 text-xs text-white/50">{summary}</p>}
       {summaryLoading && <Loader2 className="mt-2 h-3 w-3 animate-spin text-white/50" />}
-      {!summary && !summaryLoading && (
+      {!selectMode && !summary && !summaryLoading && (
         <button
           onClick={(e) => { e.stopPropagation(); onSummarize(); }}
           className="mt-2 text-xs text-purple-400 hover:underline"
@@ -1510,7 +1963,39 @@ function NoteCard({
           Summarize
         </button>
       )}
+        </div>
+      </div>
     </div>
+  );
+
+  return (
+    <>
+      {card}
+      {ctxMenu && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed z-[80] min-w-[160px] rounded-lg border border-white/10 bg-black/95 py-1 shadow-xl"
+              style={{ left: ctxMenu.x, top: ctxMenu.y }}
+              onPointerDown={(e) => e.stopPropagation()}
+              role="menu"
+              aria-label="Note actions"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-white/10"
+                onClick={() => {
+                  onRequestDelete();
+                  setCtxMenu(null);
+                }}
+              >
+                Delete
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
   );
 }
 
@@ -1581,9 +2066,8 @@ function CategoryTab({
 }
 
 function StudyModal({
-  noteId,
-  noteContent,
-  noteTitle,
+  studyScope = "single",
+  savedSetTitle,
   mode,
   flashcards,
   quizQuestions,
@@ -1603,11 +2087,9 @@ function StudyModal({
   onCardFlip,
   onQuizSelect,
   onQuizNext,
-  setUpgradeModal,
 }: {
-  noteId: string;
-  noteContent?: string;
-  noteTitle?: string;
+  studyScope?: "single" | "multi" | "saved";
+  savedSetTitle?: string;
   mode: string;
   flashcards: { front: string; back: string }[];
   quizQuestions: { question: string; options: string[]; correctIndex: number }[];
@@ -1627,7 +2109,6 @@ function StudyModal({
   onCardFlip: () => void;
   onQuizSelect: (i: number) => void;
   onQuizNext: () => void;
-  setUpgradeModal: (x: { show: boolean; message?: string; feature?: string }) => void;
 }) {
   const q = quizQuestions[quizIndex];
   const total = quizQuestions.length;
@@ -1667,10 +2148,18 @@ function StudyModal({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <Card className="mx-4 max-w-lg p-6">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-white/60">
-              {cardIndex + 1} of {flashcards.length}
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className="text-sm text-white/60">
+                {cardIndex + 1} of {flashcards.length}
+              </span>
+              {studyScope === "multi" && (
+                <p className="mt-0.5 text-xs text-purple-300/90">From multiple notes</p>
+              )}
+              {studyScope === "saved" && savedSetTitle && (
+                <p className="mt-0.5 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
+              )}
+            </div>
             <button onClick={onClose} className="text-white/60 hover:text-white">
               <X className="h-5 w-5" />
             </button>
@@ -1712,10 +2201,18 @@ function StudyModal({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <Card className="mx-4 max-w-lg p-6">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-white/60">
-              Question {quizIndex + 1} of {total}
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className="text-sm text-white/60">
+                Question {quizIndex + 1} of {total}
+              </span>
+              {studyScope === "multi" && (
+                <p className="mt-0.5 text-xs text-purple-300/90">From multiple notes</p>
+              )}
+              {studyScope === "saved" && savedSetTitle && (
+                <p className="mt-0.5 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
+              )}
+            </div>
             <button onClick={onClose} className="text-white/60 hover:text-white">
               <X className="h-5 w-5" />
             </button>

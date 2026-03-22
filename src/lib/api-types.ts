@@ -23,3 +23,13 @@ export interface ApiError {
   error: string;
   code?: string;
 }
+
+export type StudySetKind = "flashcards" | "quiz";
+
+export interface StudySetSummary {
+  id: string;
+  title: string;
+  kind: StudySetKind;
+  created_at: string;
+  item_count: number;
+}

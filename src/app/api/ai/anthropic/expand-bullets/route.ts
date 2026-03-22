@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { anthropicComplete, hasAnthropicKey } from "@/lib/anthropic";
+import { anthropicComplete, ANTHROPIC_MODEL_SONNET, hasAnthropicKey } from "@/lib/anthropic";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -44,7 +44,11 @@ export async function POST(req: Request) {
   const userMessage = `Expand and improve this note:\n\n${content.slice(0, 8000)}`;
 
   try {
-    const text = await anthropicComplete(system, userMessage, { maxTokens: 4000 });
+    const text = await anthropicComplete(system, userMessage, {
+      maxTokens: 4000,
+      model: ANTHROPIC_MODEL_SONNET,
+      usage: { userId: session.user.id },
+    });
     return NextResponse.json({ expanded: text });
   } catch (err) {
     return NextResponse.json(

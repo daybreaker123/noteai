@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { anthropicComplete, hasAnthropicKey } from "@/lib/anthropic";
+import { anthropicComplete, ANTHROPIC_MODEL_SONNET, hasAnthropicKey } from "@/lib/anthropic";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -56,7 +56,11 @@ export async function POST(req: Request) {
   const system = `You are a helpful assistant. The user has access to their notes. Use the following notes as context to answer their question. When referencing information, cite the note title in parentheses, e.g. (from: Meeting Notes). Be concise and helpful.\n\nNOTES:\n${context.slice(0, 80000)}`;
 
   try {
-    const text = await anthropicComplete(system, message, { maxTokens: 1024 });
+    const text = await anthropicComplete(system, message, {
+      maxTokens: 1024,
+      model: ANTHROPIC_MODEL_SONNET,
+      usage: { userId: session.user.id },
+    });
     return NextResponse.json({ reply: text });
   } catch (err) {
     return NextResponse.json(

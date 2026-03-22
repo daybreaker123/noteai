@@ -11,15 +11,28 @@ export function useNotesRemote(userId: string | null) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState<"free" | "pro">("free");
+  const [proHeavyUsage, setProHeavyUsage] = useState(false);
+  const [proEstimatedSpendCents, setProEstimatedSpendCents] = useState(0);
   const [upgradeModal, setUpgradeModal] = useState<{ show: boolean; message?: string; feature?: string }>({ show: false });
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const fetchPlan = useCallback(async () => {
     const res = await fetch("/api/me/plan");
-    const json = (await res.json()) as { plan?: string };
+    const json = (await res.json()) as {
+      plan?: string;
+      proHeavyUsage?: boolean;
+      proEstimatedSpendCents?: number;
+    };
     setPlan(json.plan === "pro" ? "pro" : "free");
+    setProHeavyUsage(!!json.proHeavyUsage);
+    setProEstimatedSpendCents(typeof json.proEstimatedSpendCents === "number" ? json.proEstimatedSpendCents : 0);
     return json.plan === "pro";
   }, []);
+
+  /** Re-fetch plan/usage only (lighter than full refresh). */
+  const refreshPlan = useCallback(async () => {
+    await fetchPlan();
+  }, [fetchPlan]);
 
   const fetchCategories = useCallback(async () => {
     const res = await fetch("/api/categories");
@@ -92,10 +105,11 @@ export function useNotesRemote(userId: string | null) {
       }
     },
 
-    async delete(id: string) {
+    async delete(id: string): Promise<boolean> {
       const res = await fetch(`/api/notes/${id}`, { method: "DELETE" });
-      if (!res.ok) return;
+      if (!res.ok) return false;
       setNotes((prev) => prev.filter((n) => n.id !== id));
+      return true;
     },
 
     async createCategory(name: string, color?: string): Promise<Category | null> {
@@ -153,6 +167,9 @@ export function useNotesRemote(userId: string | null) {
     notes,
     loading,
     plan,
+    proHeavyUsage,
+    proEstimatedSpendCents,
+    refreshPlan,
     upgradeModal,
     setUpgradeModal,
     categoryError,

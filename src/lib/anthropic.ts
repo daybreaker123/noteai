@@ -1,5 +1,25 @@
+import { recordProApiSpendEstimate, resolveAnthropicModelForProUser } from "@/lib/pro-api-usage";
+import { ANTHROPIC_MODEL_HAIKU, ANTHROPIC_MODEL_SONNET } from "@/lib/anthropic-models";
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-export const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+
+export { ANTHROPIC_MODEL_HAIKU, ANTHROPIC_MODEL_SONNET } from "@/lib/anthropic-models";
+
+/** Same as {@link ANTHROPIC_MODEL_SONNET} (backward compatible export). */
+export const ANTHROPIC_MODEL = ANTHROPIC_MODEL_SONNET;
+
+export type AnthropicCompleteOptions = {
+  maxTokens?: number;
+  /** Defaults to Sonnet. Use {@link ANTHROPIC_MODEL_HAIKU} for lighter tasks. */
+  model?: string;
+  /**
+   * When set, Pro users past the soft spend limit use Haiku instead of Sonnet,
+   * and successful calls increment estimated monthly spend.
+   */
+  usage?: { userId: string; variant?: "complete" | "stream" };
+};
+
+export type AnthropicStreamOptions = AnthropicCompleteOptions;
 
 export function hasAnthropicKey(): boolean {
   return !!ANTHROPIC_API_KEY;
@@ -8,10 +28,18 @@ export function hasAnthropicKey(): boolean {
 export async function anthropicComplete(
   system: string,
   userMessage: string,
-  options?: { maxTokens?: number }
+  options?: AnthropicCompleteOptions
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY not configured");
+  }
+  let model = options?.model ?? ANTHROPIC_MODEL_SONNET;
+  let estimateCents = 0;
+  if (options?.usage?.userId) {
+    const variant = options.usage.variant ?? "complete";
+    const resolved = await resolveAnthropicModelForProUser(options.usage.userId, model, variant);
+    model = resolved.model;
+    estimateCents = resolved.estimateCents;
   }
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -21,7 +49,7 @@ export async function anthropicComplete(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
+      model,
       max_tokens: options?.maxTokens ?? 1024,
       system,
       messages: [{ role: "user", content: userMessage }],
@@ -34,17 +62,32 @@ export async function anthropicComplete(
   const json = (await res.json()) as {
     content?: { type: string; text?: string }[];
   };
-  return json.content?.find((c) => c.type === "text")?.text?.trim() ?? "";
+  const text = json.content?.find((c) => c.type === "text")?.text?.trim() ?? "";
+  if (options?.usage?.userId && estimateCents > 0) {
+    await recordProApiSpendEstimate(options.usage.userId, estimateCents);
+  }
+  return text;
 }
 
 export async function anthropicStream(
   system: string,
   userMessage: string,
   onChunk: (text: string) => void,
-  options?: { maxTokens?: number }
+  options?: AnthropicStreamOptions
 ): Promise<void> {
   if (!ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY not configured");
+  }
+  let model = options?.model ?? ANTHROPIC_MODEL_SONNET;
+  let estimateCents = 0;
+  if (options?.usage?.userId) {
+    const resolved = await resolveAnthropicModelForProUser(
+      options.usage.userId,
+      model,
+      options.usage.variant ?? "stream"
+    );
+    model = resolved.model;
+    estimateCents = resolved.estimateCents;
   }
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -54,7 +97,7 @@ export async function anthropicStream(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
+      model,
       max_tokens: options?.maxTokens ?? 1024,
       system,
       messages: [{ role: "user", content: userMessage }],
@@ -92,5 +135,8 @@ export async function anthropicStream(
         }
       }
     }
+  }
+  if (options?.usage?.userId && estimateCents > 0) {
+    await recordProApiSpendEstimate(options.usage.userId, estimateCents);
   }
 }

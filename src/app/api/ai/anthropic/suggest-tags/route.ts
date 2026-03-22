@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { anthropicComplete, hasAnthropicKey } from "@/lib/anthropic";
+import { anthropicComplete, ANTHROPIC_MODEL_HAIKU, hasAnthropicKey } from "@/lib/anthropic";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -21,7 +21,11 @@ export async function POST(req: Request) {
   const userMessage = content.slice(0, 8000);
 
   try {
-    const text = await anthropicComplete(system, userMessage, { maxTokens: 128 });
+    const text = await anthropicComplete(system, userMessage, {
+      maxTokens: 128,
+      model: ANTHROPIC_MODEL_HAIKU,
+      usage: { userId: session.user.id },
+    });
     const tags = text
       .split(",")
       .map((t) => t.trim().toLowerCase().replace(/[^a-z0-9-]/g, ""))

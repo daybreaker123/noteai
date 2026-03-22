@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { hasAnthropicKey, ANTHROPIC_MODEL } from "@/lib/anthropic";
+import { hasAnthropicKey } from "@/lib/anthropic";
+import { ANTHROPIC_MODEL_SONNET } from "@/lib/anthropic-models";
+import { recordProApiSpendEstimate, resolveAnthropicModelForProUser } from "@/lib/pro-api-usage";
 import { TUTOR_SYSTEM_PROMPT } from "@/lib/tutor-prompt";
 import {
   buildUserAnthropicContent,
@@ -234,6 +236,10 @@ export async function POST(req: Request) {
 
   let fullAssistant = "";
 
+  const resolved = await resolveAnthropicModelForProUser(userId, ANTHROPIC_MODEL_SONNET, "stream");
+  const tutorModel = resolved.model;
+  const tutorEstimateCents = resolved.estimateCents;
+
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -242,7 +248,7 @@ export async function POST(req: Request) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
+      model: tutorModel,
       max_tokens: 4096,
       system: TUTOR_SYSTEM_PROMPT,
       messages: anthropicMessages,
@@ -312,6 +318,7 @@ export async function POST(req: Request) {
             console.error("tutor assistant save failed", asstErr);
           }
         }
+        await recordProApiSpendEstimate(userId, tutorEstimateCents);
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       } catch (e) {
         failed = true;

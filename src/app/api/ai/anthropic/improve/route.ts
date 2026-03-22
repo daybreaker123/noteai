@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { anthropicComplete, hasAnthropicKey } from "@/lib/anthropic";
+import { anthropicComplete, ANTHROPIC_MODEL_SONNET, hasAnthropicKey } from "@/lib/anthropic";
 
 const FREE_IMPROVE_LIMIT = 5;
 
@@ -63,7 +63,11 @@ The result should feel like a smarter, more complete version of the original not
   const userMessage = content.slice(0, 16000);
 
   try {
-    const text = await anthropicComplete(system, userMessage, { maxTokens: 4000 });
+    const text = await anthropicComplete(system, userMessage, {
+      maxTokens: 4000,
+      model: ANTHROPIC_MODEL_SONNET,
+      usage: { userId: session.user.id },
+    });
 
     if (plan !== "pro" && supabaseAdmin) {
       const month = new Date().toISOString().slice(0, 7);

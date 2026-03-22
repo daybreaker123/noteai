@@ -43,6 +43,7 @@ export function TutorPage() {
   const [sending, setSending] = React.useState(false);
   const [streamingText, setStreamingText] = React.useState("");
   const [plan, setPlan] = React.useState<"free" | "pro">("free");
+  const [proHeavyUsage, setProHeavyUsage] = React.useState(false);
   const [tutorUsed, setTutorUsed] = React.useState(0);
   const [tutorLimit, setTutorLimit] = React.useState<number | null>(20);
   const [tutorImagesUsed, setTutorImagesUsed] = React.useState(0);
@@ -69,6 +70,21 @@ export function TutorPage() {
   React.useEffect(() => {
     scrollToBottom();
   }, [messages, streamingText, sending, scrollToBottom]);
+
+  const refreshProUsage = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/me/plan");
+      if (!res.ok) return;
+      const json = (await res.json()) as { proHeavyUsage?: boolean };
+      setProHeavyUsage(!!json.proHeavyUsage);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refreshProUsage();
+  }, [refreshProUsage]);
 
   const loadConversations = React.useCallback(async () => {
     setLoadingList(true);
@@ -305,6 +321,7 @@ export function TutorPage() {
       // restore attachment UX not fully possible without re-picking file
     } finally {
       setSending(false);
+      void refreshProUsage();
     }
   };
 
@@ -351,6 +368,15 @@ export function TutorPage() {
           </Link>
         </div>
       </header>
+
+      {plan === "pro" && proHeavyUsage ? (
+        <div
+          role="status"
+          className="shrink-0 border-b border-amber-400/25 bg-amber-500/15 px-4 py-2.5 text-center text-sm text-amber-50/95"
+        >
+          You&apos;re a heavy user this month — you may experience slightly slower responses as we manage server load.
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-56 shrink-0 flex-col border-r border-white/10 bg-black/20 md:w-64">

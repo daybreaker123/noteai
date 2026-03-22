@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { anthropicComplete, hasAnthropicKey } from "@/lib/anthropic";
+import { anthropicComplete, ANTHROPIC_MODEL_HAIKU, hasAnthropicKey } from "@/lib/anthropic";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -52,7 +52,11 @@ export async function POST(req: Request) {
   const userMessage = `Note:\n${content.slice(0, 4000)}\n\nWhich category fits best?`;
 
   try {
-    const text = await anthropicComplete(system, userMessage, { maxTokens: 50 });
+    const text = await anthropicComplete(system, userMessage, {
+      maxTokens: 50,
+      model: ANTHROPIC_MODEL_HAIKU,
+      usage: { userId: session.user.id },
+    });
     const idx = categoryNames.findIndex((n) => n.toLowerCase() === text.toLowerCase());
     const categoryId = idx >= 0 ? categoryIds[idx] : categoryIds[0];
     const categoryName = idx >= 0 ? categoryNames[idx] : categoryNames[0];

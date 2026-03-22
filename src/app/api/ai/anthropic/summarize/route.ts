@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { anthropicComplete, hasAnthropicKey } from "@/lib/anthropic";
+import { anthropicComplete, ANTHROPIC_MODEL_HAIKU, hasAnthropicKey } from "@/lib/anthropic";
 
 const FREE_SUMMARY_LIMIT = 10;
 
@@ -56,7 +56,11 @@ export async function POST(req: Request) {
   const userMessage = content.slice(0, 8000);
 
   try {
-    const text = await anthropicComplete(system, userMessage, { maxTokens: 300 });
+    const text = await anthropicComplete(system, userMessage, {
+      maxTokens: 300,
+      model: ANTHROPIC_MODEL_HAIKU,
+      usage: { userId: session.user.id },
+    });
 
     if (plan !== "pro" && supabaseAdmin) {
       const month = new Date().toISOString().slice(0, 7);

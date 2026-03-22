@@ -3,9 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hasAnthropicKey } from "@/lib/anthropic";
+import { ANTHROPIC_MODEL_SONNET } from "@/lib/anthropic-models";
+import { recordProApiSpendEstimate, resolveAnthropicModelForProUser } from "@/lib/pro-api-usage";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -58,6 +59,10 @@ export async function POST(req: Request) {
 
   const system = `You are a helpful assistant. The user has access to their notes. Use the following notes as context to answer their question. When referencing information, cite the note title in parentheses, e.g. (from: Meeting Notes). Be concise and helpful.\n\nNOTES:\n${context.slice(0, 80000)}`;
 
+  const resolved = await resolveAnthropicModelForProUser(session.user.id, ANTHROPIC_MODEL_SONNET, "stream");
+  const streamModel = resolved.model;
+  const streamEstimateCents = resolved.estimateCents;
+
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -67,7 +72,7 @@ export async function POST(req: Request) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
+        model: streamModel,
         max_tokens: 1024,
         system,
         messages: [{ role: "user", content: message }],
@@ -123,6 +128,7 @@ export async function POST(req: Request) {
               }
             }
           }
+          await recordProApiSpendEstimate(session.user.id, streamEstimateCents);
           controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
         } catch (e) {
           controller.error(e);
