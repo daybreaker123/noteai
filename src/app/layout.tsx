@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Studara — Your notes. Finally working for you.",
+  title: "Studara",
   description:
     "Studara: AI-powered studying for students. Summarize, search by meaning, and turn notes into flashcards.",
   icons: {
