@@ -105,8 +105,9 @@ export function Landing() {
             </span>
             <span className="absolute -inset-4 -z-0 rounded-2xl bg-gradient-to-r from-purple-500/20 via-transparent to-blue-500/20 blur-2xl" aria-hidden />
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-white/60">
-            AI-powered note-taking that actually helps you study. Summarize, search by meaning, and turn notes into flashcards — built for how students really learn.
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/60">
+            Stop re-reading your notes hoping something sticks. Studara improves your notes, turns them into summaries,
+            flashcards, quizzes, and gives you a 24/7 AI tutor — so you actually learn.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
