@@ -1,5 +1,3 @@
--- Baseline for PostgreSQL (NextAuth + app User model). Apply to production DATABASE_URL on Vercel.
-
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
