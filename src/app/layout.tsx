@@ -8,14 +8,15 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
+// Icons: /public/favicon.svg, favicon.ico, apple-touch-icon.png — run `npm run generate-favicon` after changing studara-mark.svg
 export const metadata: Metadata = {
   title: "Studara — Your notes. Finally working for you.",
   description:
     "Studara: AI-powered studying for students. Summarize, search by meaning, and turn notes into flashcards.",
   icons: {
     icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/favicon.ico", sizes: "16x16 32x32", type: "image/x-icon" },
     ],
     shortcut: "/favicon.ico",
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
