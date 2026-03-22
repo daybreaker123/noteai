@@ -57,7 +57,9 @@ export async function POST(req: Request) {
 2) Adding relevant context, examples, or detail that would help a student studying this topic
 3) Correcting anything that seems factually uncertain (the user marked one item with ?? - address that)
 4) Keeping the casual student voice but making it clearer and more complete
-5) Formatting it cleanly without excessive markdown headers - use simple spacing and dashes, not ## headers and bold everywhere.
+5) Using clear structure with line breaks and simple dashes or numbers for lists where helpful
+
+Output rules (critical): Do not use any markdown formatting — no asterisks for bold or italic, no ** or __, no # headers, no backticks, no [links](). Return plain text only with clean spacing and line breaks so the note reads naturally in a simple text editor.
 
 The result should feel like a smarter, more complete version of the original notes, not a corporate document. Return only the improved notes, no preamble.`;
   const userMessage = content.slice(0, 16000);
