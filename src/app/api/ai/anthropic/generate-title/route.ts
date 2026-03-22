@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { anthropicComplete, ANTHROPIC_MODEL_HAIKU, hasAnthropicKey } from "@/lib/anthropic";
+import { sanitizeGeneratedNoteTitle } from "@/lib/sanitize-note-title";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "content required" }, { status: 400 });
   }
 
-  const system = `Suggest a concise, descriptive title (3-8 words) for this note. Return only the title, no quotes or punctuation.`;
+  const system = `Suggest a concise, descriptive title (3-8 words) for this note. Return only the title as plain text — no markdown (no #, *, _, \`, quotes around the title, or list markers).`;
   const userMessage = content.slice(0, 8000);
 
   try {
@@ -26,8 +27,8 @@ export async function POST(req: Request) {
       model: ANTHROPIC_MODEL_HAIKU,
       usage: { userId: session.user.id },
     });
-    const title = text.trim().replace(/^["']|["']$/g, "");
-    return NextResponse.json({ title: title || "Untitled" });
+    const title = sanitizeGeneratedNoteTitle(text);
+    return NextResponse.json({ title });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Title generation failed" },

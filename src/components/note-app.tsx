@@ -10,6 +10,7 @@ import { DeleteCategoryModal } from "@/components/delete-category-modal";
 import { DeleteNoteModal } from "@/components/delete-note-modal";
 import { Button, Card, Input, Textarea, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { sanitizeGeneratedNoteTitle } from "@/lib/sanitize-note-title";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import type { Note, Category, StudySetSummary } from "@/lib/api-types";
 import {
@@ -833,12 +834,13 @@ export function NoteApp({ userId }: { userId: string }) {
                 });
                 const json = (await res.json()) as { title?: string; error?: string };
                 if (json.title) {
-                  setEditTitle(json.title);
+                  const title = sanitizeGeneratedNoteTitle(json.title);
+                  setEditTitle(title);
                   if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
                     if (draftNote && selectedNote.id === draftNote.id) {
-                      setDraftNote((d) => (d ? { ...d, title: json.title! } : null));
+                      setDraftNote((d) => (d ? { ...d, title } : null));
                     } else {
-                      actions.update(selectedNote.id, { title: json.title });
+                      actions.update(selectedNote.id, { title });
                     }
                   }
                 } else {
