@@ -77,8 +77,11 @@ export async function POST(req: Request) {
 
   const noteIdForRow = noteIds[0] ?? null;
 
+  /** Must match `study_sets.kind` (`flashcards` | `quiz`). */
+  const studySetKind = body.kind;
+
   const rowPayload =
-    body.kind === "flashcards"
+    studySetKind === "flashcards"
       ? { cards: (payload as { cards: unknown[] }).cards }
       : { questions: (payload as { questions: unknown[] }).questions };
 
@@ -88,7 +91,7 @@ export async function POST(req: Request) {
       user_id: session.user.id,
       note_id: noteIdForRow,
       note_ids: noteIds,
-      kind: body.kind,
+      kind: studySetKind,
       title,
       payload: rowPayload,
     })

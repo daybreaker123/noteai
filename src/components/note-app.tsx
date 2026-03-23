@@ -272,7 +272,7 @@ export function NoteApp({ userId }: { userId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: "flashcards",
+          kind: "flashcards", // persisted to study_sets.kind
           title,
           note_id: studyPayloadNoteIds[0] ?? null,
           note_ids: studyPayloadNoteIds,
@@ -303,7 +303,7 @@ export function NoteApp({ userId }: { userId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: "quiz",
+          kind: "quiz", // persisted to study_sets.kind
           title,
           note_id: studyPayloadNoteIds[0] ?? null,
           note_ids: studyPayloadNoteIds,
@@ -502,11 +502,29 @@ export function NoteApp({ userId }: { userId: string }) {
     });
   }
 
-  async function generateMultiStudy(kind: "flashcards" | "quiz") {
-    setMultiStudyError(null);
+  /** Opens the same Study Mode menu as single-note study; user picks Flashcards or Quiz there. */
+  function openMultiStudyMenu() {
+    if (plan !== "pro") {
+      setUpgradeModal({ show: true, feature: "study" });
+      return;
+    }
     const ids = [...gridSelectedIds].filter((id) => !id.startsWith("draft-"));
     if (ids.length === 0) {
       setMultiStudyError("Select at least one note.");
+      return;
+    }
+    setMultiStudyError(null);
+    setStudyError(null);
+    setStudyModal({ kind: "multi", noteIds: ids });
+    setStudyMode("menu");
+    exitGridSelection();
+  }
+
+  /** Generate multi-note flashcards/quiz — used from StudyModal (same entry as single-note flow). */
+  async function runMultiStudyGeneration(kind: "flashcards" | "quiz", noteIds: string[]) {
+    const ids = noteIds.filter((id) => !id.startsWith("draft-"));
+    if (ids.length === 0) {
+      setStudyError("No valid notes selected.");
       return;
     }
     setStudyError(null);
@@ -519,7 +537,7 @@ export function NoteApp({ userId }: { userId: string }) {
       });
       const json = (await res.json()) as {
         cards?: { front: string; back: string }[];
-        questions?: { question: string; options: string[]; correctIndex: number }[];
+        questions?: { question: string; options: string[]; correctIndex: number; explanation?: string }[];
         code?: string;
         error?: string;
       };
@@ -536,7 +554,7 @@ export function NoteApp({ userId }: { userId: string }) {
         return;
       }
       if (!res.ok) {
-        setMultiStudyError(json.error ?? "Generation failed");
+        setStudyError(json.error ?? "Generation failed");
         return;
       }
       if (kind === "flashcards") {
@@ -551,11 +569,9 @@ export function NoteApp({ userId }: { userId: string }) {
         setQuizScore(null);
         setQuizSelected(null);
       }
-      setStudyModal({ kind: "multi", noteIds: ids });
-      exitGridSelection();
       void refreshStudySets();
     } catch {
-      setMultiStudyError(kind === "flashcards" ? "Failed to generate flashcards" : "Failed to generate quiz");
+      setStudyError(kind === "flashcards" ? "Failed to generate flashcards" : "Failed to generate quiz");
     } finally {
       setStudyLoading(null);
     }
@@ -1130,32 +1146,14 @@ export function NoteApp({ userId }: { userId: string }) {
                   </span>
                   <Button
                     size="sm"
-                    onClick={() => generateMultiStudy("flashcards")}
-                    disabled={!!studyLoading || gridSelectedIds.size === 0}
-                    className="gap-1.5"
+                    onClick={openMultiStudyMenu}
+                    disabled={gridSelectedIds.size === 0}
+                    className="gap-1.5 border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-md shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
                   >
-                    {studyLoading === "flashcards" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <FileText className="h-3.5 w-3.5" />
-                    )}
-                    Generate Flashcards
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    Continue to study mode
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => generateMultiStudy("quiz")}
-                    disabled={!!studyLoading || gridSelectedIds.size === 0}
-                    className="gap-1.5"
-                  >
-                    {studyLoading === "quiz" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-3.5 w-3.5" />
-                    )}
-                    Generate Quiz
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={exitGridSelection} disabled={!!studyLoading}>
+                  <Button size="sm" variant="ghost" onClick={exitGridSelection}>
                     Cancel
                   </Button>
                 </div>
@@ -1428,6 +1426,10 @@ export function NoteApp({ userId }: { userId: string }) {
           onSaveQuiz={saveQuizSetToSupabase}
           onSelectMode={(m) => setStudyMode(m)}
           onLoadFlashcards={async () => {
+            if (studyModal.kind === "multi") {
+              await runMultiStudyGeneration("flashcards", studyModal.noteIds);
+              return;
+            }
             if (studyModal.kind !== "single") return;
             const nid = studyModal.noteId;
             setStudyError(null);
@@ -1472,6 +1474,10 @@ export function NoteApp({ userId }: { userId: string }) {
             }
           }}
           onLoadQuiz={async () => {
+            if (studyModal.kind === "multi") {
+              await runMultiStudyGeneration("quiz", studyModal.noteIds);
+              return;
+            }
             if (studyModal.kind !== "single") return;
             const nid = studyModal.noteId;
             setStudyError(null);
@@ -2266,7 +2272,9 @@ function StudyModal({
             </div>
             <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">Study Mode</h2>
             <p className="mt-1.5 max-w-md text-sm text-white/55">
-              Choose how you want to practice — flip through cards or test yourself with a quiz.
+              {studyScope === "multi"
+                ? "We’ll combine your selected notes. Choose flashcards or a quiz to generate."
+                : "Choose how you want to practice — flip through cards or test yourself with a quiz."}
             </p>
             <button
               type="button"
@@ -2427,7 +2435,7 @@ function StudyModal({
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Save flashcard set
+              Save to Study Sets
             </Button>
           )}
 
@@ -2494,7 +2502,7 @@ function StudyModal({
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  Save quiz
+                  Save to Study Sets
                 </Button>
               )}
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
