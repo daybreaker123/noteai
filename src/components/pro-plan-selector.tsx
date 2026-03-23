@@ -19,7 +19,7 @@ const PRO_FEATURES = [
   "Unlimited AI improvements",
   "Unlimited AI tutor messages",
   "Unlimited tutor image uploads",
-  "AI chat with your notes",
+  "Optional: use your notes as context in the AI Tutor",
   "AI auto-categorization",
   "AI writing assistant",
   "Semantic AI search",

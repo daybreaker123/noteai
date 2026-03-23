@@ -23,6 +23,7 @@ import {
 } from "@/lib/tutor-chat-attachments";
 import {
   ArrowLeft,
+  FileStack,
   FileText,
   GraduationCap,
   Loader2,
@@ -34,6 +35,8 @@ import {
   UserCircle,
   X,
 } from "lucide-react";
+
+const USE_MY_NOTES_STORAGE_KEY = "studara-tutor-use-my-notes";
 
 type PendingImageAttachment = { kind: "image"; file: File; preview: string };
 type PendingDocumentAttachment = {
@@ -124,6 +127,27 @@ export function TutorPage() {
   /** Set in `loadMessages` only after a successful HTTP response so we can re-fetch on remount / failed loads. */
   const lastMessagesLoadedForConversationRef = React.useRef<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = React.useState<string | null>(null);
+  const [useMyNotes, setUseMyNotes] = React.useState(false);
+
+  React.useEffect(() => {
+    try {
+      setUseMyNotes(localStorage.getItem(USE_MY_NOTES_STORAGE_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleUseMyNotes = React.useCallback(() => {
+    setUseMyNotes((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(USE_MY_NOTES_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
 
   const openImageLightbox = React.useCallback((src: string) => {
     if (src) setLightboxSrc(src);
@@ -510,6 +534,7 @@ export function TutorPage() {
         body: JSON.stringify({
           conversationId: activeConversationId,
           message: visibleContent.length > 0 ? visibleContent : undefined,
+          useMyNotes,
           image: imagePayload
             ? { mediaType: imagePayload.mediaType, data: imagePayload.data }
             : undefined,
@@ -663,6 +688,22 @@ export function TutorPage() {
               <h1 className="truncate text-[0.9375rem] font-semibold tracking-tight text-white/95 sm:text-base">
                 AI Tutor
               </h1>
+              {useMyNotes ? (
+                <>
+                  <span
+                    className="flex h-2 w-2 shrink-0 rounded-full bg-purple-400 shadow-[0_0_10px_rgba(192,132,252,0.9)] sm:hidden"
+                    title="Notes context is on"
+                    aria-hidden
+                  />
+                  <span
+                    className="hidden items-center gap-1.5 rounded-full border border-purple-500/35 bg-gradient-to-r from-purple-500/20 to-blue-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-100/95 shadow-[0_0_14px_rgba(168,85,247,0.25)] sm:inline-flex"
+                    title="Your saved notes are sent as context with each message"
+                  >
+                    <FileStack className="h-3 w-3 opacity-90" aria-hidden />
+                    Notes on
+                  </span>
+                </>
+              ) : null}
             </div>
           </div>
           <p className="hidden shrink-0 items-center gap-1.5 text-right text-[11px] leading-tight text-white/38 sm:flex">
@@ -930,6 +971,32 @@ export function TutorPage() {
             className="shrink-0 border-t border-white/[0.06] bg-[#08080c]/85 px-4 py-4 shadow-[0_-12px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl backdrop-saturate-150 sm:px-6 sm:py-5"
           >
             <div className="mx-auto max-w-3xl space-y-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={useMyNotes}
+                  onClick={toggleUseMyNotes}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition sm:text-[13px]",
+                    useMyNotes
+                      ? "border-purple-500/45 bg-gradient-to-r from-purple-500/30 to-blue-500/25 text-white shadow-[0_0_20px_rgba(139,92,246,0.22)] ring-1 ring-purple-400/20"
+                      : "border-white/[0.12] bg-white/[0.04] text-white/70 hover:border-white/20 hover:bg-white/[0.07] hover:text-white/90"
+                  )}
+                >
+                  <FileStack className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                  Use My Notes
+                </button>
+                {useMyNotes ? (
+                  <span className="text-[11px] leading-snug text-purple-200/85 sm:text-xs">
+                    Your notes are included with each message you send.
+                  </span>
+                ) : (
+                  <span className="text-[11px] leading-snug text-white/38 sm:text-xs">
+                    Turn on to let the tutor use your saved notes as context.
+                  </span>
+                )}
+              </div>
               {extractingDocument ? (
                 <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/70">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin" />

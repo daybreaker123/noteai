@@ -7,6 +7,10 @@ import { ANTHROPIC_MODEL_SONNET } from "@/lib/anthropic-models";
 import { recordProApiSpendEstimate, resolveAnthropicModelForProUser } from "@/lib/pro-api-usage";
 import { getUserPlanFromDb } from "@/lib/user-plan";
 import { TUTOR_SYSTEM_PROMPT } from "@/lib/tutor-prompt";
+import {
+  buildTutorNotesContextDigest,
+  TUTOR_NOTES_CONTEXT_INSTRUCTION,
+} from "@/lib/tutor-notes-context";
 import { generateTutorConversationTitleFromExchange } from "@/lib/tutor-conversation-title";
 import { TUTOR_EXTRACTED_TEXT_MAX_CHARS } from "@/lib/tutor-chat-attachments";
 import {
@@ -80,6 +84,8 @@ async function decrementTutorUsage(userId: string, includeImage: boolean): Promi
 type IncomingBody = {
   conversationId?: string | null;
   message?: string;
+  /** When true, fetch the user’s notes from Supabase and append as system context for this request. */
+  useMyNotes?: boolean;
   image?: {
     mediaType?: string;
     data?: string;
@@ -106,6 +112,7 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json()) as IncomingBody;
+  const useMyNotes = body.useMyNotes === true;
   const rawMessage = typeof body.message === "string" ? body.message.trim() : "";
   if (rawMessage.length > TUTOR_MAX_MESSAGE_CHARS) {
     return NextResponse.json(
@@ -312,6 +319,23 @@ export async function POST(req: Request) {
   const tutorModel = resolved.model;
   const tutorEstimateCents = resolved.estimateCents;
 
+  let systemPrompt = TUTOR_SYSTEM_PROMPT;
+  if (useMyNotes) {
+    const digest = await buildTutorNotesContextDigest(supabaseAdmin, userId);
+    const notesBody = digest.trim()
+      ? digest
+      : "(The user has no saved notes with text content yet.)";
+    systemPrompt = `${TUTOR_SYSTEM_PROMPT}
+
+---
+
+${TUTOR_NOTES_CONTEXT_INSTRUCTION}
+
+## User's personal notes
+
+${notesBody}`;
+  }
+
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -322,7 +346,7 @@ export async function POST(req: Request) {
     body: JSON.stringify({
       model: tutorModel,
       max_tokens: 4096,
-      system: TUTOR_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: anthropicMessages,
       stream: true,
     }),

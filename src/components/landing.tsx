@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   Sparkles,
-  MessageCircle,
+  FileStack,
   FolderTree,
   ScanSearch,
   Wand2,
@@ -206,9 +206,9 @@ export function Landing() {
                 desc: "Paste in messy, incomplete notes and let AI rewrite them into clear, detailed, well-structured study material in one click.",
               },
               {
-                icon: <MessageCircle className="h-6 w-6 text-blue-400" />,
-                title: "Ask your notes anything",
-                desc: "Chat with AI across all your notes. It actually reads them.",
+                icon: <FileStack className="h-6 w-6 text-blue-400" />,
+                title: "AI Tutor + your notes",
+                desc: "Flip on “Use My Notes” and the tutor can answer using everything you’ve saved — or keep it off for general help.",
               },
               {
                 icon: <FolderTree className="h-6 w-6 text-purple-400" />,
@@ -416,8 +416,8 @@ export function Landing() {
                   <p className="mt-2 text-sm text-white/50">Billed monthly · cancel anytime</p>
                 )}
                 <p className="mt-3 text-sm leading-relaxed text-white/55">
-                  Full power for students who want their notes to work harder — unlimited AI, chat, search, exports, and
-                  study tools.
+                  Full power for students who want their notes to work harder — unlimited AI, search, exports, and study
+                  tools.
                 </p>
                 <ul className="mt-6 flex flex-1 flex-col gap-2.5">
                   {PRO_FEATURES.map((t) => (

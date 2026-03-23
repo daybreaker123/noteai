@@ -19,7 +19,6 @@ import {
   Plus,
   Search,
   Pin,
-  MessageCircle,
   FileText,
   Sparkles,
   ChevronRight,
@@ -27,7 +26,6 @@ import {
   X,
   Download,
   BookOpen,
-  Send,
   Loader2,
   Tag,
   GraduationCap,
@@ -43,7 +41,6 @@ import {
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
   study: "Study Mode turns your notes into flashcards and quizzes. Generate practice questions and test your knowledge with AI.",
-  chat: "AI Chat lets you ask questions across all your notes. Get answers powered by your entire knowledge base.",
   export: "Export your notes as PDF or Markdown for sharing, printing, or use in other apps.",
   semantic: "Semantic search finds notes by meaning, not just keywords. Search for concepts and ideas.",
   writing: "The Writing Assistant expands bullet points into full paragraphs and improves clarity and structure.",
@@ -69,10 +66,6 @@ export function NoteApp({ userId }: { userId: string }) {
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | "all" | null>(null);
   const [selectedNoteId, setSelectedNoteId] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [chatOpen, setChatOpen] = React.useState(false);
-  const [chatMessages, setChatMessages] = React.useState<{ role: "user" | "assistant"; content: string }[]>([]);
-  const [chatInput, setChatInput] = React.useState("");
-  const [chatLoading, setChatLoading] = React.useState(false);
   type StudyModalState =
     | { kind: "single"; noteId: string }
     | { kind: "multi"; noteIds: string[] }
@@ -459,7 +452,6 @@ export function NoteApp({ userId }: { userId: string }) {
     setEditContent(note.content);
     setDraftNote(null);
     setSelectedCategoryId(note.category_id ?? "all");
-    setChatOpen(false);
     setStudyModal(null);
     exitGridSelection();
     if (truncated) {
@@ -474,7 +466,6 @@ export function NoteApp({ userId }: { userId: string }) {
     setSelectedCategoryId(categoryId);
     setSelectedNoteId(null);
     setDraftNote(null);
-    setChatOpen(false);
     setStudyModal(null);
     setSuggestBanner(null);
     exitGridSelection();
@@ -831,7 +822,6 @@ export function NoteApp({ userId }: { userId: string }) {
                     <button
                       type="button"
                       onClick={() => {
-                        setChatOpen(false);
                         void openSavedStudySet(s);
                       }}
                       className="min-w-0 flex-1 text-left"
@@ -894,19 +884,6 @@ export function NoteApp({ userId }: { userId: string }) {
             <GraduationCap className="h-4 w-4" />
             AI Tutor
           </Link>
-          <button
-            onClick={async () => {
-              if (plan !== "pro") {
-                setUpgradeModal({ show: true, feature: "chat" });
-                return;
-              }
-              setChatOpen(true);
-            }}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
-          >
-            <MessageCircle className="h-4 w-4" />
-            AI Chat
-          </button>
           <Link
             href="/profile"
             className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
@@ -1395,128 +1372,6 @@ export function NoteApp({ userId }: { userId: string }) {
           </div>
         )}
       </main>
-
-      {/* Chat sidebar */}
-      {chatOpen && (
-        <div className="flex w-80 flex-col border-l border-white/10 bg-black/20">
-          <div className="flex items-center justify-between border-b border-white/10 p-2">
-            <span className="font-semibold text-white">AI Chat</span>
-            <button onClick={() => setChatOpen(false)} className="text-white/60 hover:text-white">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-2">
-            {chatMessages.map((m, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "rounded-lg px-3 py-2 text-sm",
-                  m.role === "user" ? "ml-4 bg-white/10" : "mr-4 bg-white/5"
-                )}
-              >
-                {m.content}
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex items-center gap-2 text-white/60">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Thinking…</span>
-              </div>
-            )}
-          </div>
-          <form
-            className="flex gap-2 border-t border-white/10 p-2"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!chatInput.trim() || chatLoading) return;
-              const msg = chatInput.trim();
-              setChatInput("");
-              setChatMessages((m) => [...m, { role: "user", content: msg }]);
-              setChatLoading(true);
-              setChatMessages((m) => [...m, { role: "assistant", content: "" }]);
-              try {
-                const res = await fetch("/api/ai/anthropic/chat/stream", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ message: msg }),
-                });
-                if (!res.ok) {
-                  const json = (await res.json()) as { code?: string; error?: string };
-                  if (json.code && res.status === 402) {
-                    setUpgradeModal({ show: true, feature: "chat" });
-                  } else {
-                    setChatMessages((m) => {
-                      const next = [...m];
-                      const last = next[next.length - 1];
-                      if (last?.role === "assistant") next[next.length - 1] = { ...last, content: json.error ?? "Sorry, I couldn't respond." };
-                      return next;
-                    });
-                  }
-                  return;
-                }
-                const reader = res.body?.getReader();
-                if (!reader) {
-                  setChatMessages((m) => {
-                    const next = [...m];
-                    const last = next[next.length - 1];
-                    if (last?.role === "assistant") next[next.length - 1] = { ...last, content: "Sorry, I couldn't respond." };
-                    return next;
-                  });
-                  return;
-                }
-                const decoder = new TextDecoder();
-                let full = "";
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  const chunk = decoder.decode(value, { stream: true });
-                  const lines = chunk.split("\n");
-                  for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                      const data = line.slice(6);
-                      if (data === "[DONE]") continue;
-                      try {
-                        const parsed = JSON.parse(data) as { text?: string };
-                        if (parsed.text) {
-                          full += parsed.text;
-                          setChatMessages((m) => {
-                            const next = [...m];
-                            const last = next[next.length - 1];
-                            if (last?.role === "assistant") next[next.length - 1] = { ...last, content: full };
-                            return next;
-                          });
-                        }
-                      } catch {
-                        // skip
-                      }
-                    }
-                  }
-                }
-              } catch {
-                setChatMessages((m) => {
-                  const next = [...m];
-                  const last = next[next.length - 1];
-                  if (last?.role === "assistant") next[next.length - 1] = { ...last, content: "Sorry, I couldn't respond." };
-                  return next;
-                });
-              } finally {
-                setChatLoading(false);
-                void refreshPlan();
-              }
-            }}
-          >
-            <input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Ask about your notes..."
-              className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40"
-            />
-            <Button type="submit" size="sm">
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
-        </div>
-      )}
 
       {/* Study modal */}
       {studyModal && (
