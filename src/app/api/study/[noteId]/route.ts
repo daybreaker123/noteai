@@ -163,17 +163,7 @@ export async function POST(
       correctIndex: Math.min(Math.max(0, q.correctIndex ?? 0), 3),
       explanation: typeof q.explanation === "string" ? q.explanation.trim() : undefined,
     }));
-    if (!isDraft && supabaseAdmin) {
-      const { error: insErr } = await supabaseAdmin.from("study_sets").insert({
-        user_id: session.user.id,
-        note_id: noteId,
-        note_ids: [noteId],
-        kind: "quiz",
-        title: noteTitleForSet,
-        payload: { questions },
-      });
-      if (insErr) console.error("[study] study_sets insert quiz", insErr);
-    }
+    // Quizzes are not auto-persisted to study_sets — user saves explicitly from the results screen.
     return NextResponse.json({ questions });
   } catch (err) {
     return NextResponse.json(

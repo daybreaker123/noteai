@@ -181,16 +181,7 @@ export async function POST(req: Request) {
       explanation: typeof q.explanation === "string" ? q.explanation.trim() : undefined,
     }));
 
-    const title = buildStudySetTitleFromNoteTitles(ordered.map((n) => n.title));
-    const { error: insErr } = await supabaseAdmin.from("study_sets").insert({
-      user_id: session.user.id,
-      note_id: noteIds[0] ?? null,
-      note_ids: noteIds,
-      kind: "quiz",
-      title,
-      payload: { questions },
-    });
-    if (insErr) console.error("[study/multi] study_sets insert quiz", insErr);
+    // Quizzes are not auto-persisted to study_sets — user saves explicitly from the results screen.
 
     if (plan !== "pro") {
       await incrementFreeStudyMultiple(session.user.id);
