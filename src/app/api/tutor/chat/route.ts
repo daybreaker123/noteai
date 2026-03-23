@@ -19,6 +19,16 @@ import {
 } from "@/lib/tutor-anthropic-content";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+/** Lets Node flush streamed bytes to the client instead of buffering many tokens in one chunk. */
+function yieldToFlushStream(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof setImmediate === "function") setImmediate(resolve);
+    else setTimeout(resolve, 0);
+  });
+}
+
+export const dynamic = "force-dynamic";
 const FREE_TUTOR_MESSAGES_PER_MONTH = 20;
 const FREE_TUTOR_IMAGES_PER_MONTH = 5;
 const MAX_CONTEXT_MESSAGES = 40;
@@ -300,30 +310,32 @@ export async function POST(req: Request) {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
+          const lines = buffer.split(/\r?\n/);
           buffer = lines.pop() ?? "";
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              if (data === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(data) as {
-                  type?: string;
-                  delta?: { type?: string; text?: string };
-                };
-                if (
-                  parsed.type === "content_block_delta" &&
-                  parsed.delta?.type === "text_delta" &&
-                  parsed.delta?.text
-                ) {
-                  fullAssistant += parsed.delta.text;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`)
-                  );
-                }
-              } catch {
-                // skip malformed
+          for (const raw of lines) {
+            const line = raw.replace(/^\s+/, "");
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6);
+            if (data === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(data) as {
+                type?: string;
+                delta?: { type?: string; text?: string };
+              };
+              if (
+                parsed.type === "content_block_delta" &&
+                parsed.delta?.type === "text_delta" &&
+                parsed.delta?.text
+              ) {
+                fullAssistant += parsed.delta.text;
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`)
+                );
+                // Critical: yield so Next/Node streams each chunk to the browser instead of batching.
+                await yieldToFlushStream();
               }
+            } catch {
+              // skip malformed
             }
           }
         }

@@ -87,8 +87,10 @@ export function TutorPage() {
     void refreshProUsage();
   }, [refreshProUsage]);
 
-  const loadConversations = React.useCallback(async () => {
-    setLoadingList(true);
+  const loadConversations = React.useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setLoadingList(true);
+    }
     try {
       const res = await fetch("/api/tutor/conversations");
       if (!res.ok) return;
@@ -107,19 +109,25 @@ export function TutorPage() {
       setTutorImagesUsed(json.tutorImagesUsed ?? 0);
       setTutorImagesLimit(json.tutorImagesLimit ?? null);
     } finally {
-      setLoadingList(false);
+      if (!opts?.silent) {
+        setLoadingList(false);
+      }
     }
   }, []);
 
-  const loadMessages = React.useCallback(async (conversationId: string) => {
-    setLoadingMessages(true);
+  const loadMessages = React.useCallback(async (conversationId: string, opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setLoadingMessages(true);
+    }
     try {
       const res = await fetch(`/api/tutor/conversations/${conversationId}/messages`);
       if (!res.ok) return;
       const json = (await res.json()) as { messages?: ChatMessage[] };
       setMessages((json.messages ?? []) as ChatMessage[]);
     } finally {
-      setLoadingMessages(false);
+      if (!opts?.silent) {
+        setLoadingMessages(false);
+      }
     }
   }, []);
 
@@ -243,7 +251,7 @@ export function TutorPage() {
         setMessages((m) => m.filter((x) => x.id !== optimisticUser.id));
         setInput(text);
         setUpgradeModal(json.code === "FREE_LIMIT_TUTOR_IMAGES" ? "images" : "messages");
-        await loadConversations();
+        await loadConversations({ silent: true });
         return;
       }
 
@@ -265,8 +273,10 @@ export function TutorPage() {
       let buffer = "";
       let convId: string | null = activeConversationId;
       let full = "";
+      const TEMP_ASSISTANT_ID = "temp-assistant";
 
-      const applySseLine = (line: string) => {
+      const applySseLine = (rawLine: string) => {
+        const line = rawLine.replace(/^\s+/, "");
         if (!line.startsWith("data: ")) return;
         const data = line.slice(6).trim();
         if (data === "[DONE]") return;
@@ -288,29 +298,41 @@ export function TutorPage() {
         }
       };
 
+      // Line-based SSE parsing (don’t wait for blank-line event boundaries — lower latency).
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split("\n\n");
-        buffer = blocks.pop() ?? "";
-        for (const block of blocks) {
-          for (const line of block.split("\n")) {
-            applySseLine(line);
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        for (const line of buffer.split("\n")) {
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
           applySseLine(line);
         }
       }
 
-      setStreamingText("");
+      // Seamless handoff: keep assistant text visible in `messages` before clearing the stream buffer,
+      // then hydrate from Supabase without showing an empty gap.
+      if (full.trim()) {
+        const assistantMsg: ChatMessage = {
+          id: TEMP_ASSISTANT_ID,
+          role: "assistant",
+          content: full,
+          created_at: new Date().toISOString(),
+        };
+        flushSync(() => {
+          setMessages((prev) => {
+            const withoutStale = prev.filter((m) => m.id !== TEMP_ASSISTANT_ID);
+            return [...withoutStale, assistantMsg];
+          });
+          setStreamingText("");
+        });
+      } else {
+        setStreamingText("");
+      }
+
       if (convId) {
-        await loadMessages(convId);
-        await loadConversations();
+        await loadMessages(convId, { silent: true });
+        await loadConversations({ silent: true });
       }
       setPendingNewChat(false);
     } catch {
