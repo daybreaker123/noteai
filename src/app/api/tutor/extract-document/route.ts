@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { TUTOR_DOCUMENT_MAX_BYTES, TUTOR_EXTRACTED_TEXT_MAX_CHARS } from "@/lib/tutor-chat-attachments";
-import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
+import { extractPdfOrDocxTextFromBuffer } from "@/lib/extract-document-text";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,24 +50,10 @@ export async function POST(req: Request) {
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
-  let text = "";
+  let text: string;
 
   try {
-    if (isPdf) {
-      const parser = new PDFParse({ data: buf });
-      const result = await parser.getText();
-      await parser.destroy();
-      text = result.text ?? "";
-    } else {
-      const result = await mammoth.extractRawText({ buffer: buf });
-      text = result.value ?? "";
-      if (result.messages?.length) {
-        const warns = result.messages.filter((m) => m.type === "error").map((m) => m.message);
-        if (warns.length) {
-          console.warn("[tutor/extract-document] mammoth messages:", warns);
-        }
-      }
-    }
+    text = await extractPdfOrDocxTextFromBuffer(buf, isPdf ? "pdf" : "docx");
   } catch (e) {
     console.error("[tutor/extract-document]", e);
     return NextResponse.json({ error: "Could not read this file. Try another export or a smaller file." }, { status: 422 });

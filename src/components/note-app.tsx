@@ -11,6 +11,7 @@ import { DeleteNoteModal } from "@/components/delete-note-modal";
 import { Button, Card, Input, Textarea, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { sanitizeGeneratedNoteTitle } from "@/lib/sanitize-note-title";
+import { NOTE_IMPORT_FILE_ACCEPT } from "@/lib/note-import-utils";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import type { Note, Category, StudySetSummary } from "@/lib/api-types";
 import { buildStudySetTitleFromNoteTitles } from "@/lib/study-set-utils";
@@ -37,6 +38,7 @@ import {
   HelpCircle,
   Save,
   Check,
+  Upload,
 } from "lucide-react";
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -122,6 +124,9 @@ export function NoteApp({ userId }: { userId: string }) {
     fromEditor?: boolean;
   } | null>(null);
   const [deleteNoteLoading, setDeleteNoteLoading] = React.useState(false);
+  const [importDocLoading, setImportDocLoading] = React.useState(false);
+  const [importDocError, setImportDocError] = React.useState<string | null>(null);
+  const importDocumentInputRef = React.useRef<HTMLInputElement>(null);
 
   const refreshStudySets = React.useCallback(async () => {
     try {
@@ -427,6 +432,43 @@ export function NoteApp({ userId }: { userId: string }) {
     })();
   }
 
+  async function handleImportDocumentChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (plan !== "pro" && notes.length >= FREE_NOTE_LIMIT) {
+      setUpgradeModal({
+        show: true,
+        message: "You've reached the free limit — upgrade to Pro for unlimited notes",
+      });
+      return;
+    }
+    setImportDocError(null);
+    setImportDocLoading(true);
+    const sid = selectedCategoryIdRef.current;
+    const targetCategoryId: string | null = sid && sid !== "all" ? sid : null;
+    const result = await actions.importDocumentFromFile(file, targetCategoryId);
+    setImportDocLoading(false);
+    if (result.ok === false) {
+      setImportDocError(result.error);
+      return;
+    }
+    const { note, truncated } = result;
+    setSelectedNoteId(note.id);
+    setEditTitle(note.title);
+    setEditContent(note.content);
+    setDraftNote(null);
+    setSelectedCategoryId(note.category_id ?? "all");
+    setChatOpen(false);
+    setStudyModal(null);
+    exitGridSelection();
+    if (truncated) {
+      setToolbarError(
+        "This document was very long — only the first portion was imported. You can add the rest manually if needed."
+      );
+    }
+  }
+
   /** Sidebar category pick: leave note editor and show the grid for that category. */
   function selectSidebarCategory(categoryId: string | "all") {
     setSelectedCategoryId(categoryId);
@@ -639,6 +681,23 @@ export function NoteApp({ userId }: { userId: string }) {
 
   return (
     <div className="relative flex h-dvh bg-[#0a0a0f]">
+      {importDocLoading && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm"
+          role="alertdialog"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label="Importing document"
+        >
+          <div className="max-w-sm rounded-2xl border border-white/10 bg-[#12121a]/95 px-8 py-6 text-center shadow-xl shadow-purple-950/40">
+            <Loader2 className="mx-auto h-9 w-9 animate-spin text-purple-400" aria-hidden />
+            <p className="mt-4 text-sm font-medium text-white">Importing document…</p>
+            <p className="mt-1.5 text-xs text-white/50">
+              Extracting text — large PDFs may take a little longer.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Background gradient (landing-style) */}
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -top-24 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/15 via-blue-500/10 to-fuchsia-500/10 blur-3xl" />
@@ -652,13 +711,55 @@ export function NoteApp({ userId }: { userId: string }) {
           <div className="text-xs text-white/60">AI note-taking</div>
         </div>
         <div className="flex shrink-0 flex-col p-3">
-          <button
-            onClick={handleNewNote}
-            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
-          >
-            <Plus className="h-4 w-4" />
-            New Note
-          </button>
+          <input
+            ref={importDocumentInputRef}
+            type="file"
+            accept={NOTE_IMPORT_FILE_ACCEPT}
+            className="hidden"
+            aria-hidden
+            onChange={handleImportDocumentChange}
+          />
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleNewNote}
+              className="flex min-w-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-2 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500 sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+              New Note
+            </button>
+            <button
+              type="button"
+              title="PDF or Word (.docx) only"
+              aria-label="Import document from PDF or Word"
+              disabled={importDocLoading}
+              onClick={() => {
+                setImportDocError(null);
+                importDocumentInputRef.current?.click();
+              }}
+              className="flex min-w-0 items-center justify-center gap-1 rounded-xl border border-white/15 bg-white/[0.06] px-1.5 py-2.5 text-[11px] font-semibold leading-tight text-white/90 shadow-md transition hover:border-purple-500/35 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40 sm:gap-1.5 sm:px-2 sm:text-xs"
+            >
+              {importDocLoading ? (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin sm:h-4 sm:w-4" aria-hidden />
+              ) : (
+                <Upload className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
+              )}
+              <span className="min-w-0 text-center">Import Document</span>
+            </button>
+          </div>
+          {importDocError && (
+            <div className="-mt-2 mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+              <span>{importDocError}</span>
+              <button
+                type="button"
+                onClick={() => setImportDocError(null)}
+                className="shrink-0 text-red-300 hover:text-white"
+                aria-label="Dismiss"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           <div className="mb-4 flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur">
             <Search className="h-4 w-4 shrink-0 text-white/50" />
             <input
@@ -1162,6 +1263,19 @@ export function NoteApp({ userId }: { userId: string }) {
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
                     size="sm"
+                    variant="ghost"
+                    disabled={importDocLoading}
+                    onClick={() => {
+                      setImportDocError(null);
+                      importDocumentInputRef.current?.click();
+                    }}
+                    className="gap-1.5 border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Import Document
+                  </Button>
+                  <Button
+                    size="sm"
                     onClick={startGridSelection}
                     className="gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/15"
                   >
@@ -1179,11 +1293,25 @@ export function NoteApp({ userId }: { userId: string }) {
               <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-12">
                 <FileText className="h-12 w-12 text-white/30" />
                 <p className="mt-4 text-white/60">No notes yet</p>
-                <p className="mt-1 text-sm text-white/40">Click New Note to create your first note</p>
-                <Button onClick={handleNewNote} className="mt-6">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Note
-                </Button>
+                <p className="mt-1 text-sm text-white/40">Create a note or import a PDF or Word file</p>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                  <Button onClick={handleNewNote}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Note
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={importDocLoading}
+                    onClick={() => {
+                      setImportDocError(null);
+                      importDocumentInputRef.current?.click();
+                    }}
+                    className="border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import Document
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="grid flex-1 content-start gap-4 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

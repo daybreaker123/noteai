@@ -87,6 +87,48 @@ export function useNotesRemote(userId: string | null) {
       return note;
     },
 
+    async importDocumentFromFile(
+      file: File,
+      categoryId: string | null
+    ): Promise<
+      | { readonly ok: true; note: Note; truncated: boolean }
+      | { readonly ok: false; error: string }
+    > {
+      const form = new FormData();
+      form.append("file", file);
+      if (categoryId) form.append("category_id", categoryId);
+      const res = await fetch("/api/notes/import-document", { method: "POST", body: form });
+      const json = (await res.json().catch(() => null)) as (Note & { truncated?: boolean }) | ApiError | null;
+      if (!json) {
+        return { ok: false, error: "Something went wrong. Please try again." };
+      }
+      if (res.status === 401) {
+        return { ok: false, error: "Sign in to import documents." };
+      }
+      if (handleApiError(res, json as ApiError)) {
+        return { ok: false, error: (json as ApiError).error ?? "Upgrade required" };
+      }
+      if (!res.ok || !("id" in json && typeof (json as Note).id === "string")) {
+        const err = (json as ApiError)?.error ?? `Import failed (${res.status})`;
+        return { ok: false, error: err };
+      }
+      const raw = json as Note & { truncated?: boolean };
+      const truncated = raw.truncated === true;
+      const note: Note = {
+        id: raw.id,
+        user_id: raw.user_id,
+        category_id: raw.category_id ?? null,
+        title: raw.title,
+        content: raw.content,
+        pinned: raw.pinned,
+        tags: Array.isArray(raw.tags) ? raw.tags : [],
+        created_at: raw.created_at,
+        updated_at: raw.updated_at,
+      };
+      setNotes((prev) => [...prev, note]);
+      return { ok: true, note, truncated };
+    },
+
     async update(id: string, patch: Partial<Pick<Note, "title" | "content" | "category_id" | "pinned" | "tags">>) {
       if (!id || id.startsWith("draft-")) return;
       try {
