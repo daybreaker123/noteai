@@ -114,7 +114,7 @@ export default function TermsPage() {
                     {contactEmail ? (
                       <>
                         <a data-custom-class="link" href="mailto:studarausersupport@gmail.com">
-                          studarausersupport@gmail.com
+                          support@studara.org
                         </a>
                         .
                       </>

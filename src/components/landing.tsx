@@ -534,6 +534,12 @@ export function Landing() {
               <Link href="/cookies" className="transition hover:text-white/80">
                 Cookie Policy
               </Link>
+              <a
+                href="mailto:studarausersupport@gmail.com"
+                className="transition hover:text-white/80"
+              >
+                Support · support@studara.org
+              </a>
             </div>
           </div>
           <div className="mt-8 text-xs text-white/40">

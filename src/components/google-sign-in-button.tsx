@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { Button } from "@/components/ui";
 
 /**
@@ -26,7 +26,7 @@ export function GoogleSignInButton({ callbackUrl }: { callbackUrl: string }) {
       });
   }, []);
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
     const absolute =
       callbackUrl.startsWith("http://") || callbackUrl.startsWith("https://")
         ? callbackUrl
@@ -34,8 +34,15 @@ export function GoogleSignInButton({ callbackUrl }: { callbackUrl: string }) {
             callbackUrl.startsWith("/") ? callbackUrl : `/${callbackUrl}`,
             window.location.origin
           ).href;
-    // redirect: true (default) — full navigation so Set-Cookie from OAuth completes before /auth/callback
-    void signIn("google", { callbackUrl: absolute, redirect: true });
+    // Clear any existing NextAuth JWT first. Otherwise NextAuth links the new Google account to the
+    // *current* Studara user (see callback-handler: oauth + sessionToken → linkAccount to logged-in user).
+    await signOut({ redirect: false });
+    // prompt forces Google’s account picker; provider also sets authorization.params.prompt.
+    void signIn(
+      "google",
+      { callbackUrl: absolute, redirect: true },
+      { prompt: "select_account" }
+    );
   };
 
   if (!ready) {

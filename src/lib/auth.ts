@@ -28,15 +28,22 @@ export const authOptions: NextAuthOptions = {
   providers: [
     ...(googleConfigured
       ? [
-          // Link Google to an existing user with the same verified email (e.g. password signup first).
-          // Set on the provider object and in GoogleProvider() options so merge keeps it on InternalProvider.
           {
             ...GoogleProvider({
               clientId: googleId!,
               clientSecret: googleSecret!,
-              allowDangerousEmailAccountLinking: true,
+              // Must stay false: when true, a brand-new Google account whose email matches an existing
+              // User row is merged into that user without verifying ownership — wrong for multi-tenant safety.
+              allowDangerousEmailAccountLinking: false,
+              // Always show the account picker so the browser’s active Google session doesn’t silently win.
+              authorization: {
+                params: {
+                  prompt: "select_account",
+                  scope: "openid email profile",
+                },
+              },
             }),
-            allowDangerousEmailAccountLinking: true,
+            allowDangerousEmailAccountLinking: false,
           },
         ]
       : []),
@@ -48,8 +55,9 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+        const email = credentials.email.trim().toLowerCase();
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
         if (!user?.password) return null;
         const ok = await compare(credentials.password, user.password);
@@ -72,6 +80,16 @@ export const authOptions: NextAuthOptions = {
     },
   },
   callbacks: {
+    /**
+     * NextAuth already resolves OAuth users by (provider, providerAccountId) first (Google `sub`).
+     * This callback only gates access; identity linking is handled by the adapter + JWT session rules.
+     */
+    async signIn({ account }) {
+      if (account?.provider === "google" && !account.providerAccountId) {
+        return false;
+      }
+      return true;
+    },
     async redirect({ url, baseUrl }) {
       // Prefer NEXTAUTH_URL so production (e.g. Vercel) never uses a mis-inferred http://localhost base.
       const baseNorm = (getNextAuthUrl() ?? baseUrl).replace(/\/$/, "");

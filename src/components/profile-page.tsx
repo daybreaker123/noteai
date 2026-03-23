@@ -433,6 +433,15 @@ export function ProfilePage() {
               Member since{" "}
               <span className="font-medium text-white/90">{memberSince}</span>
             </p>
+            <p className="mt-4 text-sm text-white/60">
+              Need help? Contact us at{" "}
+              <a
+                href="mailto:studarausersupport@gmail.com"
+                className="font-medium text-violet-300/95 underline decoration-violet-400/40 underline-offset-2 transition hover:text-violet-200"
+              >
+                support@studara.org
+              </a>
+            </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Button
                 type="button"
