@@ -1,7 +1,7 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { Adapter, AdapterAccount, AdapterUser } from "next-auth/adapters";
-import { AccountNotLinkedError } from "next-auth/core/errors";
 import type { PrismaClient } from "@prisma/client";
+import { AccountNotLinkedError } from "@/lib/auth-account-not-linked-error";
 import { getSessionUserFromJwt } from "@/lib/auth-jwt";
 import { decodeGoogleIdTokenPayload } from "@/lib/google-id-token";
 
