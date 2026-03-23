@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hasAnthropicKey } from "@/lib/anthropic";
 import { ANTHROPIC_MODEL_SONNET } from "@/lib/anthropic-models";
 import { recordProApiSpendEstimate, resolveAnthropicModelForProUser } from "@/lib/pro-api-usage";
+import { getUserPlanFromDb } from "@/lib/user-plan";
 import { TUTOR_SYSTEM_PROMPT } from "@/lib/tutor-prompt";
 import {
   buildUserAnthropicContent,
@@ -19,14 +20,6 @@ import {
 } from "@/lib/tutor-anthropic-content";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-
-/** Lets Node flush streamed bytes to the client instead of buffering many tokens in one chunk. */
-function yieldToFlushStream(): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof setImmediate === "function") setImmediate(resolve);
-    else setTimeout(resolve, 0);
-  });
-}
 
 export const dynamic = "force-dynamic";
 const FREE_TUTOR_MESSAGES_PER_MONTH = 20;
@@ -92,7 +85,8 @@ type IncomingBody = {
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const userId = typeof session?.user?.id === "string" ? session.user.id.trim() : "";
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!hasAnthropicKey() || !ANTHROPIC_API_KEY) {
@@ -102,7 +96,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   }
 
-  const userId = session.user.id;
   const body = (await req.json()) as IncomingBody;
   const rawMessage = body.message?.trim() ?? "";
   let imagePayload: StoredImageAttachment[] | null = null;
@@ -133,9 +126,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Enter a message or attach an image." }, { status: 400 });
   }
 
-  let plan: "free" | "pro" = "free";
-  const { data: planRow } = await supabaseAdmin.from("user_plans").select("plan").eq("user_id", userId).single();
-  plan = planRow?.plan === "pro" ? "pro" : "free";
+  const plan = await getUserPlanFromDb(userId);
 
   const month = new Date().toISOString().slice(0, 7);
   if (plan !== "pro") {
@@ -331,8 +322,6 @@ export async function POST(req: Request) {
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`)
                 );
-                // Critical: yield so Next/Node streams each chunk to the browser instead of batching.
-                await yieldToFlushStream();
               }
             } catch {
               // skip malformed

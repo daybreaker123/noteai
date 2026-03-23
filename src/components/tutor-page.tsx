@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { flushSync } from "react-dom";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
@@ -42,7 +41,8 @@ export function TutorPage() {
   const [loadingList, setLoadingList] = React.useState(true);
   const [loadingMessages, setLoadingMessages] = React.useState(false);
   const [sending, setSending] = React.useState(false);
-  const [streamingText, setStreamingText] = React.useState("");
+  /** True while the tutor reply is being generated (Option A: no token-by-token UI; show typing only). */
+  const [awaitingTutorReply, setAwaitingTutorReply] = React.useState(false);
   const [plan, setPlan] = React.useState<"free" | "pro">("free");
   const [proHeavyUsage, setProHeavyUsage] = React.useState(false);
   const [tutorUsed, setTutorUsed] = React.useState(0);
@@ -70,7 +70,7 @@ export function TutorPage() {
 
   React.useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingText, sending, scrollToBottom]);
+  }, [messages, awaitingTutorReply, sending, scrollToBottom]);
 
   const refreshProUsage = React.useCallback(async () => {
     try {
@@ -168,7 +168,7 @@ export function TutorPage() {
     setPendingNewChat(true);
     setActiveConversationId(null);
     setMessages([]);
-    setStreamingText("");
+    setAwaitingTutorReply(false);
     if (pendingImage) URL.revokeObjectURL(pendingImage.preview);
     setPendingImage(null);
   };
@@ -218,7 +218,6 @@ export function TutorPage() {
     if (pendingImage) URL.revokeObjectURL(pendingImage.preview);
     setPendingImage(null);
     setSending(true);
-    setStreamingText("");
 
     const optimisticAttachments: StoredImageAttachment[] | undefined = imagePayload
       ? [{ type: "image", media_type: imagePayload.mediaType, data: imagePayload.data }]
@@ -232,6 +231,7 @@ export function TutorPage() {
       attachments: optimisticAttachments,
     };
     setMessages((m) => [...m, optimisticUser]);
+    setAwaitingTutorReply(true);
 
     try {
       const res = await fetch("/api/tutor/chat", {
@@ -250,6 +250,7 @@ export function TutorPage() {
         const json = (await res.json().catch(() => ({}))) as { code?: string };
         setMessages((m) => m.filter((x) => x.id !== optimisticUser.id));
         setInput(text);
+        setAwaitingTutorReply(false);
         setUpgradeModal(json.code === "FREE_LIMIT_TUTOR_IMAGES" ? "images" : "messages");
         await loadConversations({ silent: true });
         return;
@@ -259,6 +260,7 @@ export function TutorPage() {
         const errText = await res.text();
         setMessages((m) => m.filter((x) => x.id !== optimisticUser.id));
         setInput(text);
+        setAwaitingTutorReply(false);
         alert(errText || "Something went wrong");
         return;
       }
@@ -266,6 +268,7 @@ export function TutorPage() {
       const reader = res.body?.getReader();
       if (!reader) {
         setMessages((m) => m.filter((x) => x.id !== optimisticUser.id));
+        setAwaitingTutorReply(false);
         return;
       }
 
@@ -275,6 +278,9 @@ export function TutorPage() {
       let full = "";
       const TEMP_ASSISTANT_ID = "temp-assistant";
 
+      const titlePreview =
+        messageText.slice(0, 80) + (messageText.length > 80 ? "…" : "") || "New chat";
+
       const applySseLine = (rawLine: string) => {
         const line = rawLine.replace(/^\s+/, "");
         if (!line.startsWith("data: ")) return;
@@ -283,22 +289,29 @@ export function TutorPage() {
         try {
           const parsed = JSON.parse(data) as { text?: string; conversationId?: string };
           if (parsed.conversationId) {
-            convId = parsed.conversationId;
-            setActiveConversationId(parsed.conversationId);
+            const id = parsed.conversationId;
+            convId = id;
+            setActiveConversationId(id);
+            setConversations((prev) => {
+              if (prev.some((c) => c.id === id)) return prev;
+              const now = new Date().toISOString();
+              const row: Conversation = {
+                id,
+                title: titlePreview,
+                updated_at: now,
+                created_at: now,
+              };
+              return [row, ...prev];
+            });
           }
           if (parsed.text) {
             full += parsed.text;
-            // React 18 batches updates in a tight loop — flush so each token paints as it arrives.
-            flushSync(() => {
-              setStreamingText(full);
-            });
           }
         } catch {
           /* skip */
         }
       };
 
-      // Line-based SSE parsing (don’t wait for blank-line event boundaries — lower latency).
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -310,8 +323,7 @@ export function TutorPage() {
         }
       }
 
-      // Seamless handoff: keep assistant text visible in `messages` before clearing the stream buffer,
-      // then hydrate from Supabase without showing an empty gap.
+      // Option A: reveal the full assistant message in one update (no incremental/streaming UI).
       if (full.trim()) {
         const assistantMsg: ChatMessage = {
           id: TEMP_ASSISTANT_ID,
@@ -319,16 +331,12 @@ export function TutorPage() {
           content: full,
           created_at: new Date().toISOString(),
         };
-        flushSync(() => {
-          setMessages((prev) => {
-            const withoutStale = prev.filter((m) => m.id !== TEMP_ASSISTANT_ID);
-            return [...withoutStale, assistantMsg];
-          });
-          setStreamingText("");
+        setMessages((prev) => {
+          const withoutStale = prev.filter((m) => m.id !== TEMP_ASSISTANT_ID);
+          return [...withoutStale, assistantMsg];
         });
-      } else {
-        setStreamingText("");
       }
+      setAwaitingTutorReply(false);
 
       if (convId) {
         await loadMessages(convId, { silent: true });
@@ -338,6 +346,7 @@ export function TutorPage() {
     } catch {
       setMessages((m) => m.filter((x) => x.id !== optimisticUser.id));
       setInput(text);
+      setAwaitingTutorReply(false);
       // restore attachment UX not fully possible without re-picking file
     } finally {
       setSending(false);
@@ -345,7 +354,7 @@ export function TutorPage() {
     }
   };
 
-  const showTyping = sending && !streamingText;
+  const showTyping = awaitingTutorReply;
 
   return (
     <div className="flex h-dvh flex-col bg-[#0a0a0f] text-white">
@@ -456,7 +465,7 @@ export function TutorPage() {
               <div className="flex h-full items-center justify-center text-white/40">
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
-            ) : messages.length === 0 && !sending && !streamingText ? (
+            ) : messages.length === 0 && !sending && !awaitingTutorReply ? (
               <div className="mx-auto max-w-xl pt-8 text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-white/10">
                   <GraduationCap className="h-7 w-7 text-emerald-300" />
@@ -510,17 +519,6 @@ export function TutorPage() {
                     </div>
                   </div>
                 ))}
-
-                {streamingText ? (
-                  <div className="flex gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-emerald-500/30 to-blue-600/30">
-                      <GraduationCap className="h-4 w-4 text-emerald-200" />
-                    </div>
-                    <div className="max-w-[85%] rounded-2xl border border-white/5 bg-white/5 px-4 py-2.5 text-sm text-white/95">
-                      <TutorMarkdown content={streamingText} />
-                    </div>
-                  </div>
-                ) : null}
 
                 {showTyping ? (
                   <div className="flex gap-3">

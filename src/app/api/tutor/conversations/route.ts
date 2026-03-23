@@ -2,22 +2,21 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getUserPlanFromDb } from "@/lib/user-plan";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const userId = typeof session?.user?.id === "string" ? session.user.id.trim() : "";
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!supabaseAdmin) {
     return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   }
 
-  const userId = session.user.id;
   const month = new Date().toISOString().slice(0, 7);
 
-  let plan: "free" | "pro" = "free";
-  const { data: planRow } = await supabaseAdmin.from("user_plans").select("plan").eq("user_id", userId).single();
-  plan = planRow?.plan === "pro" ? "pro" : "free";
+  const plan = await getUserPlanFromDb(userId);
 
   let tutorMessagesUsed = 0;
   let tutorImagesUsed = 0;
@@ -54,7 +53,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const userId = typeof session?.user?.id === "string" ? session.user.id.trim() : "";
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!supabaseAdmin) {
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { title?: string };
   const title = (body.title?.trim() || "New chat").slice(0, 120);
 
-  const conversationInsert = { user_id: session.user.id, title };
+  const conversationInsert = { user_id: userId, title };
   console.log("[tutor/conversations POST] tutor_conversations insert", {
     table: "tutor_conversations",
     payload: conversationInsert,
