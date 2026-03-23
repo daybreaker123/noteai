@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 import { sanitizeGeneratedNoteTitle } from "@/lib/sanitize-note-title";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import type { Note, Category, StudySetSummary } from "@/lib/api-types";
+import { buildStudySetTitleFromNoteTitles } from "@/lib/study-set-utils";
 import {
   Plus,
   Search,
@@ -34,6 +35,7 @@ import {
   Library,
   SquareStack,
   HelpCircle,
+  Save,
 } from "lucide-react";
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -100,6 +102,7 @@ export function NoteApp({ userId }: { userId: string }) {
   const [writingLoading, setWritingLoading] = React.useState(false);
   const [autoCategorizeLoading, setAutoCategorizeLoading] = React.useState(false);
   const [studyLoading, setStudyLoading] = React.useState<"flashcards" | "quiz" | null>(null);
+  const [studySaveLoading, setStudySaveLoading] = React.useState<"flashcards" | "quiz" | null>(null);
   const [studyError, setStudyError] = React.useState<string | null>(null);
   const [improveLoading, setImproveLoading] = React.useState(false);
   const [extractLoading, setExtractLoading] = React.useState(false);
@@ -235,6 +238,91 @@ export function NoteApp({ userId }: { userId: string }) {
       setEditContent(selectedNote.content);
     }
   }, [selectedNote?.id, selectedNote?.title, selectedNote?.content, draftNote]);
+
+  const studySourceLabel = React.useMemo(() => {
+    if (!studyModal) return "Untitled";
+    if (studyModal.kind === "saved") return studyModal.title;
+    if (studyModal.kind === "multi") {
+      const titles = studyModal.noteIds.map((id) => notes.find((n) => n.id === id)?.title);
+      return buildStudySetTitleFromNoteTitles(titles);
+    }
+    const nid = studyModal.noteId;
+    if (draftNote && nid === draftNote.id) return (editTitle ?? "Untitled").trim() || "Untitled";
+    return (notes.find((n) => n.id === nid)?.title ?? "Untitled").trim() || "Untitled";
+  }, [studyModal, notes, draftNote, editTitle]);
+
+  const studyPayloadNoteIds = React.useMemo((): string[] => {
+    if (!studyModal) return [];
+    if (studyModal.kind === "multi") return studyModal.noteIds.filter((id) => !id.startsWith("draft-"));
+    if (studyModal.kind === "single") {
+      const nid = studyModal.noteId;
+      if (nid.startsWith("draft-")) return [];
+      return [nid];
+    }
+    return [];
+  }, [studyModal]);
+
+  const saveFlashcardSetToSupabase = React.useCallback(async () => {
+    if (!studyModal || studyModal.kind === "saved" || flashcards.length === 0) return;
+    setStudySaveLoading("flashcards");
+    setStudyError(null);
+    try {
+      const title = `Flashcards — ${studySourceLabel}`;
+      const res = await fetch("/api/study-sets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "flashcards",
+          title,
+          note_id: studyPayloadNoteIds[0] ?? null,
+          note_ids: studyPayloadNoteIds,
+          payload: { cards: flashcards },
+        }),
+      });
+      const j = (await res.json()) as { error?: string; code?: string };
+      if (res.status === 402) {
+        setUpgradeModal({ show: true, feature: "study" });
+        return;
+      }
+      if (!res.ok) throw new Error(j.error ?? "Save failed");
+      void refreshStudySets();
+    } catch (e) {
+      setStudyError(e instanceof Error ? e.message : "Could not save study set");
+    } finally {
+      setStudySaveLoading(null);
+    }
+  }, [studyModal, flashcards, studySourceLabel, studyPayloadNoteIds, refreshStudySets]);
+
+  const saveQuizSetToSupabase = React.useCallback(async () => {
+    if (!studyModal || studyModal.kind === "saved" || quizQuestions.length === 0) return;
+    setStudySaveLoading("quiz");
+    setStudyError(null);
+    try {
+      const title = `Quiz — ${studySourceLabel}`;
+      const res = await fetch("/api/study-sets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "quiz",
+          title,
+          note_id: studyPayloadNoteIds[0] ?? null,
+          note_ids: studyPayloadNoteIds,
+          payload: { questions: quizQuestions },
+        }),
+      });
+      const j = (await res.json()) as { error?: string; code?: string };
+      if (res.status === 402) {
+        setUpgradeModal({ show: true, feature: "study" });
+        return;
+      }
+      if (!res.ok) throw new Error(j.error ?? "Save failed");
+      void refreshStudySets();
+    } catch (e) {
+      setStudyError(e instanceof Error ? e.message : "Could not save study set");
+    } finally {
+      setStudySaveLoading(null);
+    }
+  }, [studyModal, quizQuestions, studySourceLabel, studyPayloadNoteIds, refreshStudySets]);
 
   React.useEffect(() => {
     setSummaryBelow(null);
@@ -631,17 +719,29 @@ export function NoteApp({ userId }: { userId: string }) {
                       className="min-w-0 flex-1 text-left"
                     >
                       <span className="line-clamp-2 text-xs font-medium text-white/90">{s.title}</span>
-                      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-white/45">
-                        <span>{s.kind === "flashcards" ? "Flashcards" : "Quiz"}</span>
-                        <span>·</span>
-                        <span>{s.item_count} {s.kind === "flashcards" ? "cards" : "questions"}</span>
-                        <span>·</span>
-                        <span>
-                          {new Date(s.created_at).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                          })}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <Badge
+                          className={cn(
+                            "border-0 text-[10px] font-medium",
+                            s.kind === "flashcards"
+                              ? "bg-violet-500/20 text-violet-200"
+                              : "bg-cyan-500/15 text-cyan-200"
+                          )}
+                        >
+                          {s.kind === "flashcards" ? "Flashcards" : "Quiz"}
+                        </Badge>
+                        <span className="text-[10px] text-white/45">
+                          {s.item_count} {s.kind === "flashcards" ? "cards" : "questions"}
                         </span>
+                      </div>
+                      <span className="mt-1 block text-[10px] text-white/40">
+                        {new Date(s.created_at).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
                       </span>
                     </button>
                     <button
@@ -1319,8 +1419,13 @@ export function NoteApp({ userId }: { userId: string }) {
             setQuizScore(null);
             setQuizSelected(null);
             setStudyLoading(null);
+            setStudySaveLoading(null);
             setStudyError(null);
           }}
+          canPersistStudy={studyModal.kind !== "saved"}
+          studySaveLoading={studySaveLoading}
+          onSaveFlashcards={saveFlashcardSetToSupabase}
+          onSaveQuiz={saveQuizSetToSupabase}
           onSelectMode={(m) => setStudyMode(m)}
           onLoadFlashcards={async () => {
             if (studyModal.kind !== "single") return;
@@ -2114,6 +2219,10 @@ function StudyModal({
   onQuizSelect,
   onQuizNext,
   onQuizTryAgain,
+  canPersistStudy,
+  studySaveLoading,
+  onSaveFlashcards,
+  onSaveQuiz,
 }: {
   studyScope?: "single" | "multi" | "saved";
   savedSetTitle?: string;
@@ -2137,6 +2246,10 @@ function StudyModal({
   onQuizSelect: (i: number) => void;
   onQuizNext: () => void;
   onQuizTryAgain: () => void;
+  canPersistStudy: boolean;
+  studySaveLoading: "flashcards" | "quiz" | null;
+  onSaveFlashcards: () => void | Promise<void>;
+  onSaveQuiz: () => void | Promise<void>;
 }) {
   const q = quizQuestions[quizIndex];
   const total = quizQuestions.length;
@@ -2245,6 +2358,10 @@ function StudyModal({
             </button>
           </div>
 
+          {error && (
+            <p className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-200">{error}</p>
+          )}
+
           <p className="mt-3 text-center text-xs text-white/45">Click the card to flip</p>
 
           {/* Fixed-size flip card: full width, min 200px height; gradient accent border */}
@@ -2298,6 +2415,22 @@ function StudyModal({
             {cardIndex + 1} of {totalCards}
           </p>
 
+          {canPersistStudy && (
+            <Button
+              type="button"
+              className="mt-3 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-md shadow-violet-500/20 disabled:opacity-50"
+              onClick={() => void onSaveFlashcards()}
+              disabled={studySaveLoading === "flashcards"}
+            >
+              {studySaveLoading === "flashcards" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Save flashcard set
+            </Button>
+          )}
+
           <div className="mt-3 flex w-full items-center justify-center gap-3">
             <Button
               type="button"
@@ -2345,22 +2478,42 @@ function StudyModal({
             </p>
             <p className="mt-1 text-lg font-medium text-white/80">{pct}% correct</p>
             <p className="mt-4 text-sm leading-relaxed text-white/60">{quizEncouragementMessage(finalScore, total)}</p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Button
-                type="button"
-                onClick={onQuizTryAgain}
-                className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-lg shadow-violet-500/25 sm:w-auto sm:min-w-[140px]"
-              >
-                Try again
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={onClose}
-                className="w-full border border-white/15 bg-white/[0.06] text-white hover:bg-white/10 sm:w-auto sm:min-w-[140px]"
-              >
-                Back to notes
-              </Button>
+            {error && (
+              <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">{error}</p>
+            )}
+            <div className="mt-8 flex flex-col gap-3">
+              {canPersistStudy && (
+                <Button
+                  type="button"
+                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-lg shadow-violet-500/25"
+                  onClick={() => void onSaveQuiz()}
+                  disabled={studySaveLoading === "quiz"}
+                >
+                  {studySaveLoading === "quiz" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Save quiz
+                </Button>
+              )}
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <Button
+                  type="button"
+                  onClick={onQuizTryAgain}
+                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-md shadow-violet-500/20 sm:w-auto sm:min-w-[140px]"
+                >
+                  Try again
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onClose}
+                  className="w-full border border-white/15 bg-white/[0.06] text-white hover:bg-white/10 sm:w-auto sm:min-w-[140px]"
+                >
+                  Back to notes
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
@@ -2390,6 +2543,9 @@ function StudyModal({
               )}
               {studyScope === "saved" && savedSetTitle && (
                 <p className="mt-1 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
+              )}
+              {error && (
+                <p className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-200">{error}</p>
               )}
               <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                 <div
