@@ -678,7 +678,7 @@ export function NoteApp({ userId }: { userId: string }) {
           )}
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Categories</div>
         </div>
-        <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        <nav className="app-sidebar-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-3">
           <div className="space-y-0.5">
             <CategoryTab
               id="all"
@@ -717,7 +717,7 @@ export function NoteApp({ userId }: { userId: string }) {
               <Library className="h-3.5 w-3.5" />
               Study Sets
             </div>
-            <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+            <div className="app-sidebar-scrollbar max-h-48 space-y-1 overflow-y-auto pr-1">
               {savedStudySets.length === 0 ? (
                 <p className="px-2 py-1 text-xs text-white/40">No saved sets yet</p>
               ) : (

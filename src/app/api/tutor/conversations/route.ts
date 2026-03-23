@@ -64,9 +64,18 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { title?: string };
   const title = (body.title?.trim() || "New chat").slice(0, 120);
 
+  const conversationInsert = { user_id: session.user.id, title };
+  console.log("[tutor/conversations POST] tutor_conversations insert", {
+    table: "tutor_conversations",
+    payload: conversationInsert,
+    nullFields: Object.fromEntries(
+      Object.entries(conversationInsert).filter(([, v]) => v === null || v === undefined)
+    ),
+  });
+
   const { data: row, error } = await supabaseAdmin
     .from("tutor_conversations")
-    .insert({ user_id: session.user.id, title })
+    .insert(conversationInsert)
     .select("id, title, updated_at, created_at")
     .single();
 

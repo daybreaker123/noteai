@@ -166,9 +166,17 @@ export async function POST(req: Request) {
 
   if (!conversationId) {
     const title = titleSeed.slice(0, 80) + (titleSeed.length > 80 ? "…" : "");
+    const conversationInsert = { user_id: userId, title };
+    console.log("[tutor/chat] tutor_conversations insert (new thread)", {
+      table: "tutor_conversations",
+      payload: conversationInsert,
+      nullFields: Object.fromEntries(
+        Object.entries(conversationInsert).filter(([, v]) => v === null || v === undefined)
+      ),
+    });
     const { data: created, error: createErr } = await supabaseAdmin
       .from("tutor_conversations")
-      .insert({ user_id: userId, title })
+      .insert(conversationInsert)
       .select("id, title")
       .single();
     if (createErr || !created) {
@@ -190,10 +198,10 @@ export async function POST(req: Request) {
     }
   }
 
-  const insertRow: {
+  const userMessagePayload: {
     conversation_id: string;
     user_id: string;
-    role: string;
+    role: "user";
     content: string;
     attachments?: StoredImageAttachment[] | null;
   } = {
@@ -203,10 +211,22 @@ export async function POST(req: Request) {
     content: displayText,
   };
   if (imagePayload?.length) {
-    insertRow.attachments = imagePayload;
+    userMessagePayload.attachments = imagePayload;
   }
 
-  const { error: userMsgErr } = await supabaseAdmin.from("tutor_messages").insert(insertRow);
+  console.log("[tutor/chat] tutor_messages insert (user)", {
+    table: "tutor_messages",
+    payload: {
+      ...userMessagePayload,
+      content: `${displayText.slice(0, 200)}${displayText.length > 200 ? "…" : ""}`,
+      attachments: userMessagePayload.attachments ? "[present]" : undefined,
+    },
+    nullFields: Object.fromEntries(
+      Object.entries(userMessagePayload).filter(([, v]) => v === null || v === undefined)
+    ),
+  });
+
+  const { error: userMsgErr } = await supabaseAdmin.from("tutor_messages").insert(userMessagePayload);
   if (userMsgErr) {
     return NextResponse.json({ error: userMsgErr.message }, { status: 500 });
   }
@@ -308,12 +328,24 @@ export async function POST(req: Request) {
           }
         }
         if (fullAssistant.trim() && supabaseAdmin) {
-          const { error: asstErr } = await supabaseAdmin.from("tutor_messages").insert({
-            conversation_id: conversationId,
+          const assistantPayload = {
+            conversation_id: conversationId as string,
             user_id: userId,
-            role: "assistant",
+            role: "assistant" as const,
             content: fullAssistant,
+          };
+          console.log("[tutor/chat] tutor_messages insert (assistant)", {
+            table: "tutor_messages",
+            payload: {
+              ...assistantPayload,
+              content: `${fullAssistant.slice(0, 200)}${fullAssistant.length > 200 ? "…" : ""}`,
+              contentLength: fullAssistant.length,
+            },
+            nullFields: Object.fromEntries(
+              Object.entries(assistantPayload).filter(([, v]) => v === null || v === undefined)
+            ),
           });
+          const { error: asstErr } = await supabaseAdmin.from("tutor_messages").insert(assistantPayload);
           if (asstErr) {
             console.error("tutor assistant save failed", asstErr);
           }
