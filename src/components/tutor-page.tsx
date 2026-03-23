@@ -22,6 +22,7 @@ import {
   TUTOR_FILE_INPUT_ACCEPT,
 } from "@/lib/tutor-chat-attachments";
 import {
+  ArrowLeft,
   FileText,
   GraduationCap,
   Loader2,
@@ -664,14 +665,21 @@ export function TutorPage() {
               </h1>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={newChat}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-500 via-purple-600 to-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-md shadow-purple-950/40 ring-1 ring-white/10 transition hover:brightness-110 active:brightness-95 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"
-          >
-            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} aria-hidden />
-            New Chat
-          </button>
+          <p className="hidden shrink-0 items-center gap-1.5 text-right text-[11px] leading-tight text-white/38 sm:flex">
+            <kbd className="rounded-md border border-white/[0.12] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/55">
+              Enter
+            </kbd>
+            <span>to send</span>
+            <span className="text-white/25">·</span>
+            <kbd className="rounded-md border border-white/[0.12] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/55">
+              Shift
+            </kbd>
+            <span className="text-white/38">+</span>
+            <kbd className="rounded-md border border-white/[0.12] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/55">
+              Enter
+            </kbd>
+            <span>new line</span>
+          </p>
         </div>
       </header>
 
@@ -731,6 +739,13 @@ export function TutorPage() {
             )}
           </div>
           <div className="shrink-0 border-t border-white/[0.06] p-2">
+            <Link
+              href="/dashboard"
+              className="mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/[0.05] hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0 opacity-70" />
+              Back to Notes
+            </Link>
             <Link
               href="/profile"
               className="mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/[0.05] hover:text-white"
