@@ -36,6 +36,7 @@ import {
   SquareStack,
   HelpCircle,
   Save,
+  Check,
 } from "lucide-react";
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -2003,26 +2004,52 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "group rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-500/30 hover:bg-white/10",
-        selectMode ? "cursor-default" : "cursor-pointer",
-        selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30",
+        "group rounded-2xl border border-white/10 bg-white/5 p-5 transition-[border-color,box-shadow,background-color] duration-200 ease-out",
+        selectMode ? "cursor-default" : "cursor-pointer hover:border-purple-500/30 hover:bg-white/10",
+        selectMode &&
+          !selected &&
+          "hover:border-white/[0.14] hover:bg-white/[0.06] hover:shadow-none",
+        selected &&
+          selectMode &&
+          "border-purple-500/45 bg-gradient-to-br from-purple-500/[0.14] to-blue-600/[0.07] shadow-[0_0_0_1px_rgba(168,85,247,0.35),0_0_28px_rgba(139,92,246,0.22),0_0_48px_rgba(59,130,246,0.08)] hover:border-purple-400/50 hover:from-purple-500/[0.16] hover:to-blue-600/[0.09]",
         categoryColor && "border-l-4"
       )}
       style={categoryColor ? { borderLeftColor: categoryColor } : undefined}
     >
       <div className="flex items-start gap-3">
         {selectMode && (
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={(e) => {
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={selected}
+            onClick={(e) => {
               e.stopPropagation();
               onToggleSelect?.();
             }}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-white/30 bg-white/10 text-purple-500 focus:ring-purple-500"
+            className={cn(
+              "relative mt-0.5 flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-md border transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0f]",
+              selected
+                ? "border-transparent shadow-[0_0_10px_rgba(168,85,247,0.35)]"
+                : "border-white/[0.22] bg-black/35 hover:border-white/40 hover:bg-white/[0.06]"
+            )}
             aria-label={selected ? "Deselect note" : "Select note"}
-          />
+          >
+            <span
+              className={cn(
+                "absolute inset-0 rounded-[inherit] bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 transition-opacity duration-200 ease-out",
+                selected ? "opacity-100" : "opacity-0"
+              )}
+              aria-hidden
+            />
+            <Check
+              className={cn(
+                "relative z-[1] h-2.5 w-2.5 text-white transition-all duration-200 ease-out",
+                selected ? "scale-100 opacity-100" : "scale-[0.65] opacity-0"
+              )}
+              strokeWidth={3}
+              aria-hidden
+            />
+          </button>
         )}
         <div className="min-w-0 flex-1">
       <div className="flex items-start justify-between gap-2">
