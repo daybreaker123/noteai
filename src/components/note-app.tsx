@@ -21,6 +21,7 @@ import {
   FileText,
   Sparkles,
   ChevronRight,
+  ChevronLeft,
   X,
   Download,
   BookOpen,
@@ -1407,8 +1408,14 @@ export function NoteApp({ userId }: { userId: string }) {
               setStudyLoading(null);
             }
           }}
-          onCardPrev={() => setCardIndex((i) => Math.max(0, i - 1))}
-          onCardNext={() => setCardIndex((i) => Math.min(flashcards.length - 1, i + 1))}
+          onCardPrev={() => {
+            setCardIndex((i) => Math.max(0, i - 1));
+            setCardFlipped(false);
+          }}
+          onCardNext={() => {
+            setCardIndex((i) => Math.min(flashcards.length - 1, i + 1));
+            setCardFlipped(false);
+          }}
           onCardFlip={() => setCardFlipped((f) => !f)}
           onQuizSelect={(i) => {
             if (quizSelected !== null) return;
@@ -2147,37 +2154,103 @@ function StudyModal({
 
   if (mode === "flashcards" && flashcards.length > 0) {
     const card = flashcards[cardIndex];
+    const totalCards = flashcards.length;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <Card className="mx-4 max-w-lg p-6">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span className="text-sm text-white/60">
-                {cardIndex + 1} of {flashcards.length}
-              </span>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <Card className="mx-auto w-full max-w-lg border border-white/10 bg-[#0c0c12]/95 p-5 shadow-2xl backdrop-blur-sm sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold tracking-tight text-white">Flashcards</h3>
               {studyScope === "multi" && (
-                <p className="mt-0.5 text-xs text-purple-300/90">From multiple notes</p>
+                <p className="mt-1 text-xs text-violet-300/90">From multiple notes</p>
               )}
               {studyScope === "saved" && savedSetTitle && (
-                <p className="mt-0.5 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
+                <p className="mt-1 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
               )}
             </div>
-            <button onClick={onClose} className="text-white/60 hover:text-white">
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-lg p-1.5 text-white/50 transition hover:bg-white/10 hover:text-white"
+              aria-label="Close"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div
-            onClick={onCardFlip}
-            className="mt-4 min-h-[120px] cursor-pointer rounded-xl border border-white/10 bg-white/5 p-4 text-white"
-          >
-            {cardFlipped ? card.back : card.front}
+
+          <p className="mt-3 text-center text-xs text-white/45">Click the card to flip</p>
+
+          {/* Fixed-size flip card: full width, min 200px height; gradient accent border */}
+          <div className="mt-3 w-full">
+            <div className="rounded-2xl bg-gradient-to-br from-violet-500/50 via-indigo-500/35 to-cyan-500/40 p-[1px] shadow-[0_0_40px_-12px_rgba(139,92,246,0.35)]">
+              <div className="perspective-[1400px] w-full">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={onCardFlip}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onCardFlip();
+                    }
+                  }}
+                  className={cn(
+                    "relative min-h-[200px] w-full cursor-pointer transition-transform duration-500 ease-out [transform-style:preserve-3d]",
+                    cardFlipped && "[transform:rotateY(180deg)]"
+                  )}
+                  aria-label={cardFlipped ? "Show question (front)" : "Show answer (back)"}
+                >
+                  {/* Front — term / question */}
+                  <div
+                    className="absolute inset-0 flex min-h-[200px] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-white/[0.08] bg-[#12121a] px-5 py-6 text-center [backface-visibility:hidden] [transform:rotateY(0deg)]"
+                  >
+                    <span className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-indigo-300">
+                      Question
+                    </span>
+                    <p className="max-w-full text-base font-medium leading-relaxed text-white/95 [overflow-wrap:anywhere]">
+                      {card.front}
+                    </p>
+                  </div>
+                  {/* Back — definition / answer */}
+                  <div
+                    className="absolute inset-0 flex min-h-[200px] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-white/[0.08] bg-[#12121a] px-5 py-6 text-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
+                  >
+                    <span className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-violet-300">
+                      Answer
+                    </span>
+                    <p className="max-w-full text-base leading-relaxed text-white/90 [overflow-wrap:anywhere]">
+                      {card.back}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="mt-4 flex justify-between">
-            <Button variant="ghost" onClick={onCardPrev} disabled={cardIndex === 0}>
+
+          <p className="mt-4 text-center text-sm font-medium tabular-nums text-white/55">
+            {cardIndex + 1} of {totalCards}
+          </p>
+
+          <div className="mt-3 flex w-full items-center justify-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-[7.5rem] border border-white/10 bg-white/[0.04] text-white hover:bg-white/10"
+              onClick={onCardPrev}
+              disabled={cardIndex === 0}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4 opacity-80" />
               Previous
             </Button>
-            <Button variant="ghost" onClick={onCardNext} disabled={cardIndex === flashcards.length - 1}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-[7.5rem] border border-white/10 bg-white/[0.04] text-white hover:bg-white/10"
+              onClick={onCardNext}
+              disabled={cardIndex === totalCards - 1}
+            >
               Next
+              <ChevronRight className="ml-1 h-4 w-4 opacity-80" />
             </Button>
           </div>
         </Card>
