@@ -148,19 +148,20 @@ export async function POST(
       }
       return NextResponse.json({ cards });
     }
-    const system = `You are a quiz assistant. Create 5 multiple choice questions from the note. Each question has 4 options and one correct answer (index 0-3). Return JSON: {"questions":[{"question":"...","options":["a","b","c","d"],"correctIndex":0}]}`;
+    const system = `You are a quiz assistant. Create 5 multiple choice questions from the note. Each question has 4 options and one correct answer (index 0-3). Include a one-sentence "explanation" for why the correct answer is right. Return JSON: {"questions":[{"question":"...","options":["a","b","c","d"],"correctIndex":0,"explanation":"..."}]}`;
     const text = await anthropicComplete(system, `Create a quiz from this note:\n\n${content}`, {
       maxTokens: 2000,
       model: ANTHROPIC_MODEL_SONNET,
       usage: { userId: session.user.id },
     });
     const parsed = JSON.parse(text.replace(/```json?\s*|\s*```/g, "")) as {
-      questions?: { question: string; options: string[]; correctIndex: number }[];
+      questions?: { question: string; options: string[]; correctIndex: number; explanation?: string }[];
     };
     const questions = (parsed.questions ?? []).slice(0, 5).map((q) => ({
       question: q.question ?? "",
       options: Array.isArray(q.options) ? q.options : [],
       correctIndex: Math.min(Math.max(0, q.correctIndex ?? 0), 3),
+      explanation: typeof q.explanation === "string" ? q.explanation.trim() : undefined,
     }));
     if (!isDraft && supabaseAdmin) {
       const { error: insErr } = await supabaseAdmin.from("study_sets").insert({

@@ -165,19 +165,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ cards });
     }
 
-    const system = `You are a quiz assistant. The user provided multiple notes (separated by ---). Create 8 multiple choice questions that test understanding across ALL notes. Each question has 4 options and one correct answer (index 0-3). Return JSON: {"questions":[{"question":"...","options":["a","b","c","d"],"correctIndex":0}]}`;
+    const system = `You are a quiz assistant. The user provided multiple notes (separated by ---). Create 8 multiple choice questions that test understanding across ALL notes. Each question has 4 options and one correct answer (index 0-3). Include a one-sentence "explanation" for why the correct answer is right. Return JSON: {"questions":[{"question":"...","options":["a","b","c","d"],"correctIndex":0,"explanation":"..."}]}`;
     const text = await anthropicComplete(
       system,
       `Create a unified quiz from these notes:\n\n${combined}`,
       { maxTokens: 4000, model: ANTHROPIC_MODEL_SONNET, usage: { userId: session.user.id } }
     );
     const parsed = JSON.parse(text.replace(/```json?\s*|\s*```/g, "")) as {
-      questions?: { question: string; options: string[]; correctIndex: number }[];
+      questions?: { question: string; options: string[]; correctIndex: number; explanation?: string }[];
     };
     const questions = (parsed.questions ?? []).slice(0, 10).map((q) => ({
       question: q.question ?? "",
       options: Array.isArray(q.options) ? q.options : [],
       correctIndex: Math.min(Math.max(0, q.correctIndex ?? 0), 3),
+      explanation: typeof q.explanation === "string" ? q.explanation.trim() : undefined,
     }));
 
     const title = buildStudySetTitleFromNoteTitles(ordered.map((n) => n.title));

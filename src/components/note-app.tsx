@@ -32,6 +32,8 @@ import {
   UserCircle,
   Trash2,
   Library,
+  SquareStack,
+  HelpCircle,
 } from "lucide-react";
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -78,7 +80,7 @@ export function NoteApp({ userId }: { userId: string }) {
   const [studyMode, setStudyMode] = React.useState<"menu" | "flashcards" | "quiz">("menu");
   const [flashcards, setFlashcards] = React.useState<{ front: string; back: string }[]>([]);
   const [quizQuestions, setQuizQuestions] = React.useState<
-    { question: string; options: string[]; correctIndex: number }[]
+    { question: string; options: string[]; correctIndex: number; explanation?: string }[]
   >([]);
   const [quizIndex, setQuizIndex] = React.useState(0);
   const [quizScore, setQuizScore] = React.useState<number | null>(null);
@@ -1433,6 +1435,11 @@ export function NoteApp({ userId }: { userId: string }) {
               setQuizScore((s) => s ?? 0);
             }
           }}
+          onQuizTryAgain={() => {
+            setQuizIndex(0);
+            setQuizScore(null);
+            setQuizSelected(null);
+          }}
         />
       )}
 
@@ -2074,6 +2081,16 @@ function CategoryTab({
   );
 }
 
+function quizEncouragementMessage(score: number, total: number): string {
+  if (total <= 0) return "Thanks for completing the quiz!";
+  const pct = (score / total) * 100;
+  if (pct >= 100) return "Perfect score — you've mastered this material!";
+  if (pct >= 80) return "Excellent work — you're in great shape for the exam.";
+  if (pct >= 60) return "Solid effort — review the tricky ones and you'll nail it.";
+  if (pct >= 40) return "Keep going — every attempt builds stronger recall.";
+  return "Don't give up — try again and watch your score climb.";
+}
+
 function StudyModal({
   studyScope = "single",
   savedSetTitle,
@@ -2088,7 +2105,7 @@ function StudyModal({
   loading,
   error,
   onClose,
-  onSelectMode,
+  onSelectMode: _onSelectMode,
   onLoadFlashcards,
   onLoadQuiz,
   onCardPrev,
@@ -2096,12 +2113,13 @@ function StudyModal({
   onCardFlip,
   onQuizSelect,
   onQuizNext,
+  onQuizTryAgain,
 }: {
   studyScope?: "single" | "multi" | "saved";
   savedSetTitle?: string;
   mode: string;
   flashcards: { front: string; back: string }[];
-  quizQuestions: { question: string; options: string[]; correctIndex: number }[];
+  quizQuestions: { question: string; options: string[]; correctIndex: number; explanation?: string }[];
   cardIndex: number;
   cardFlipped: boolean;
   quizIndex: number;
@@ -2118,6 +2136,7 @@ function StudyModal({
   onCardFlip: () => void;
   onQuizSelect: (i: number) => void;
   onQuizNext: () => void;
+  onQuizTryAgain: () => void;
 }) {
   const q = quizQuestions[quizIndex];
   const total = quizQuestions.length;
@@ -2126,26 +2145,74 @@ function StudyModal({
 
   if (mode === "menu") {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <Card className="mx-4 max-w-sm p-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Study Mode</h3>
-            <button onClick={onClose} className="text-white/60 hover:text-white">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
+        <Card className="studara-study-modal-enter relative mx-auto w-full max-w-2xl border border-white/10 bg-[#0c0c12]/95 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+          <div className="flex flex-col items-center text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/30 to-cyan-500/20 ring-1 ring-white/10">
+              <GraduationCap className="h-8 w-8 text-violet-200" strokeWidth={1.5} />
+            </div>
+            <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">Study Mode</h2>
+            <p className="mt-1.5 max-w-md text-sm text-white/55">
+              Choose how you want to practice — flip through cards or test yourself with a quiz.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-4 top-4 rounded-lg p-2 text-white/45 transition hover:bg-white/10 hover:text-white sm:right-6 sm:top-6"
+              aria-label="Close"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
-          {error && (
-            <p className="mt-2 text-sm text-red-400">{error}</p>
-          )}
-          <div className="mt-4 space-y-2">
-            <Button onClick={onLoadFlashcards} className="w-full" disabled={!!loading}>
-              {loading === "flashcards" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-              Generate Flashcards
-            </Button>
-            <Button onClick={onLoadQuiz} variant="ghost" className="w-full" disabled={!!loading}>
-              {loading === "quiz" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              Generate Quiz
-            </Button>
+
+          {error && <p className="mt-4 text-center text-sm text-red-400">{error}</p>}
+
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+            <div className="flex flex-col rounded-2xl border border-white/[0.08] bg-[#12121a] p-5 shadow-inner sm:min-h-[220px]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15 text-violet-200">
+                <SquareStack className="h-6 w-6" strokeWidth={1.75} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-white">Flashcards</h3>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-white/55">
+                Key terms and definitions you can flip through at your own pace.
+              </p>
+              <Button
+                type="button"
+                onClick={onLoadFlashcards}
+                disabled={!!loading}
+                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
+              >
+                {loading === "flashcards" ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <SquareStack className="mr-2 h-4 w-4 opacity-90" />
+                )}
+                {loading === "flashcards" ? "Generating…" : "Start flashcards"}
+              </Button>
+            </div>
+
+            <div className="flex flex-col rounded-2xl border border-white/[0.08] bg-[#12121a] p-5 shadow-inner sm:min-h-[220px]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-200">
+                <HelpCircle className="h-6 w-6" strokeWidth={1.75} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-white">Quiz</h3>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-white/55">
+                Multiple choice questions to check your understanding and track progress.
+              </p>
+              <Button
+                type="button"
+                onClick={onLoadQuiz}
+                disabled={!!loading}
+                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
+              >
+                {loading === "quiz" ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <HelpCircle className="mr-2 h-4 w-4 opacity-90" />
+                )}
+                {loading === "quiz" ? "Generating…" : "Start quiz"}
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
@@ -2156,7 +2223,7 @@ function StudyModal({
     const card = flashcards[cardIndex];
     const totalCards = flashcards.length;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
         <Card className="mx-auto w-full max-w-lg border border-white/10 bg-[#0c0c12]/95 p-5 shadow-2xl backdrop-blur-sm sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -2259,63 +2326,160 @@ function StudyModal({
   }
 
   if (mode === "quiz" && quizQuestions.length > 0 && q) {
+    const pct = total > 0 ? Math.round((finalScore / total) * 100) : 0;
+    const optionLetters = ["A", "B", "C", "D"];
+    const paddedOptions = [...q.options];
+    while (paddedOptions.length < 4) paddedOptions.push("");
+    const fourOptions = paddedOptions.slice(0, 4);
+
     if (done) {
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <Card className="mx-4 max-w-sm p-6 text-center">
-            <h3 className="text-xl font-semibold text-white">
-              {finalScore}/{total} — {finalScore === total ? "Perfect!" : finalScore >= total - 1 ? "Great job!" : "Keep practicing!"}
-            </h3>
-            <div className="mt-4 flex gap-2">
-              <Button onClick={onClose}>Done</Button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
+          <Card className="studara-study-modal-enter mx-auto w-full max-w-md border border-white/10 bg-[#0c0c12]/95 p-6 text-center shadow-2xl backdrop-blur-xl sm:p-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/35 to-cyan-500/25 ring-1 ring-white/10">
+              <GraduationCap className="h-8 w-8 text-violet-100" strokeWidth={1.5} />
+            </div>
+            <h2 className="mt-5 text-2xl font-semibold text-white">Quiz complete</h2>
+            <p className="mt-2 text-5xl font-bold tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-cyan-300">
+              {finalScore}/{total}
+            </p>
+            <p className="mt-1 text-lg font-medium text-white/80">{pct}% correct</p>
+            <p className="mt-4 text-sm leading-relaxed text-white/60">{quizEncouragementMessage(finalScore, total)}</p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button
+                type="button"
+                onClick={onQuizTryAgain}
+                className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-lg shadow-violet-500/25 sm:w-auto sm:min-w-[140px]"
+              >
+                Try again
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onClose}
+                className="w-full border border-white/15 bg-white/[0.06] text-white hover:bg-white/10 sm:w-auto sm:min-w-[140px]"
+              >
+                Back to notes
+              </Button>
             </div>
           </Card>
         </div>
       );
     }
+
+    const showExplain = quizSelected !== null;
+    const fallbackExplain =
+      q.explanation?.trim() ||
+      (showExplain
+        ? quizSelected === q.correctIndex
+          ? "That's the best answer — well done."
+          : `The correct answer is (${optionLetters[q.correctIndex] ?? "?"}): ${fourOptions[q.correctIndex] || "—"}.`
+        : null);
+
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <Card className="mx-4 max-w-lg p-6">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span className="text-sm text-white/60">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
+        <Card className="mx-auto w-full max-w-lg border border-white/10 bg-[#0c0c12]/95 p-5 shadow-2xl backdrop-blur-sm sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-white/40">Quiz</p>
+              <p className="mt-1 text-sm font-medium tabular-nums text-white/70">
                 Question {quizIndex + 1} of {total}
-              </span>
+              </p>
               {studyScope === "multi" && (
-                <p className="mt-0.5 text-xs text-purple-300/90">From multiple notes</p>
+                <p className="mt-1 text-xs text-violet-300/90">From multiple notes</p>
               )}
               {studyScope === "saved" && savedSetTitle && (
-                <p className="mt-0.5 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
+                <p className="mt-1 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
               )}
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 transition-[width] duration-300 ease-out"
+                  style={{ width: `${((quizIndex + 1) / total) * 100}%` }}
+                />
+              </div>
             </div>
-            <button onClick={onClose} className="text-white/60 hover:text-white">
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-lg p-1.5 text-white/50 transition hover:bg-white/10 hover:text-white"
+              aria-label="Close"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="mt-4 font-medium text-white">{q.question}</p>
-          <div className="mt-4 space-y-2">
-            {q.options.map((opt, i) => (
-              <button
-                key={i}
-                onClick={() => onQuizSelect(i)}
-                disabled={quizSelected !== null}
-                className={cn(
-                  "w-full rounded-lg border px-4 py-2 text-left text-sm transition",
-                  quizSelected === null && "border-white/10 hover:bg-white/5",
-                  quizSelected === i && i === q.correctIndex && "border-green-500 bg-green-500/20 text-green-300",
-                  quizSelected === i && i !== q.correctIndex && "border-red-500 bg-red-500/20 text-red-300",
-                  quizSelected !== null && i === q.correctIndex && "border-green-500 bg-green-500/20 text-green-300"
+
+          <div className="mt-5 w-full">
+            <div className="rounded-2xl bg-gradient-to-br from-violet-500/50 via-indigo-500/35 to-cyan-500/40 p-[1px] shadow-[0_0_40px_-12px_rgba(139,92,246,0.35)]">
+              <div className="flex min-h-[320px] flex-col rounded-[15px] border border-white/[0.08] bg-[#12121a] p-5 sm:min-h-[340px] sm:p-6">
+                <h3 className="text-center text-base font-bold leading-snug text-white sm:text-lg [overflow-wrap:anywhere]">
+                  {q.question}
+                </h3>
+                <div className="mt-5 flex flex-1 flex-col gap-2">
+                  {fourOptions.map((opt, i) => {
+                    const isCorrect = i === q.correctIndex;
+                    const isPicked = quizSelected === i;
+                    const revealed = quizSelected !== null;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => onQuizSelect(i)}
+                        disabled={revealed || !String(opt).trim()}
+                        className={cn(
+                          "flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition",
+                          !revealed && String(opt).trim() && "border-white/10 bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10",
+                          !String(opt).trim() && "cursor-not-allowed border-dashed border-white/[0.08] bg-white/[0.02] opacity-40",
+                          revealed && isCorrect && "border-emerald-500/70 bg-emerald-500/15 text-emerald-100",
+                          revealed && !isCorrect && isPicked && "border-red-500/80 bg-red-500/15 text-red-100",
+                          revealed && !isCorrect && !isPicked && "border-white/[0.06] opacity-50"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold",
+                            !revealed && "bg-white/10 text-white/80",
+                            revealed && isCorrect && "bg-emerald-500/30 text-emerald-100",
+                            revealed && !isCorrect && isPicked && "bg-red-500/30 text-red-100",
+                            revealed && !isCorrect && !isPicked && "bg-white/5 text-white/40"
+                          )}
+                        >
+                          {optionLetters[i]}
+                        </span>
+                        <span className="pt-0.5 leading-relaxed text-white/90 [overflow-wrap:anywhere]">
+                          {String(opt).trim() || "—"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {showExplain && fallbackExplain && (
+                  <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] px-3 py-2.5 text-center text-xs leading-relaxed text-white/65 [overflow-wrap:anywhere]">
+                    {fallbackExplain}
+                  </div>
                 )}
-              >
-                {opt}
-              </button>
-            ))}
+
+                {quizSelected !== null && (
+                  <div className="mt-auto pt-4">
+                    <Button
+                      type="button"
+                      className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-md shadow-violet-500/20"
+                      onClick={onQuizNext}
+                    >
+                      {quizIndex < total - 1 ? (
+                        <>
+                          Next question
+                          <ChevronRight className="ml-1 inline h-4 w-4" />
+                        </>
+                      ) : (
+                        "View results"
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          {quizSelected !== null && (
-            <Button className="mt-4 w-full" onClick={onQuizNext}>
-              {quizIndex < total - 1 ? "Next" : "See score"}
-            </Button>
-          )}
         </Card>
       </div>
     );
