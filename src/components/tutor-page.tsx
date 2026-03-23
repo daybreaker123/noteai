@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
@@ -129,8 +130,13 @@ export function TutorPage() {
   React.useEffect(() => {
     if (loadingList) return;
     if (conversations.length === 0) {
-      if (!pendingNewChat) {
-        setActiveConversationId(null);
+      // Don't wipe local chat while the sidebar list hasn't caught up yet (e.g. right after first
+      // message: we already have conversationId + messages, but loadConversations hasn't returned).
+      if (
+        !pendingNewChat &&
+        !activeConversationId &&
+        !sending
+      ) {
         setMessages([]);
       }
       return;
@@ -141,7 +147,7 @@ export function TutorPage() {
       setActiveConversationId(first);
       void loadMessages(first);
     }
-  }, [loadingList, conversations, activeConversationId, pendingNewChat, loadMessages]);
+  }, [loadingList, conversations, activeConversationId, pendingNewChat, loadMessages, sending]);
 
   const selectConversation = (id: string) => {
     if (id === activeConversationId) return;
@@ -260,6 +266,28 @@ export function TutorPage() {
       let convId: string | null = activeConversationId;
       let full = "";
 
+      const applySseLine = (line: string) => {
+        if (!line.startsWith("data: ")) return;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") return;
+        try {
+          const parsed = JSON.parse(data) as { text?: string; conversationId?: string };
+          if (parsed.conversationId) {
+            convId = parsed.conversationId;
+            setActiveConversationId(parsed.conversationId);
+          }
+          if (parsed.text) {
+            full += parsed.text;
+            // React 18 batches updates in a tight loop — flush so each token paints as it arrives.
+            flushSync(() => {
+              setStreamingText(full);
+            });
+          }
+        } catch {
+          /* skip */
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -268,53 +296,23 @@ export function TutorPage() {
         buffer = blocks.pop() ?? "";
         for (const block of blocks) {
           for (const line of block.split("\n")) {
-            if (!line.startsWith("data: ")) continue;
-            const data = line.slice(6).trim();
-            if (data === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(data) as { text?: string; conversationId?: string };
-              if (parsed.conversationId) {
-                convId = parsed.conversationId;
-                setActiveConversationId(parsed.conversationId);
-              }
-              if (parsed.text) {
-                full += parsed.text;
-                setStreamingText(full);
-              }
-            } catch {
-              /* skip */
-            }
+            applySseLine(line);
           }
         }
       }
 
       if (buffer.trim()) {
         for (const line of buffer.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(data) as { text?: string; conversationId?: string };
-            if (parsed.conversationId) {
-              convId = parsed.conversationId;
-              setActiveConversationId(parsed.conversationId);
-            }
-            if (parsed.text) {
-              full += parsed.text;
-              setStreamingText(full);
-            }
-          } catch {
-            /* skip */
-          }
+          applySseLine(line);
         }
       }
 
       setStreamingText("");
-      setPendingNewChat(false);
       if (convId) {
         await loadMessages(convId);
         await loadConversations();
       }
+      setPendingNewChat(false);
     } catch {
       setMessages((m) => m.filter((x) => x.id !== optimisticUser.id));
       setInput(text);
@@ -432,11 +430,11 @@ export function TutorPage() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6">
-            {loadingMessages && messages.length === 0 ? (
+            {loadingMessages && messages.length === 0 && !sending ? (
               <div className="flex h-full items-center justify-center text-white/40">
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
-            ) : messages.length === 0 && !sending ? (
+            ) : messages.length === 0 && !sending && !streamingText ? (
               <div className="mx-auto max-w-xl pt-8 text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-white/10">
                   <GraduationCap className="h-7 w-7 text-emerald-300" />
