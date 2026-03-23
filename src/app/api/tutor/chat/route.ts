@@ -7,16 +7,16 @@ import { ANTHROPIC_MODEL_SONNET } from "@/lib/anthropic-models";
 import { recordProApiSpendEstimate, resolveAnthropicModelForProUser } from "@/lib/pro-api-usage";
 import { getUserPlanFromDb } from "@/lib/user-plan";
 import { TUTOR_SYSTEM_PROMPT } from "@/lib/tutor-prompt";
-import { generateTutorConversationTitle } from "@/lib/tutor-conversation-title";
+import { generateTutorConversationTitleFromExchange } from "@/lib/tutor-conversation-title";
+import { TUTOR_EXTRACTED_TEXT_MAX_CHARS } from "@/lib/tutor-chat-attachments";
 import {
-  buildUserAnthropicContent,
+  buildTutorUserContentForModel,
+  combineTutorAttachments,
   estimateBytesFromBase64,
   isAllowedImageMediaType,
   normalizeBase64Payload,
-  parseAttachmentsFromDb,
-  TUTOR_DEFAULT_IMAGE_PROMPT,
   TUTOR_MAX_IMAGE_BYTES,
-  type AnthropicUserContent,
+  type StoredDocumentContextAttachment,
   type StoredImageAttachment,
 } from "@/lib/tutor-anthropic-content";
 
@@ -26,6 +26,8 @@ export const dynamic = "force-dynamic";
 const FREE_TUTOR_MESSAGES_PER_MONTH = 20;
 const FREE_TUTOR_IMAGES_PER_MONTH = 5;
 const MAX_CONTEXT_MESSAGES = 40;
+/** User message text (incl. pasted document extracts) — stay below model context limits. */
+const TUTOR_MAX_MESSAGE_CHARS = 200_000;
 
 async function incrementTutorUsage(userId: string, includeImage: boolean): Promise<void> {
   if (!supabaseAdmin) return;
@@ -82,6 +84,12 @@ type IncomingBody = {
     mediaType?: string;
     data?: string;
   } | null;
+  /** PDF/DOCX extract — stored in attachments; visible user message stays `message` only. */
+  documentContext?: {
+    fileName?: string;
+    displayType?: string;
+    text?: string;
+  } | null;
 };
 
 export async function POST(req: Request) {
@@ -98,8 +106,40 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json()) as IncomingBody;
-  const rawMessage = body.message?.trim() ?? "";
+  const rawMessage = typeof body.message === "string" ? body.message.trim() : "";
+  if (rawMessage.length > TUTOR_MAX_MESSAGE_CHARS) {
+    return NextResponse.json(
+      { error: `Message too long (max ${TUTOR_MAX_MESSAGE_CHARS.toLocaleString()} characters).` },
+      { status: 400 }
+    );
+  }
   let imagePayload: StoredImageAttachment[] | null = null;
+  let documentAttachment: StoredDocumentContextAttachment | null = null;
+
+  const doc = body.documentContext;
+  if (doc?.text != null && String(doc.text).trim()) {
+    let docText = String(doc.text).trim();
+    if (docText.length > TUTOR_EXTRACTED_TEXT_MAX_CHARS) {
+      return NextResponse.json(
+        { error: `Attached document text too long (max ${TUTOR_EXTRACTED_TEXT_MAX_CHARS.toLocaleString()} characters).` },
+        { status: 400 }
+      );
+    }
+    const fileName = (doc.fileName?.trim() || "document").slice(0, 240);
+    const displayType = (doc.displayType?.trim() || "Document").slice(0, 40);
+    documentAttachment = {
+      type: "document_context",
+      file_name: fileName,
+      display_type: displayType,
+      text: docText,
+    };
+    if (rawMessage.length + docText.length > TUTOR_MAX_MESSAGE_CHARS) {
+      return NextResponse.json(
+        { error: `Message plus attachment exceed limit (max ${TUTOR_MAX_MESSAGE_CHARS.toLocaleString()} characters).` },
+        { status: 400 }
+      );
+    }
+  }
 
   if (body.image?.data) {
     const normalized = normalizeBase64Payload(body.image.data, body.image.mediaType);
@@ -122,9 +162,9 @@ export async function POST(req: Request) {
     imagePayload = [{ type: "image", media_type: normalized.mediaType, data: normalized.data }];
   }
 
-  const displayText = rawMessage || (imagePayload ? TUTOR_DEFAULT_IMAGE_PROMPT : "");
-  if (!displayText) {
-    return NextResponse.json({ error: "Enter a message or attach an image." }, { status: 400 });
+  const visibleContent = rawMessage;
+  if (!visibleContent && !imagePayload?.length && !documentAttachment) {
+    return NextResponse.json({ error: "Enter a message or attach a file." }, { status: 400 });
   }
 
   const plan = await getUserPlanFromDb(userId);
@@ -194,27 +234,30 @@ export async function POST(req: Request) {
     }
   }
 
+  const combinedAttachments = combineTutorAttachments(imagePayload, documentAttachment);
+
   const userMessagePayload: {
     conversation_id: string;
     user_id: string;
     role: "user";
     content: string;
-    attachments?: StoredImageAttachment[] | null;
+    attachments?: ReturnType<typeof combineTutorAttachments>;
   } = {
     conversation_id: conversationId,
     user_id: userId,
     role: "user",
-    content: displayText,
+    content: visibleContent,
+    attachments: combinedAttachments ?? undefined,
   };
-  if (imagePayload?.length) {
-    userMessagePayload.attachments = imagePayload;
-  }
 
   console.log("[tutor/chat] tutor_messages insert (user)", {
     table: "tutor_messages",
     payload: {
       ...userMessagePayload,
-      content: `${displayText.slice(0, 200)}${displayText.length > 200 ? "…" : ""}`,
+      content:
+        visibleContent.length > 0
+          ? `${visibleContent.slice(0, 200)}${visibleContent.length > 200 ? "…" : ""}`
+          : "[no visible text — attachment only]",
       attachments: userMessagePayload.attachments ? "[present]" : undefined,
     },
     nullFields: Object.fromEntries(
@@ -225,6 +268,16 @@ export async function POST(req: Request) {
   const { error: userMsgErr } = await supabaseAdmin.from("tutor_messages").insert(userMessagePayload);
   if (userMsgErr) {
     return NextResponse.json({ error: userMsgErr.message }, { status: 500 });
+  }
+
+  /** Keep sidebar order correct (most recently messaged first) even if DB triggers are missing. */
+  const { error: touchUserErr } = await supabaseAdmin
+    .from("tutor_conversations")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", conversationId)
+    .eq("user_id", userId);
+  if (touchUserErr) {
+    console.warn("[tutor/chat] tutor_conversations updated_at (after user message) failed", touchUserErr.message);
   }
 
   const hadImage = !!imagePayload?.length;
@@ -245,8 +298,11 @@ export async function POST(req: Request) {
     if (m.role === "assistant") {
       return { role: "assistant" as const, content: m.content };
     }
-    const imgs = parseAttachmentsFromDb(m.attachments);
-    const userContent: AnthropicUserContent = buildUserAnthropicContent(m.content, imgs);
+    const userContent = buildTutorUserContentForModel(
+      m.content ?? "",
+      m.attachments,
+      TUTOR_EXTRACTED_TEXT_MAX_CHARS
+    );
     return { role: "user" as const, content: userContent };
   });
 
@@ -345,6 +401,17 @@ export async function POST(req: Request) {
           if (asstErr) {
             console.error("tutor assistant save failed", asstErr);
           } else {
+            const { error: touchAsstErr } = await supabaseAdmin
+              .from("tutor_conversations")
+              .update({ updated_at: new Date().toISOString() })
+              .eq("id", conversationId as string)
+              .eq("user_id", userId);
+            if (touchAsstErr) {
+              console.warn(
+                "[tutor/chat] tutor_conversations updated_at (after assistant message) failed",
+                touchAsstErr.message
+              );
+            }
             const { count: msgCount } = await supabaseAdmin
               .from("tutor_messages")
               .select("id", { count: "exact", head: true })
@@ -352,14 +419,18 @@ export async function POST(req: Request) {
             if (msgCount === 2) {
               const { data: firstUserRow } = await supabaseAdmin
                 .from("tutor_messages")
-                .select("content")
+                .select("content, attachments")
                 .eq("conversation_id", conversationId as string)
                 .eq("role", "user")
                 .order("created_at", { ascending: true })
                 .limit(1)
                 .maybeSingle();
-              const firstQuestion = (firstUserRow?.content ?? displayText).trim();
-              const generatedTitle = await generateTutorConversationTitle(firstQuestion, userId);
+              const generatedTitle = await generateTutorConversationTitleFromExchange({
+                firstUserContent: firstUserRow?.content ?? "",
+                firstUserAttachments: firstUserRow?.attachments,
+                firstAssistantResponse: fullAssistant.trim(),
+                userId,
+              });
               if (generatedTitle) {
                 await supabaseAdmin
                   .from("tutor_conversations")
