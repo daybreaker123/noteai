@@ -1,9 +1,37 @@
 import { resend, getEmailFrom } from "@/lib/email/resend-client";
+import { buildPasswordResetEmailHtml } from "@/lib/email/password-reset-html";
 import { buildWelcomeEmailHtml, getWelcomeDashboardUrl } from "@/lib/email/welcome-html";
 import { buildProUpgradeEmailHtml, type BillingCycleLabel } from "@/lib/email/pro-upgrade-html";
 import { getSiteUrl } from "@/lib/site-url";
 
 const LOG = "[email]";
+
+export async function sendPasswordResetEmail(to: string, rawToken: string): Promise<{ ok: boolean; error?: string }> {
+  if (!resend) {
+    console.warn(`${LOG} RESEND_API_KEY not set — skipping password reset email`);
+    return { ok: false, error: "Email not configured" };
+  }
+  const base = getSiteUrl();
+  const resetUrl = `${base}/reset-password?token=${encodeURIComponent(rawToken)}`;
+  const html = buildPasswordResetEmailHtml({ resetUrl });
+  try {
+    const { error } = await resend.emails.send({
+      from: getEmailFrom(),
+      to,
+      subject: "Reset your Studara password",
+      html,
+    });
+    if (error) {
+      console.error(`${LOG} password reset send failed:`, error);
+      return { ok: false, error: String(error.message ?? error) };
+    }
+    console.info(`${LOG} password reset sent`, { to });
+    return { ok: true };
+  } catch (e) {
+    console.error(`${LOG} password reset send exception:`, e);
+    return { ok: false, error: e instanceof Error ? e.message : "Send failed" };
+  }
+}
 
 export async function sendWelcomeEmail(to: string, name: string | null): Promise<void> {
   if (!resend) {

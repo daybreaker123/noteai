@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui";
-import { StudaraWordmark } from "@/components/studara-wordmark";
+import { StudaraWordmark, StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { cn } from "@/lib/cn";
 import { TutorImageLightbox } from "@/components/tutor-image-lightbox";
 import { TutorMarkdown } from "@/components/tutor-markdown";
@@ -22,14 +22,12 @@ import {
   TUTOR_FILE_INPUT_ACCEPT,
 } from "@/lib/tutor-chat-attachments";
 import {
-  ArrowLeft,
   FileText,
   GraduationCap,
   Loader2,
   Paperclip,
   Plus,
   Send,
-  Settings,
   Sparkles,
   Trash2,
   UserCircle,
@@ -63,8 +61,6 @@ function tutorChatUserInitials(name: string | null | undefined, email: string | 
   }
   return "ME";
 }
-
-const TUTOR_ACTIVE_CONV_STORAGE_KEY = "studara-tutor-active-conversation-id";
 
 /** Avoid stale RSC/router caches; always load fresh threads from Supabase. */
 const tutorFetchInit: RequestInit = { cache: "no-store", credentials: "include" };
@@ -116,8 +112,6 @@ export function TutorPage() {
     title: string;
   } | null>(null);
   const [deletingConversation, setDeletingConversation] = React.useState(false);
-  /** When true, user chose "New chat" — don't auto-select the latest conversation from the list. */
-  const [pendingNewChat, setPendingNewChat] = React.useState(false);
   /** Single pending attachment (image with preview, or document with extracted text). */
   const [pendingAttachment, setPendingAttachment] = React.useState<PendingAttachment | null>(null);
   const [extractingDocument, setExtractingDocument] = React.useState(false);
@@ -251,100 +245,37 @@ export function TutorPage() {
   const showFreeUsage = planReady && plan === "free";
 
   React.useEffect(() => {
-    console.log("[tutor:restore] mount bootstrap: loadUserPlan + loadConversations");
     void Promise.all([loadUserPlan(), loadConversations()]);
   }, [loadUserPlan, loadConversations]);
 
-  /** After list loads, restore last-open thread (localStorage) or the most recent conversation, then fetch messages. */
+  /** Legacy: we no longer restore last thread from localStorage — clear old key once. */
   React.useEffect(() => {
-    console.log("[tutor:restore] effect tick", {
-      loadingList,
-      conversationCount: conversations.length,
-      activeConversationId,
-      pendingNewChat,
-      sending,
-      lastLoadedConv: lastMessagesLoadedForConversationRef.current,
-    });
-
-    if (loadingList) {
-      console.log("[tutor:restore] skip: conversation list still loading");
-      return;
-    }
-
-    if (conversations.length === 0) {
-      console.log("[tutor:restore] no conversations from API — clear thread ref");
-      lastMessagesLoadedForConversationRef.current = null;
-      if (!pendingNewChat && !activeConversationId && !sending) {
-        setMessages([]);
-      }
-      return;
-    }
-
-    if (pendingNewChat) {
-      console.log("[tutor:restore] skip: user started new chat (no auto-restore)");
-      return;
-    }
-
-    const inList = (id: string | null): id is string =>
-      Boolean(id && conversations.some((c) => c.id === id));
-
-    let saved: string | null = null;
     try {
-      saved = localStorage.getItem(TUTOR_ACTIVE_CONV_STORAGE_KEY)?.trim() || null;
-    } catch {
-      /* private mode / SSR */
-    }
-
-    let targetId: string;
-
-    if (inList(activeConversationId)) {
-      targetId = activeConversationId;
-      console.log("[tutor:restore] active conversation id is valid for this user", { targetId });
-    } else {
-      const fromStorage = saved && conversations.some((c) => c.id === saved) ? saved : null;
-      targetId = fromStorage ?? conversations[0]!.id;
-      console.log("[tutor:restore] pick conversation", {
-        targetId,
-        source: fromStorage ? "localStorage" : "most_recent_updated_at",
-        savedInStorage: saved,
-        savedWasValid: Boolean(fromStorage),
-      });
-      if (activeConversationId !== targetId) {
-        setActiveConversationId(targetId);
-      }
-    }
-
-    if (lastMessagesLoadedForConversationRef.current === targetId) {
-      console.log("[tutor:restore] skip loadMessages: already loaded this conversation in session", {
-        targetId,
-      });
-      return;
-    }
-
-    console.log("[tutor:restore] calling loadMessages", { targetId });
-    void loadMessages(targetId);
-  }, [loadingList, conversations, activeConversationId, pendingNewChat, loadMessages, sending]);
-
-  /** Persist active thread so returning to /tutor reloads the same conversation from Supabase. */
-  React.useEffect(() => {
-    if (!activeConversationId || pendingNewChat) return;
-    try {
-      localStorage.setItem(TUTOR_ACTIVE_CONV_STORAGE_KEY, activeConversationId);
-      console.log("[tutor:restore] persisted activeConversationId to localStorage", {
-        activeConversationId,
-      });
+      localStorage.removeItem("studara-tutor-active-conversation-id");
     } catch {
       /* ignore */
     }
-  }, [activeConversationId, pendingNewChat]);
+  }, []);
+
+  /**
+   * Opening /tutor always shows the empty “new chat” state — no auto-restore of the last thread.
+   * Sidebar still lists conversations; user must click one (or send a message) to load a thread.
+   */
+  React.useEffect(() => {
+    if (loadingList) return;
+    if (conversations.length === 0) {
+      lastMessagesLoadedForConversationRef.current = null;
+      if (!activeConversationId && !sending) {
+        setMessages([]);
+      }
+    }
+  }, [loadingList, conversations.length, activeConversationId, sending]);
 
   const selectConversation = (id: string) => {
     if (id === activeConversationId) return;
-    console.log("[tutor:restore] selectConversation — effect will loadMessages", { id });
-    setPendingNewChat(false);
-    /** Clear so restore effect always fetches thread for the newly selected id (avoids stale skip). */
     lastMessagesLoadedForConversationRef.current = null;
     setActiveConversationId(id);
+    void loadMessages(id);
   };
 
   const deleteConversation = async () => {
@@ -366,19 +297,8 @@ export function TutorPage() {
       setConversations(remaining);
       if (activeConversationId === id) {
         lastMessagesLoadedForConversationRef.current = null;
-        if (remaining.length > 0) {
-          const pick = remaining[0]!.id;
-          setActiveConversationId(pick);
-          void loadMessages(pick);
-        } else {
-          setActiveConversationId(null);
-          setMessages([]);
-          try {
-            localStorage.removeItem(TUTOR_ACTIVE_CONV_STORAGE_KEY);
-          } catch {
-            /* ignore */
-          }
-        }
+        setActiveConversationId(null);
+        setMessages([]);
       }
       setConversationToDelete(null);
     } finally {
@@ -387,17 +307,10 @@ export function TutorPage() {
   };
 
   const newChat = () => {
-    console.log("[tutor:restore] newChat — clear active thread + message cache ref");
-    setPendingNewChat(true);
     setActiveConversationId(null);
     lastMessagesLoadedForConversationRef.current = null;
     setMessages([]);
     setAwaitingTutorReply(false);
-    try {
-      localStorage.removeItem(TUTOR_ACTIVE_CONV_STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
     if (pendingAttachment?.kind === "image") {
       URL.revokeObjectURL(pendingAttachment.preview);
     }
@@ -713,7 +626,6 @@ export function TutorPage() {
         await loadMessages(convId, { silent: true });
         await loadConversations({ silent: true });
       }
-      setPendingNewChat(false);
     } catch {
       setMessages((m) => m.filter((x) => x.id !== optimisticUser.id));
       setInput(text);
@@ -738,45 +650,29 @@ export function TutorPage() {
         <div className="absolute -top-32 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/12 via-blue-500/8 to-fuchsia-500/8 blur-3xl" />
       </div>
 
-      <header className="relative z-10 shrink-0 px-4 pb-0 pt-3 sm:px-5">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/notes"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/45 transition hover:bg-white/5 hover:text-white"
-            aria-label="Back to notes"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-purple-500/25 to-blue-500/20">
-              <GraduationCap className="h-4 w-4 text-purple-200/95" />
+      <header className="relative z-10 shrink-0 border-b border-white/[0.08] bg-[#08080c]/92 backdrop-blur-xl backdrop-saturate-150">
+        <div className="mx-auto flex h-14 max-w-[2000px] items-center justify-between gap-3 px-4 sm:h-[3.25rem] sm:px-5">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+            <StudaraWordmarkLink href="/notes" linkClassName="shrink-0 opacity-95 transition hover:opacity-100" />
+            <span className="hidden h-5 w-px shrink-0 bg-white/[0.1] sm:block" aria-hidden />
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-gradient-to-br from-purple-500/35 to-blue-500/25 shadow-sm shadow-purple-900/20">
+                <GraduationCap className="h-3.5 w-3.5 text-purple-100/95" strokeWidth={2} />
+              </div>
+              <h1 className="truncate text-[0.9375rem] font-semibold tracking-tight text-white/95 sm:text-base">
+                AI Tutor
+              </h1>
             </div>
-            <h1 className="text-base font-semibold tracking-tight text-white sm:text-[1.05rem]">AI Tutor</h1>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={newChat}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-white/55 transition hover:bg-white/8 hover:text-white"
-              aria-label="New chat"
-              title="New chat"
-            >
-              <Plus className="h-5 w-5" strokeWidth={2} />
-            </button>
-            <Link
-              href="/profile"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-white/45 transition hover:bg-white/8 hover:text-white"
-              aria-label="Settings"
-              title="Settings"
-            >
-              <Settings className="h-[18px] w-[18px]" />
-            </Link>
-          </div>
+          <button
+            type="button"
+            onClick={newChat}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-500 via-purple-600 to-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-md shadow-purple-950/40 ring-1 ring-white/10 transition hover:brightness-110 active:brightness-95 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"
+          >
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} aria-hidden />
+            New Chat
+          </button>
         </div>
-        <div
-          className="mt-3 h-px w-full bg-gradient-to-r from-transparent via-white/12 to-transparent"
-          aria-hidden
-        />
       </header>
 
       <div className="relative z-10 flex min-h-0 flex-1">

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button, Input } from "@/components/ui";
 import { Card } from "@/components/ui";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
@@ -46,6 +47,14 @@ export function LoginPanel({
           required
           autoComplete="current-password"
         />
+        <div className="text-right">
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-[var(--accent)]/90 hover:text-[var(--accent)] hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
         {error ? (
           <p className="text-sm text-red-400">{error}</p>
         ) : null}
