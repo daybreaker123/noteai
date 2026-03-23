@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getProUsageState } from "@/lib/pro-api-usage";
+import { getUserPlanFromDb } from "@/lib/user-plan";
 
 export const runtime = "nodejs";
 
 /**
- * Same `user_plans` lookup as `/api/me/profile`: `select('plan').eq('user_id', session.user.id).single()`
+ * Authoritative plan for UI: same `user_plans` lookup as tutor/API routes via {@link getUserPlanFromDb}.
  */
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -16,35 +16,18 @@ export async function GET() {
   if (!sessionUserId) {
     return NextResponse.json({ plan: "free" });
   }
-  if (!supabaseAdmin) {
-    return NextResponse.json({ plan: "free" });
-  }
 
-  const { data, error: planError } = await supabaseAdmin
-    .from("user_plans")
-    .select("plan")
-    .eq("user_id", sessionUserId)
-    .single();
-
-  let planValue: string | null = null;
-  if (!planError || planError.code === "PGRST116") {
-    planValue = data?.plan != null && typeof data.plan === "string" ? data.plan : null;
-  } else {
-    console.error("[api/me/plan] user_plans plan query failed:", planError.message);
-  }
-
-  const raw = planValue != null ? planValue.trim().toLowerCase() : "";
-  const plan = raw === "pro" ? "pro" : "free";
+  const plan = await getUserPlanFromDb(sessionUserId);
 
   let proHeavyUsage = false;
   let proEstimatedSpendCents = 0;
-  if (plan === "pro" && sessionUserId) {
+  if (plan === "pro") {
     const st = await getProUsageState(sessionUserId);
     proHeavyUsage = st.heavyUsage;
     proEstimatedSpendCents = st.estimatedSpendCents;
   }
 
-  console.log("[api/me/plan]", { sessionUserId, planRaw: planValue, plan, proHeavyUsage });
+  console.log("[api/me/plan]", { sessionUserId, plan, proHeavyUsage });
 
   return NextResponse.json({ plan, proHeavyUsage, proEstimatedSpendCents });
 }

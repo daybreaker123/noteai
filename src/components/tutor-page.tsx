@@ -44,9 +44,10 @@ export function TutorPage() {
   /** True while the tutor reply is being generated (Option A: no token-by-token UI; show typing only). */
   const [awaitingTutorReply, setAwaitingTutorReply] = React.useState(false);
   const [plan, setPlan] = React.useState<"free" | "pro">("free");
-  const [proHeavyUsage, setProHeavyUsage] = React.useState(false);
+  /** After first `/api/me/plan` load — avoids flashing free-tier limits before we know the real plan. */
+  const [planReady, setPlanReady] = React.useState(false);
   const [tutorUsed, setTutorUsed] = React.useState(0);
-  const [tutorLimit, setTutorLimit] = React.useState<number | null>(20);
+  const [tutorLimit, setTutorLimit] = React.useState<number | null>(null);
   const [tutorImagesUsed, setTutorImagesUsed] = React.useState(0);
   const [tutorImagesLimit, setTutorImagesLimit] = React.useState<number | null>(null);
   const [upgradeModal, setUpgradeModal] = React.useState<null | "messages" | "images">(null);
@@ -72,20 +73,26 @@ export function TutorPage() {
     scrollToBottom();
   }, [messages, awaitingTutorReply, sending, scrollToBottom]);
 
-  const refreshProUsage = React.useCallback(async () => {
+  /** Source of truth for subscription tier (matches Supabase `user_plans` + tutor API enforcement). */
+  const loadUserPlan = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/me/plan");
-      if (!res.ok) return;
-      const json = (await res.json()) as { proHeavyUsage?: boolean };
-      setProHeavyUsage(!!json.proHeavyUsage);
+      const res = await fetch("/api/me/plan", { cache: "no-store" });
+      if (!res.ok) {
+        return;
+      }
+      const json = (await res.json()) as { plan?: string };
+      const p = json.plan === "pro" ? "pro" : "free";
+      setPlan(p);
+      if (p === "pro") {
+        setTutorLimit(null);
+        setTutorImagesLimit(null);
+      }
     } catch {
       /* ignore */
+    } finally {
+      setPlanReady(true);
     }
   }, []);
-
-  React.useEffect(() => {
-    void refreshProUsage();
-  }, [refreshProUsage]);
 
   const loadConversations = React.useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) {
@@ -103,7 +110,6 @@ export function TutorPage() {
         tutorImagesLimit?: number | null;
       };
       setConversations(json.conversations ?? []);
-      setPlan(json.plan === "pro" ? "pro" : "free");
       setTutorUsed(json.tutorMessagesUsed ?? 0);
       setTutorLimit(json.tutorMessagesLimit ?? null);
       setTutorImagesUsed(json.tutorImagesUsed ?? 0);
@@ -131,9 +137,11 @@ export function TutorPage() {
     }
   }, []);
 
+  const showFreeUsage = planReady && plan === "free";
+
   React.useEffect(() => {
-    void loadConversations();
-  }, [loadConversations]);
+    void Promise.all([loadUserPlan(), loadConversations()]);
+  }, [loadUserPlan, loadConversations]);
 
   React.useEffect(() => {
     if (loadingList) return;
@@ -178,7 +186,7 @@ export function TutorPage() {
     e.target.value = "";
     if (!file) return;
     if (
-      plan === "free" &&
+      showFreeUsage &&
       tutorImagesLimit != null &&
       tutorImagesUsed >= tutorImagesLimit
     ) {
@@ -278,16 +286,17 @@ export function TutorPage() {
       let full = "";
       const TEMP_ASSISTANT_ID = "temp-assistant";
 
-      const titlePreview =
-        messageText.slice(0, 80) + (messageText.length > 80 ? "…" : "") || "New chat";
-
       const applySseLine = (rawLine: string) => {
         const line = rawLine.replace(/^\s+/, "");
         if (!line.startsWith("data: ")) return;
         const data = line.slice(6).trim();
         if (data === "[DONE]") return;
         try {
-          const parsed = JSON.parse(data) as { text?: string; conversationId?: string };
+          const parsed = JSON.parse(data) as {
+            text?: string;
+            conversationId?: string;
+            conversationTitle?: string;
+          };
           if (parsed.conversationId) {
             const id = parsed.conversationId;
             convId = id;
@@ -297,12 +306,21 @@ export function TutorPage() {
               const now = new Date().toISOString();
               const row: Conversation = {
                 id,
-                title: titlePreview,
+                title: "New chat",
                 updated_at: now,
                 created_at: now,
               };
               return [row, ...prev];
             });
+          }
+          if (parsed.conversationTitle && parsed.conversationId) {
+            const id = parsed.conversationId;
+            const t = parsed.conversationTitle.trim();
+            if (t) {
+              setConversations((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, title: t, updated_at: new Date().toISOString() } : c))
+              );
+            }
           }
           if (parsed.text) {
             full += parsed.text;
@@ -350,7 +368,7 @@ export function TutorPage() {
       // restore attachment UX not fully possible without re-picking file
     } finally {
       setSending(false);
-      void refreshProUsage();
+      void loadUserPlan();
     }
   };
 
@@ -377,16 +395,10 @@ export function TutorPage() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {plan === "free" && tutorLimit != null && (
+          {showFreeUsage && tutorLimit != null && (
             <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 sm:inline">
               {tutorUsed} / {tutorLimit} msgs
               {tutorImagesLimit != null ? ` · ${tutorImagesUsed} / ${tutorImagesLimit} imgs` : ""}
-            </span>
-          )}
-          {plan === "pro" && (
-            <span className="hidden items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-200 sm:flex">
-              <Sparkles className="h-3 w-3" />
-              Unlimited
             </span>
           )}
           <Link
@@ -397,15 +409,6 @@ export function TutorPage() {
           </Link>
         </div>
       </header>
-
-      {plan === "pro" && proHeavyUsage ? (
-        <div
-          role="status"
-          className="shrink-0 border-b border-amber-400/25 bg-amber-500/15 px-4 py-2.5 text-center text-sm text-amber-50/95"
-        >
-          You&apos;re a heavy user this month — you may experience slightly slower responses as we manage server load.
-        </div>
-      ) : null}
 
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-56 shrink-0 flex-col border-r border-white/10 bg-black/20 md:w-64">
@@ -577,7 +580,7 @@ export function TutorPage() {
                   type="button"
                   disabled={
                     sending ||
-                    (plan === "free" &&
+                    (showFreeUsage &&
                       tutorImagesLimit != null &&
                       tutorImagesUsed >= tutorImagesLimit)
                   }
@@ -585,7 +588,7 @@ export function TutorPage() {
                   className="flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-xl border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
                   aria-label="Attach image"
                   title={
-                    plan === "free" &&
+                    showFreeUsage &&
                     tutorImagesLimit != null &&
                     tutorImagesUsed >= tutorImagesLimit
                       ? "Monthly free image limit reached — upgrade to Pro for unlimited uploads"
@@ -617,7 +620,7 @@ export function TutorPage() {
                 </Button>
               </div>
             </div>
-            {plan === "free" && tutorLimit != null && (
+            {showFreeUsage && tutorLimit != null && (
               <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-white/40">
                 Free plan: {Math.max(0, tutorLimit - tutorUsed)} tutor messages left
                 {tutorImagesLimit != null

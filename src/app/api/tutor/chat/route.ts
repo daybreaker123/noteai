@@ -7,6 +7,7 @@ import { ANTHROPIC_MODEL_SONNET } from "@/lib/anthropic-models";
 import { recordProApiSpendEstimate, resolveAnthropicModelForProUser } from "@/lib/pro-api-usage";
 import { getUserPlanFromDb } from "@/lib/user-plan";
 import { TUTOR_SYSTEM_PROMPT } from "@/lib/tutor-prompt";
+import { generateTutorConversationTitle } from "@/lib/tutor-conversation-title";
 import {
   buildUserAnthropicContent,
   estimateBytesFromBase64,
@@ -163,11 +164,9 @@ export async function POST(req: Request) {
   }
 
   let conversationId = body.conversationId?.trim() || null;
-  const titleSeed = rawMessage || (imagePayload ? "Image" : displayText);
 
   if (!conversationId) {
-    const title = titleSeed.slice(0, 80) + (titleSeed.length > 80 ? "…" : "");
-    const conversationInsert = { user_id: userId, title };
+    const conversationInsert = { user_id: userId, title: "New chat" };
     console.log("[tutor/chat] tutor_conversations insert (new thread)", {
       table: "tutor_conversations",
       payload: conversationInsert,
@@ -192,10 +191,6 @@ export async function POST(req: Request) {
       .single();
     if (convErr || !conv || conv.user_id !== userId) {
       return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
-    }
-    if (conv.title === "New chat") {
-      const t = titleSeed.slice(0, 80) + (titleSeed.length > 80 ? "…" : "");
-      await supabaseAdmin.from("tutor_conversations").update({ title: t }).eq("id", conversationId);
     }
   }
 
@@ -349,6 +344,37 @@ export async function POST(req: Request) {
           const { error: asstErr } = await supabaseAdmin.from("tutor_messages").insert(assistantPayload);
           if (asstErr) {
             console.error("tutor assistant save failed", asstErr);
+          } else {
+            const { count: msgCount } = await supabaseAdmin
+              .from("tutor_messages")
+              .select("id", { count: "exact", head: true })
+              .eq("conversation_id", conversationId as string);
+            if (msgCount === 2) {
+              const { data: firstUserRow } = await supabaseAdmin
+                .from("tutor_messages")
+                .select("content")
+                .eq("conversation_id", conversationId as string)
+                .eq("role", "user")
+                .order("created_at", { ascending: true })
+                .limit(1)
+                .maybeSingle();
+              const firstQuestion = (firstUserRow?.content ?? displayText).trim();
+              const generatedTitle = await generateTutorConversationTitle(firstQuestion, userId);
+              if (generatedTitle) {
+                await supabaseAdmin
+                  .from("tutor_conversations")
+                  .update({ title: generatedTitle })
+                  .eq("id", conversationId as string);
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      conversationId,
+                      conversationTitle: generatedTitle,
+                    })}\n\n`
+                  )
+                );
+              }
+            }
           }
         }
         await recordProApiSpendEstimate(userId, tutorEstimateCents);
