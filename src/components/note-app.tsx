@@ -38,7 +38,10 @@ import {
   Check,
   Upload,
   FilePenLine,
+  Timer,
 } from "lucide-react";
+import { PomodoroProvider, usePomodoro } from "@/components/pomodoro/pomodoro-context";
+import { PomodoroPortal } from "@/components/pomodoro/pomodoro-widget";
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
   study: "Study Mode turns your notes into flashcards and quizzes. Generate practice questions and test your knowledge with AI.",
@@ -669,6 +672,7 @@ export function NoteApp({ userId }: { userId: string }) {
   }
 
   return (
+    <PomodoroProvider>
     <div className="relative flex h-dvh bg-[#0a0a0f]">
       {importDocLoading && (
         <div
@@ -1546,6 +1550,8 @@ export function NoteApp({ userId }: { userId: string }) {
         }}
       />
     </div>
+    <PomodoroPortal />
+    </PomodoroProvider>
   );
 }
 
@@ -1624,6 +1630,8 @@ function EditorPanel({
   setUpgradeModal: (x: { show: boolean; message?: string; feature?: string }) => void;
   onDeleteRequest: () => void;
 }) {
+  const { openWidget } = usePomodoro();
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
       {/* Toolbar */}
@@ -1661,6 +1669,15 @@ function EditorPanel({
               Auto-categorize
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={openWidget}
+            title="Pomodoro timer"
+            aria-label="Open Pomodoro timer"
+          >
+            <Timer className="h-3.5 w-3.5" />
+          </Button>
           <Button size="sm" variant="ghost" onClick={onStudy}>
             <BookOpen className="mr-1.5 h-3.5 w-3.5" />
             Study
