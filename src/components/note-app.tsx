@@ -37,13 +37,13 @@ import {
   Save,
   Check,
   Upload,
+  FilePenLine,
 } from "lucide-react";
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
   study: "Study Mode turns your notes into flashcards and quizzes. Generate practice questions and test your knowledge with AI.",
   export: "Export your notes as PDF or Markdown for sharing, printing, or use in other apps.",
   semantic: "Semantic search finds notes by meaning, not just keywords. Search for concepts and ideas.",
-  writing: "The Writing Assistant expands bullet points into full paragraphs and improves clarity and structure.",
   autoCategorize: "Auto-categorization suggests the best category for your note using AI.",
 };
 
@@ -88,14 +88,12 @@ export function NoteApp({ userId }: { userId: string }) {
   const [exportMenu, setExportMenu] = React.useState<string | null>(null);
   const [suggestBanner, setSuggestBanner] = React.useState<{ categoryId: string; name: string } | null>(null);
   const [newNoteIds, setNewNoteIds] = React.useState<Set<string>>(new Set());
-  const [writingUndo, setWritingUndo] = React.useState<{ prev: string } | null>(null);
   const [summaryCache, setSummaryCache] = React.useState<Record<string, string>>({});
   const [summaryLoading, setSummaryLoading] = React.useState<Set<string>>(new Set());
   const [semanticIds, setSemanticIds] = React.useState<string[]>([]);
   const [draftNote, setDraftNote] = React.useState<Note | null>(null);
   const [summaryBelow, setSummaryBelow] = React.useState<string | null>(null);
   const [summarizeLoading, setSummarizeLoading] = React.useState(false);
-  const [writingLoading, setWritingLoading] = React.useState(false);
   const [autoCategorizeLoading, setAutoCategorizeLoading] = React.useState(false);
   const [studyLoading, setStudyLoading] = React.useState<"flashcards" | "quiz" | null>(null);
   const [studySaveLoading, setStudySaveLoading] = React.useState<"flashcards" | "quiz" | null>(null);
@@ -702,44 +700,16 @@ export function NoteApp({ userId }: { userId: string }) {
           <div className="text-xs text-white/60">AI note-taking</div>
         </div>
         <div className="flex shrink-0 flex-col p-3">
-          <input
-            ref={importDocumentInputRef}
-            type="file"
-            accept={NOTE_IMPORT_FILE_ACCEPT}
-            className="hidden"
-            aria-hidden
-            onChange={handleImportDocumentChange}
-          />
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={handleNewNote}
-              className="flex min-w-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-2 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500 sm:gap-2 sm:px-3 sm:text-sm"
-            >
-              <Plus className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-              New Note
-            </button>
-            <button
-              type="button"
-              title="PDF or Word (.docx) only"
-              aria-label="Import document from PDF or Word"
-              disabled={importDocLoading}
-              onClick={() => {
-                setImportDocError(null);
-                importDocumentInputRef.current?.click();
-              }}
-              className="flex min-w-0 items-center justify-center gap-1 rounded-xl border border-white/15 bg-white/[0.06] px-1.5 py-2.5 text-[11px] font-semibold leading-tight text-white/90 shadow-md transition hover:border-purple-500/35 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40 sm:gap-1.5 sm:px-2 sm:text-xs"
-            >
-              {importDocLoading ? (
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin sm:h-4 sm:w-4" aria-hidden />
-              ) : (
-                <Upload className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
-              )}
-              <span className="min-w-0 text-center">Import Document</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleNewNote}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+          >
+            <Plus className="h-4 w-4" />
+            New Note
+          </button>
           {importDocError && (
-            <div className="-mt-2 mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
               <span>{importDocError}</span>
               <button
                 type="button"
@@ -885,6 +855,13 @@ export function NoteApp({ userId }: { userId: string }) {
             AI Tutor
           </Link>
           <Link
+            href="/essay-feedback"
+            className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+          >
+            <FilePenLine className="h-4 w-4" />
+            Essay Feedback
+          </Link>
+          <Link
             href="/profile"
             className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
           >
@@ -899,6 +876,14 @@ export function NoteApp({ userId }: { userId: string }) {
 
       {/* Main content: grid of note cards OR editor panel */}
       <main className="relative z-10 flex flex-1 flex-col overflow-hidden">
+        <input
+          ref={importDocumentInputRef}
+          type="file"
+          accept={NOTE_IMPORT_FILE_ACCEPT}
+          className="hidden"
+          aria-hidden
+          onChange={handleImportDocumentChange}
+        />
         {plan === "pro" && proHeavyUsage ? (
           <div
             role="status"
@@ -919,7 +904,6 @@ export function NoteApp({ userId }: { userId: string }) {
             editContent={editContent}
             setEditContent={setEditContent}
             suggestBanner={suggestBanner}
-            writingUndo={writingUndo}
             onBack={() => {
               if (draftNote) setDraftNote(null);
               setSelectedNoteId(null);
@@ -942,18 +926,6 @@ export function NoteApp({ userId }: { userId: string }) {
               }
             }}
             onSuggestDismiss={() => setSuggestBanner(null)}
-            onWritingUndo={() => {
-              if (selectedNoteId && writingUndo) {
-                setEditContent(writingUndo.prev);
-                if (!draftNote || selectedNoteId !== draftNote.id) {
-                  actions.update(selectedNoteId, { content: writingUndo.prev });
-                } else {
-                  setDraftNote((d) => (d ? { ...d, content: writingUndo!.prev } : null));
-                }
-                setWritingUndo(null);
-              }
-            }}
-            onWritingDismiss={() => setWritingUndo(null)}
             onSummarize={async () => {
               const res = await fetch("/api/ai", {
                 method: "POST",
@@ -1074,41 +1046,6 @@ export function NoteApp({ userId }: { userId: string }) {
                 setTagsLoading(false);
               }
             }}
-            onWritingAssistant={async () => {
-              if (plan !== "pro") {
-                setUpgradeModal({ show: true, feature: "writing" });
-                return;
-              }
-              setWritingLoading(true);
-              try {
-                const res = await fetch("/api/ai/anthropic/expand-bullets", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ content: editContent }),
-                });
-                const json = (await res.json()) as { expanded?: string; code?: string; error?: string };
-                if (json.code && res.status === 402) {
-                  setUpgradeModal({ show: true, feature: "writing" });
-                  return;
-                }
-                if (json.expanded && selectedNote) {
-                  setWritingUndo({ prev: editContent });
-                  setEditContent(json.expanded);
-                  if (draftNote && selectedNote.id === draftNote.id) {
-                    setDraftNote((d) => (d ? { ...d, content: json.expanded! } : null));
-                  } else {
-                    actions.update(selectedNote.id, { content: json.expanded });
-                  }
-                } else if (json.error) {
-                  setUpgradeModal({ show: true, message: json.error });
-                }
-              } catch {
-                setUpgradeModal({ show: true, message: "Writing assistant failed" });
-              } finally {
-                setWritingLoading(false);
-              }
-            }}
-            writingLoading={writingLoading}
             onStudy={() => {
               if (plan !== "pro") {
                 setUpgradeModal({ show: true, feature: "study" });
@@ -1621,11 +1558,9 @@ function EditorPanel({
   editContent,
   setEditContent,
   suggestBanner,
-  writingUndo,
   summaryBelow,
   summaryLoading,
   autoCategorizeLoading,
-  writingLoading,
   improveLoading,
   extractLoading,
   titleLoading,
@@ -1637,14 +1572,11 @@ function EditorPanel({
   onUpdate,
   onSuggestApply,
   onSuggestDismiss,
-  onWritingUndo,
-  onWritingDismiss,
   onSummarize,
   onImprove,
   onExtract,
   onGenerateTitle,
   onSuggestTags,
-  onWritingAssistant,
   onStudy,
   onClaudeSummarize,
   onAutoCategorize,
@@ -1663,11 +1595,9 @@ function EditorPanel({
   editContent: string;
   setEditContent: (v: string) => void;
   suggestBanner: { categoryId: string; name: string } | null;
-  writingUndo: { prev: string } | null;
   summaryBelow: string | null;
   summaryLoading: boolean;
   autoCategorizeLoading: boolean;
-  writingLoading: boolean;
   improveLoading: boolean;
   extractLoading: boolean;
   titleLoading: boolean;
@@ -1679,14 +1609,11 @@ function EditorPanel({
   onUpdate: (patch: Partial<Pick<Note, "title" | "content" | "category_id" | "tags">>) => void;
   onSuggestApply: () => void;
   onSuggestDismiss: () => void;
-  onWritingUndo: () => void;
-  onWritingDismiss: () => void;
   onSummarize: () => void;
   onImprove: () => void;
   onExtract: () => void;
   onGenerateTitle: () => void;
   onSuggestTags: () => void;
-  onWritingAssistant: () => void;
   onStudy: () => void;
   onClaudeSummarize: () => void;
   onAutoCategorize: () => void;
@@ -1738,10 +1665,6 @@ function EditorPanel({
             <BookOpen className="mr-1.5 h-3.5 w-3.5" />
             Study
           </Button>
-          <Button size="sm" variant="ghost" onClick={onWritingAssistant} disabled={writingLoading}>
-            {writingLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
-            Writing assistant
-          </Button>
         </div>
         <button
           type="button"
@@ -1761,15 +1684,6 @@ function EditorPanel({
           <div className="flex gap-2">
             <Button size="sm" onClick={onSuggestApply}>Apply</Button>
             <Button size="sm" variant="ghost" onClick={onSuggestDismiss}>Dismiss</Button>
-          </div>
-        </div>
-      )}
-      {writingUndo && (
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-2 text-sm">
-          <span className="text-white/70">Writing assistant applied. Undo?</span>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={onWritingUndo}>Undo</Button>
-            <Button size="sm" variant="ghost" onClick={onWritingDismiss}>Dismiss</Button>
           </div>
         </div>
       )}

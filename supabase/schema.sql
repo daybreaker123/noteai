@@ -53,6 +53,7 @@ create table if not exists public.ai_usage (
   tutor_messages int not null default 0,
   tutor_images int not null default 0,
   study_multiple int not null default 0,
+  essay_feedback int not null default 0,
   pro_estimated_api_cents int not null default 0,
   primary key (user_id, month)
 );
