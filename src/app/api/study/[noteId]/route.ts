@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { anthropicComplete, ANTHROPIC_MODEL_SONNET, hasAnthropicKey } from "@/lib/anthropic";
 import { rowMatchesSingleNoteCache } from "@/lib/study-set-utils";
+import { htmlToPlainText } from "@/lib/note-content-html";
 
 async function latestPayloadForSingleNoteCache(
   userId: string,
@@ -101,7 +102,8 @@ export async function POST(
   let content: string;
   let noteTitleForSet = "Study set";
   if (bodyContent?.trim()) {
-    content = `${bodyTitle ?? "Note"}\n\n${bodyContent}`.slice(0, 8000);
+    const plain = htmlToPlainText(bodyContent);
+    content = `${bodyTitle ?? "Note"}\n\n${plain}`.slice(0, 8000);
   } else if (supabaseAdmin && !noteId.startsWith("draft-")) {
     const { data: note } = await supabaseAdmin
       .from("notes")
@@ -113,7 +115,8 @@ export async function POST(
       return NextResponse.json({ error: "Note not found" }, { status: 404 });
     }
     noteTitleForSet = (note.title ?? "Untitled").trim() || "Untitled";
-    content = `${note.title}\n\n${note.content}`.slice(0, 8000);
+    const plainBody = htmlToPlainText(note.content);
+    content = `${note.title}\n\n${plainBody}`.slice(0, 8000);
   } else {
     return NextResponse.json({ error: "Note content required" }, { status: 400 });
   }

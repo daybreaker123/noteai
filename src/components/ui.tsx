@@ -23,7 +23,7 @@ export function Button({
   size?: "sm" | "md";
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50 disabled:pointer-events-none";
+    "inline-flex touch-manipulation items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50 disabled:pointer-events-none";
   const variants: Record<string, string> = {
     default: "border-[var(--border)] bg-white/10 hover:bg-white/15 text-[var(--text)]",
     ghost: "border-transparent bg-transparent hover:bg-white/10 text-[var(--text)]",
@@ -31,8 +31,8 @@ export function Button({
     success: "border-transparent bg-[var(--accent2)]/90 hover:bg-[var(--accent2)] text-black",
   };
   const sizes: Record<string, string> = {
-    sm: "h-9 px-3",
-    md: "h-10 px-3.5",
+    sm: "min-h-11 min-w-[44px] px-3 py-2.5 sm:h-9 sm:min-h-0 sm:min-w-0 sm:py-2",
+    md: "min-h-11 min-w-[44px] px-3.5 py-2.5 sm:h-10 sm:min-h-0 sm:min-w-0 sm:py-2",
   };
   return <button className={cn(base, variants[variant], sizes[size], className)} {...props} />;
 }
@@ -41,7 +41,7 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cn(
-        "h-10 w-full rounded-xl border border-[var(--border)] bg-white/5 px-3 text-sm text-[var(--text)] outline-none placeholder:text-white/40 focus:ring-2 focus:ring-[var(--accent)]/40",
+        "min-h-11 w-full rounded-xl border border-[var(--border)] bg-white/5 px-3 py-2 text-base text-[var(--text)] outline-none placeholder:text-white/40 focus:ring-2 focus:ring-[var(--accent)]/40 sm:min-h-10 sm:py-2 sm:text-sm",
         className,
       )}
       {...props}
@@ -53,7 +53,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
   return (
     <textarea
       className={cn(
-        "min-h-40 w-full resize-y rounded-xl border border-[var(--border)] bg-white/5 px-3 py-2.5 text-sm text-[var(--text)] outline-none placeholder:text-white/40 focus:ring-2 focus:ring-[var(--accent)]/40",
+        "min-h-40 w-full resize-y rounded-xl border border-[var(--border)] bg-white/5 px-3 py-3 text-base text-[var(--text)] outline-none placeholder:text-white/40 focus:ring-2 focus:ring-[var(--accent)]/40 sm:py-2.5 sm:text-sm",
         className,
       )}
       {...props}

@@ -52,21 +52,28 @@ export async function POST(req: Request) {
     }
   }
 
-  const system = `You are an expert note-taker and tutor. Improve these student notes by:
-1) Fixing any unclear or incomplete explanations and filling in gaps in understanding
-2) Adding relevant context, examples, or detail that would help a student studying this topic
-3) Correcting anything that seems factually uncertain (the user marked one item with ?? - address that)
-4) Keeping the casual student voice but making it clearer and more complete
-5) Using clear structure with line breaks and simple dashes or numbers for lists where helpful
+  const system = `You are an expert note-taker and tutor. The user message is note content: it may be HTML (from a rich editor) or plain text for older notes.
 
-Output rules (critical): Do not use any markdown formatting — no asterisks for bold or italic, no ** or __, no # headers, no backticks, no [links](). Return plain text only with clean spacing and line breaks so the note reads naturally in a simple text editor.
+Improve the notes by:
+1) Fixing unclear or incomplete explanations and filling gaps in understanding
+2) Adding relevant context, examples, or detail that helps a student studying this topic
+3) Correcting anything that seems factually uncertain (if the user marked something with ??, address it)
+4) Keeping a natural student voice while making the writing clearer and more complete
 
-The result should feel like a smarter, more complete version of the original notes, not a corporate document. Return only the improved notes, no preamble.`;
-  const userMessage = content.slice(0, 16000);
+Preserve all existing formatting including tables, bullet points, headings, code blocks, and other structured elements. If a table exists in the notes, keep it intact and only improve the text content within it. Return the improved content in the same format as the input.
+
+Formatting rules (critical):
+- Preserve all structure from the input: tables (same rows/columns/header cells), bullet/numbered/task lists, headings, blockquotes, code blocks, horizontal rules, images (keep the same src URLs), links, and inline formatting (bold, italic, underline, strike, highlight) and text alignment when expressed as HTML. Only change the wording inside cells, headings, paragraphs, and list items — do not remove or flatten tables or lists.
+- If the input is HTML, return improved content as HTML only (a fragment for a rich text editor body). Reuse the same tags and attributes where possible; do not replace structured HTML with plain text or Markdown.
+- If the input is plain text (no HTML tags), return improved plain text with line breaks; do not use Markdown (no **, #, backticks, or []() links).
+- Do not wrap the output in markdown code fences. Do not include <html>, <head>, or <body> wrappers — return only the inner content fragment.
+
+Return only the improved notes, no preamble or commentary.`;
+  const userMessage = content.slice(0, 200_000);
 
   try {
     const text = await anthropicComplete(system, userMessage, {
-      maxTokens: 4000,
+      maxTokens: 8192,
       model: ANTHROPIC_MODEL_SONNET,
       usage: { userId: session.user.id },
     });

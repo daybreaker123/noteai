@@ -3,8 +3,9 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useNotesRemote } from "@/lib/use-notes-remote";
-import { SignoutButton } from "@/components/signout-button";
 import { CreateCategoryModal } from "@/components/create-category-modal";
 import { DeleteCategoryModal } from "@/components/delete-category-modal";
 import { DeleteNoteModal } from "@/components/delete-note-modal";
@@ -12,13 +13,22 @@ import { Button, Card, Input, Textarea, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { sanitizeGeneratedNoteTitle } from "@/lib/sanitize-note-title";
 import { NOTE_IMPORT_FILE_ACCEPT } from "@/lib/note-import-utils";
+import { ensureEditorHtml, htmlToPlainText, normalizeImprovedNoteHtml, noteContentPreview } from "@/lib/note-content-html";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
+import { NoteRichTextEditor } from "@/components/note-rich-text-editor";
+import { OnboardingModal } from "@/components/onboarding-modal";
 import type { Note, Category, StudySetSummary } from "@/lib/api-types";
 import { buildStudySetTitleFromNoteTitles } from "@/lib/study-set-utils";
+import { NoteStudyProgressBar, NoteStudyProgressTrail } from "@/components/note-study-progress";
+import {
+  computeStudyProgressCompletion,
+  noteHasSavedStudySet,
+  type StudyProgressCompletion,
+  type StudyProgressStepId,
+} from "@/lib/note-study-progress";
 import {
   Plus,
   Search,
-  Pin,
   FileText,
   Sparkles,
   ChevronRight,
@@ -29,32 +39,58 @@ import {
   Loader2,
   Tag,
   GraduationCap,
-  UserCircle,
   Trash2,
-  Library,
-  SquareStack,
   HelpCircle,
+  Bookmark,
+  SquareStack,
   Save,
-  Check,
+  Pin,
   Upload,
   FilePenLine,
-  Timer,
+  LayoutGrid,
+  FolderPlus,
+  Menu,
 } from "lucide-react";
-import { PomodoroProvider, usePomodoro } from "@/components/pomodoro/pomodoro-context";
-import { PomodoroPortal } from "@/components/pomodoro/pomodoro-widget";
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
   study: "Study Mode turns your notes into flashcards and quizzes. Generate practice questions and test your knowledge with AI.",
   export: "Export your notes as PDF or Markdown for sharing, printing, or use in other apps.",
-  semantic: "Semantic search finds notes by meaning, not just keywords. Search for concepts and ideas.",
   autoCategorize: "Auto-categorization suggests the best category for your note using AI.",
 };
 
-export function NoteApp({ userId }: { userId: string }) {
+/** Skip global ⌘N / ⌘K when typing in the editor or any form field. */
+function shouldIgnoreAppShortcut(e: KeyboardEvent): boolean {
+  const t = e.target;
+  if (!t || !(t instanceof Element)) return false;
+  return Boolean(
+    t.closest("input, textarea, select, [contenteditable='true'], .studara-tiptap, .studara-tiptap-root")
+  );
+}
+
+function userInitials(name: string | null | undefined, email: string | null | undefined) {
+  const n = name?.trim();
+  if (n) {
+    const parts = n.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]![0]!}${parts[parts.length - 1]![0]!}`.toUpperCase();
+    return n.slice(0, 2).toUpperCase();
+  }
+  const e = email?.trim();
+  if (e) return e.slice(0, 2).toUpperCase();
+  return "?";
+}
+
+export function NoteApp({
+  userId,
+  initialOpenStudySetId = null,
+}: {
+  userId: string;
+  initialOpenStudySetId?: string | null;
+}) {
   const {
     categories,
     notes,
     loading,
+    notesLoadError,
     plan,
     proHeavyUsage,
     refreshPlan,
@@ -62,9 +98,14 @@ export function NoteApp({ userId }: { userId: string }) {
     setUpgradeModal,
     categoryError,
     clearCategoryError,
+    saveErrorMessage,
+    clearSaveErrorMessage,
     actions,
     FREE_NOTE_LIMIT,
   } = useNotesRemote(userId);
+
+  const router = useRouter();
+  const { data: session } = useSession();
 
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | "all" | null>(null);
   const [selectedNoteId, setSelectedNoteId] = React.useState<string | null>(null);
@@ -89,11 +130,11 @@ export function NoteApp({ userId }: { userId: string }) {
   const [cardIndex, setCardIndex] = React.useState(0);
   const [cardFlipped, setCardFlipped] = React.useState(false);
   const [exportMenu, setExportMenu] = React.useState<string | null>(null);
+  const [studySetLoadError, setStudySetLoadError] = React.useState<string | null>(null);
   const [suggestBanner, setSuggestBanner] = React.useState<{ categoryId: string; name: string } | null>(null);
   const [newNoteIds, setNewNoteIds] = React.useState<Set<string>>(new Set());
   const [summaryCache, setSummaryCache] = React.useState<Record<string, string>>({});
   const [summaryLoading, setSummaryLoading] = React.useState<Set<string>>(new Set());
-  const [semanticIds, setSemanticIds] = React.useState<string[]>([]);
   const [draftNote, setDraftNote] = React.useState<Note | null>(null);
   const [summaryBelow, setSummaryBelow] = React.useState<string | null>(null);
   const [summarizeLoading, setSummarizeLoading] = React.useState(false);
@@ -102,10 +143,8 @@ export function NoteApp({ userId }: { userId: string }) {
   const [studySaveLoading, setStudySaveLoading] = React.useState<"flashcards" | "quiz" | null>(null);
   const [studyError, setStudyError] = React.useState<string | null>(null);
   const [improveLoading, setImproveLoading] = React.useState(false);
-  const [extractLoading, setExtractLoading] = React.useState(false);
   const [titleLoading, setTitleLoading] = React.useState(false);
   const [tagsLoading, setTagsLoading] = React.useState(false);
-  const [extractTasksModal, setExtractTasksModal] = React.useState<string[] | null>(null);
   const [suggestTagsChips, setSuggestTagsChips] = React.useState<string[] | null>(null);
   const [toolbarError, setToolbarError] = React.useState<string | null>(null);
   const [improveToast, setImproveToast] = React.useState(false);
@@ -121,6 +160,18 @@ export function NoteApp({ userId }: { userId: string }) {
   const [importDocLoading, setImportDocLoading] = React.useState(false);
   const [importDocError, setImportDocError] = React.useState<string | null>(null);
   const importDocumentInputRef = React.useRef<HTMLInputElement>(null);
+  const sidebarSearchInputRef = React.useRef<HTMLInputElement>(null);
+  const processedOpenStudyRef = React.useRef<string | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileSidebarOpen]);
 
   const refreshStudySets = React.useCallback(async () => {
     try {
@@ -164,22 +215,14 @@ export function NoteApp({ userId }: { userId: string }) {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      if (plan === "pro" && semanticIds.length > 0) {
-        return list.filter((n) => semanticIds.includes(n.id)).sort((a, b) => {
-          const ai = semanticIds.indexOf(a.id);
-          const bi = semanticIds.indexOf(b.id);
-          if (ai >= 0 && bi >= 0) return ai - bi;
-          if (ai >= 0) return -1;
-          if (bi >= 0) return 1;
-          return 0;
-        });
-      }
-      list = list.filter(
-        (n) =>
+      list = list.filter((n) => {
+        const body = htmlToPlainText(n.content).toLowerCase();
+        return (
           n.title.toLowerCase().includes(q) ||
-          n.content.toLowerCase().includes(q) ||
+          body.includes(q) ||
           (n.tags ?? []).some((t) => t.toLowerCase().includes(q))
-      );
+        );
+      });
     }
     return list.sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
@@ -188,30 +231,16 @@ export function NoteApp({ userId }: { userId: string }) {
       const bTime = b.updated_at ?? b.created_at ?? "";
       return bTime.localeCompare(aTime);
     });
-  }, [notes, selectedCategoryId, searchQuery, plan, semanticIds]);
+  }, [notes, selectedCategoryId, searchQuery]);
 
-  React.useEffect(() => {
-    if (!searchQuery.trim() || plan !== "pro") {
-      setSemanticIds([]);
-      return;
+  const noteCounts = React.useMemo(() => {
+    const byCategory = new Map<string, number>();
+    for (const n of notes) {
+      const key = n.category_id ?? "__uncat__";
+      byCategory.set(key, (byCategory.get(key) ?? 0) + 1);
     }
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/search/semantic", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery }),
-      });
-      if (cancelled) return;
-      const json = (await res.json()) as { notes?: { id: string }[] };
-      if (res.ok && json.notes) {
-        setSemanticIds(json.notes.map((n) => n.id));
-      } else {
-        setSemanticIds([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [searchQuery, plan]);
+    return { total: notes.length, byCategory };
+  }, [notes]);
 
   const selectedNote =
     selectedNoteId && draftNote && selectedNoteId === draftNote.id
@@ -221,23 +250,78 @@ export function NoteApp({ userId }: { userId: string }) {
         : null;
   const [editTitle, setEditTitle] = React.useState("");
   const [editContent, setEditContent] = React.useState("");
+  /** Bumps when AI replaces full body so Tiptap remounts with new HTML. */
+  const [editorContentRevision, setEditorContentRevision] = React.useState(0);
   const editTitleRef = React.useRef(editTitle);
   const editContentRef = React.useRef(editContent);
   const skipSyncRef = React.useRef(false);
+  const lastLoadedEditorNoteIdRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     editTitleRef.current = editTitle;
     editContentRef.current = editContent;
   }, [editTitle, editContent]);
+
+  React.useEffect(() => {
+    setEditorContentRevision(0);
+  }, [selectedNoteId]);
+
   React.useEffect(() => {
     if (skipSyncRef.current) {
       skipSyncRef.current = false;
       return;
     }
-    if (selectedNote && !draftNote) {
-      setEditTitle(selectedNote.title);
-      setEditContent(selectedNote.content);
+    if (!selectedNoteId) {
+      lastLoadedEditorNoteIdRef.current = null;
+      return;
     }
-  }, [selectedNote?.id, selectedNote?.title, selectedNote?.content, draftNote]);
+    if (!selectedNote) return;
+    const id = selectedNote.id;
+    if (lastLoadedEditorNoteIdRef.current === id) {
+      setEditTitle(selectedNote.title);
+      return;
+    }
+    lastLoadedEditorNoteIdRef.current = id;
+    setEditTitle(selectedNote.title);
+    setEditContent(ensureEditorHtml(selectedNote.content));
+  }, [selectedNoteId, selectedNote, draftNote]);
+
+  const [showOnboarding, setShowOnboarding] = React.useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    if (!userId || loading) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/me/onboarding", { cache: "no-store", credentials: "include" });
+        if (!res.ok) {
+          if (!cancelled) setShowOnboarding(false);
+          return;
+        }
+        const j = (await res.json()) as { needsOnboarding?: boolean };
+        if (!cancelled) setShowOnboarding(!!j.needsOnboarding);
+      } catch {
+        if (!cancelled) setShowOnboarding(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, loading]);
+
+  const handleOnboardingFinished = React.useCallback(
+    async ({ welcomeNoteId }: { welcomeNoteId: string | null }) => {
+      setShowOnboarding(false);
+      setMobileSidebarOpen(false);
+      await actions.refresh();
+      lastLoadedEditorNoteIdRef.current = null;
+      if (welcomeNoteId) {
+        setSelectedCategoryId("all");
+        setDraftNote(null);
+        setSelectedNoteId(welcomeNoteId);
+      }
+    },
+    [actions]
+  );
 
   const studySourceLabel = React.useMemo(() => {
     if (!studyModal) return "Untitled";
@@ -328,19 +412,51 @@ export function NoteApp({ userId }: { userId: string }) {
     setSummaryBelow(null);
   }, [selectedNoteId]);
 
+  /** Latest editor snapshot for flushing when leaving a note (avoids losing debounced edits). */
+  const editorFlushRef = React.useRef<{ id: string | null; title: string; content: string }>({
+    id: null,
+    title: "",
+    content: "",
+  });
+  const actionsRef = React.useRef(actions);
+  actionsRef.current = actions;
+
+  React.useLayoutEffect(() => {
+    return () => {
+      const snap = editorFlushRef.current;
+      if (!snap.id || snap.id.startsWith("draft-")) return;
+      const n = notes.find((x) => x.id === snap.id);
+      if (!n) return;
+      if (n.title === snap.title && n.content === snap.content) return;
+      void actionsRef.current.update(snap.id, { title: snap.title, content: snap.content });
+    };
+  }, [selectedNoteId, draftNote, notes]);
+
+  React.useLayoutEffect(() => {
+    if (selectedNoteId && !draftNote && selectedNote && !selectedNoteId.startsWith("draft-")) {
+      editorFlushRef.current = {
+        id: selectedNoteId,
+        title: editTitle,
+        content: editContent,
+      };
+    } else {
+      editorFlushRef.current = { id: null, title: "", content: "" };
+    }
+  }, [selectedNoteId, editTitle, editContent, draftNote, selectedNote]);
+
   const saveDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => {
     if (!selectedNoteId || !selectedNote || draftNote) return;
     saveDebounce.current = setTimeout(() => {
       actions.update(selectedNoteId, { title: editTitle, content: editContent });
-      if (newNoteIds.has(selectedNoteId) && editContent.trim().length > 50 && plan === "pro") {
+      if (newNoteIds.has(selectedNoteId) && htmlToPlainText(editContent).trim().length > 50 && plan === "pro") {
         const catIds = categories.map((c) => c.id);
         const catNames = categories.map((c) => c.name);
         fetch("/api/ai/anthropic/suggest-category", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            content: editContent,
+            content: htmlToPlainText(editContent),
             categoryIds: catIds,
             categoryNames: catNames,
           }),
@@ -365,14 +481,27 @@ export function NoteApp({ userId }: { userId: string }) {
   }, [editTitle, editContent, selectedNoteId, selectedNote, draftNote, actions, categories, plan, newNoteIds, suggestBanner]);
 
   React.useEffect(() => {
+    if (!exportMenu) return;
+    function onPointerDown(e: PointerEvent) {
+      const root = document.querySelector(`[data-note-export-root="${exportMenu}"]`);
+      const t = e.target;
+      if (root && t instanceof Node && root.contains(t)) return;
+      setExportMenu(null);
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [exportMenu]);
+
+  React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (shouldIgnoreAppShortcut(e)) return;
       if (e.key === "n" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         handleNewNote();
       }
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        (document.querySelector('[data-search-input]') as HTMLInputElement)?.focus();
+        sidebarSearchInputRef.current?.focus();
       }
     }
     window.addEventListener("keydown", onKey);
@@ -403,6 +532,7 @@ export function NoteApp({ userId }: { userId: string }) {
     setEditTitle("Untitled");
     setEditContent("");
     setNewNoteIds((prev) => new Set(prev).add(draftId));
+    setMobileSidebarOpen(false);
 
     // Persist in background — don't block the editor
     (async () => {
@@ -450,7 +580,7 @@ export function NoteApp({ userId }: { userId: string }) {
     const { note, truncated } = result;
     setSelectedNoteId(note.id);
     setEditTitle(note.title);
-    setEditContent(note.content);
+    setEditContent(ensureEditorHtml(note.content));
     setDraftNote(null);
     setSelectedCategoryId(note.category_id ?? "all");
     setStudyModal(null);
@@ -464,6 +594,7 @@ export function NoteApp({ userId }: { userId: string }) {
 
   /** Sidebar category pick: leave note editor and show the grid for that category. */
   function selectSidebarCategory(categoryId: string | "all") {
+    setMobileSidebarOpen(false);
     setSelectedCategoryId(categoryId);
     setSelectedNoteId(null);
     setDraftNote(null);
@@ -500,7 +631,6 @@ export function NoteApp({ userId }: { userId: string }) {
         delete next[id];
         return next;
       });
-      setSemanticIds((ids) => ids.filter((x) => x !== id));
       setExportMenu((m) => (m === id ? null : m));
       if (studyModal?.kind === "single" && studyModal.noteId === id) setStudyModal(null);
       if (studyModal?.kind === "multi" && studyModal.noteIds.includes(id)) setStudyModal(null);
@@ -612,17 +742,27 @@ export function NoteApp({ userId }: { userId: string }) {
     }
   }
 
-  async function openSavedStudySet(row: StudySetSummary) {
+  async function loadAndOpenStudySet(setId: string, titleFallback?: string) {
     setStudyError(null);
-    setStudyLoading(row.kind === "flashcards" ? "flashcards" : "quiz");
+    setStudySetLoadError(null);
+    setStudyLoading("flashcards");
     try {
-      const res = await fetch(`/api/study-sets/${row.id}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        kind: "flashcards" | "quiz";
+      const res = await fetch(`/api/study-sets/${setId}`);
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+        kind?: "flashcards" | "quiz";
         title?: string;
-        payload: { cards?: { front: string; back: string }[]; questions?: { question: string; options: string[]; correctIndex: number }[] };
-      };
+        payload?: { cards?: { front: string; back: string }[]; questions?: { question: string; options: string[]; correctIndex: number }[] };
+      } | null;
+      if (!res.ok) {
+        const msg = data && typeof data.error === "string" ? data.error : "Could not open study set";
+        setStudySetLoadError(msg);
+        return;
+      }
+      if (!data || (data.kind !== "flashcards" && data.kind !== "quiz")) {
+        setStudySetLoadError("Invalid study set data");
+        return;
+      }
       if (data.kind === "flashcards") {
         setFlashcards(data.payload?.cards ?? []);
         setStudyMode("flashcards");
@@ -635,33 +775,27 @@ export function NoteApp({ userId }: { userId: string }) {
         setQuizScore(null);
         setQuizSelected(null);
       }
-      setStudyModal({ kind: "saved", setId: row.id, title: data.title ?? row.title });
+      setStudyModal({ kind: "saved", setId, title: data.title ?? titleFallback ?? "Study set" });
     } catch {
-      setStudyError("Could not open study set");
+      setStudySetLoadError("Could not open study set");
     } finally {
       setStudyLoading(null);
     }
   }
 
-  async function deleteSavedStudySet(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    const res = await fetch(`/api/study-sets/${id}`, { method: "DELETE" });
-    if (!res.ok) return;
-    if (studyModal?.kind === "saved" && studyModal.setId === id) {
-      setStudyModal(null);
-      setStudyMode("menu");
-      setFlashcards([]);
-      setQuizQuestions([]);
-      setCardIndex(0);
-      setCardFlipped(false);
-      setQuizIndex(0);
-      setQuizScore(null);
-      setQuizSelected(null);
-      setStudyLoading(null);
-      setStudyError(null);
-    }
-    void refreshStudySets();
-  }
+  React.useEffect(() => {
+    if (!initialOpenStudySetId || loading) return;
+    if (showOnboarding !== false) return;
+    if (processedOpenStudyRef.current === initialOpenStudySetId) return;
+    processedOpenStudyRef.current = initialOpenStudySetId;
+    void loadAndOpenStudySet(initialOpenStudySetId).finally(() => {
+      router.replace("/notes", { scroll: false });
+    });
+  }, [initialOpenStudySetId, loading, showOnboarding, router]);
+
+  React.useEffect(() => {
+    if (!initialOpenStudySetId) processedOpenStudyRef.current = null;
+  }, [initialOpenStudySetId]);
 
   if (loading) {
     return (
@@ -672,8 +806,7 @@ export function NoteApp({ userId }: { userId: string }) {
   }
 
   return (
-    <PomodoroProvider>
-    <div className="relative flex h-dvh bg-[#0a0a0f]">
+    <div className="relative flex h-dvh max-w-[100vw] overflow-x-hidden bg-[#0a0a0f]">
       {importDocLoading && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm"
@@ -697,189 +830,230 @@ export function NoteApp({ userId }: { userId: string }) {
         <div className="absolute top-1/2 left-1/2 h-[400px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-blue-500/5 via-purple-600/10 to-emerald-500/5 blur-3xl" />
       </div>
 
+      {/* Mobile sidebar overlay */}
+      <div
+        role="presentation"
+        aria-hidden={!mobileSidebarOpen}
+        className={cn(
+          "fixed inset-0 z-[35] bg-black/55 backdrop-blur-sm transition-opacity duration-300 md:hidden",
+          mobileSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
+        onClick={() => setMobileSidebarOpen(false)}
+      />
+
       {/* Sidebar */}
-      <aside className="relative z-20 flex h-dvh w-64 flex-shrink-0 flex-col border-r border-white/10 bg-black/30 backdrop-blur-xl">
-        <div className="flex shrink-0 flex-col gap-2 border-b border-white/10 p-4">
-          <StudaraWordmarkLink href="/notes" />
-          <div className="text-xs text-white/60">AI note-taking</div>
+      <aside
+        className={cn(
+          "flex h-dvh shrink-0 flex-col border-r border-white/[0.06] bg-black/25 backdrop-blur-xl",
+          "w-[min(18rem,92vw)] sm:w-72",
+          "fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:relative md:z-20 md:translate-x-0",
+          mobileSidebarOpen ? "translate-x-0 shadow-2xl shadow-black/50" : "-translate-x-full md:translate-x-0"
+        )}
+      >
+        <div className="shrink-0 px-4 pt-5">
+          <StudaraWordmarkLink
+            href="/notes"
+            linkClassName="touch-manipulation"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
         </div>
-        <div className="flex shrink-0 flex-col p-3">
+        <div className="shrink-0 px-4 pb-4 pt-4">
           <button
             type="button"
             onClick={handleNewNote}
-            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+            className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
             New Note
           </button>
+        </div>
+        <div className="shrink-0 px-4 pb-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <input
+              ref={sidebarSearchInputRef}
+              data-search-input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search notes…"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-2.5 pl-10 pr-3 text-sm text-white shadow-inner outline-none transition duration-200 placeholder:text-white/35 focus:border-purple-500/35 focus:ring-2 focus:ring-purple-500/20"
+            />
+          </div>
+        </div>
+        <nav className="app-sidebar-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-6">
           {importDocError && (
-            <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
               <span>{importDocError}</span>
               <button
                 type="button"
                 onClick={() => setImportDocError(null)}
-                className="shrink-0 text-red-300 hover:text-white"
+                className="shrink-0 text-red-300 transition hover:text-white"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur">
-            <Search className="h-4 w-4 shrink-0 text-white/50" />
-            <input
-              data-search-input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search notes..."
-              className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/40"
-            />
-          </div>
           {categoryError && (
-            <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
               <span>{categoryError}</span>
-              <button onClick={clearCategoryError} className="shrink-0 text-red-300 hover:text-white">
+              <button
+                type="button"
+                onClick={clearCategoryError}
+                className="shrink-0 text-red-300 transition hover:text-white"
+              >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Categories</div>
-        </div>
-        <nav className="app-sidebar-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-          <div className="space-y-0.5">
-            <CategoryTab
-              id="all"
-              name="All Notes"
-              selected={selectedCategoryId === "all"}
-              onClick={() => selectSidebarCategory("all")}
-            />
-            {categories.map((c) => (
+          <div className="px-1">
+            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Notes</p>
+            <div className="space-y-1">
               <CategoryTab
-                key={c.id}
-                id={c.id}
-                name={c.name}
-                color={c.color}
-                selected={selectedCategoryId === c.id}
-                onClick={() => selectSidebarCategory(c.id)}
-                onRename={() => {
-                  const name = prompt("Rename category:", c.name);
-                  if (name?.trim()) actions.updateCategory(c.id, name.trim());
-                }}
-                onDelete={() => setDeleteCategoryModal({ id: c.id, name: c.name })}
+                id="all"
+                name="All Notes"
+                count={noteCounts.total}
+                icon={<LayoutGrid className="h-4 w-4 shrink-0 text-white/45" />}
+                selected={selectedCategoryId === "all"}
+                onClick={() => selectSidebarCategory("all")}
               />
-            ))}
-            <button
-              onClick={() => {
-                clearCategoryError();
-                setCreateCategoryModalOpen(true);
-              }}
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-white/60 hover:bg-white/5 hover:text-white/80"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add category
-            </button>
+              {categories.map((c) => (
+                <CategoryTab
+                  key={c.id}
+                  id={c.id}
+                  name={c.name}
+                  color={c.color}
+                  count={noteCounts.byCategory.get(c.id) ?? 0}
+                  selected={selectedCategoryId === c.id}
+                  onClick={() => selectSidebarCategory(c.id)}
+                  onRename={() => {
+                    const name = prompt("Rename category:", c.name);
+                    if (name?.trim()) actions.updateCategory(c.id, name.trim());
+                  }}
+                  onDelete={() => setDeleteCategoryModal({ id: c.id, name: c.name })}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  clearCategoryError();
+                  setCreateCategoryModalOpen(true);
+                }}
+                className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-white/50 transition duration-200 hover:bg-white/[0.05] hover:text-white/85"
+              >
+                <FolderPlus className="h-4 w-4 shrink-0 text-white/40" />
+                Add category
+              </button>
+            </div>
           </div>
-          <div className="mt-5 border-t border-white/10 pt-4">
-            <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wider text-white/50">
-              <Library className="h-3.5 w-3.5" />
-              Study Sets
+
+          <div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+
+          <div className="px-1">
+            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">AI tools</p>
+            <div className="space-y-1">
+              <Link
+                href="/tutor"
+                onClick={() => setMobileSidebarOpen(false)}
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-white/75 transition duration-200 hover:bg-white/[0.05] hover:text-white touch-manipulation"
+              >
+                <GraduationCap className="h-4 w-4 shrink-0 text-white/50" />
+                AI Tutor
+              </Link>
+              <Link
+                href="/essay-feedback"
+                onClick={() => setMobileSidebarOpen(false)}
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-white/75 transition duration-200 hover:bg-white/[0.05] hover:text-white touch-manipulation"
+              >
+                <FilePenLine className="h-4 w-4 shrink-0 text-white/50" />
+                Essay Feedback
+              </Link>
             </div>
-            <div className="app-sidebar-scrollbar max-h-48 space-y-1 overflow-y-auto pr-1">
-              {savedStudySets.length === 0 ? (
-                <p className="px-2 py-1 text-xs text-white/40">No saved sets yet</p>
-              ) : (
-                savedStudySets.map((s) => (
-                  <div
-                    key={s.id}
-                    className="group flex w-full items-start gap-1 rounded-lg border border-transparent px-1.5 py-1.5 text-left transition hover:border-white/10 hover:bg-white/5"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void openSavedStudySet(s);
-                      }}
-                      className="min-w-0 flex-1 text-left"
-                    >
-                      <span className="line-clamp-2 text-xs font-medium text-white/90">{s.title}</span>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        <Badge
-                          className={cn(
-                            "border-0 text-[10px] font-medium",
-                            s.kind === "flashcards"
-                              ? "bg-violet-500/20 text-violet-200"
-                              : "bg-cyan-500/15 text-cyan-200"
-                          )}
-                        >
-                          {s.kind === "flashcards" ? "Flashcards" : "Quiz"}
-                        </Badge>
-                        <span className="text-[10px] text-white/45">
-                          {s.item_count} {s.kind === "flashcards" ? "cards" : "questions"}
-                        </span>
-                      </div>
-                      <span className="mt-1 block text-[10px] text-white/40">
-                        {new Date(s.created_at).toLocaleString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => deleteSavedStudySet(s.id, e)}
-                      className="shrink-0 rounded p-1 text-white/40 transition hover:bg-red-500/20 hover:text-red-300"
-                      title="Delete study set"
-                      aria-label="Delete study set"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
+          </div>
+
+          <div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+
+          <div className="px-1">
+            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Study</p>
+            <Link
+              href="/study-sets"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-white/75 transition duration-200 hover:bg-white/[0.05] hover:text-white touch-manipulation"
+            >
+              <Bookmark className="h-4 w-4 shrink-0 text-white/50" />
+              <span className="min-w-0 flex-1 truncate">Study sets</span>
+              <span className="shrink-0 tabular-nums text-xs text-white/40">{savedStudySets.length}</span>
+            </Link>
           </div>
         </nav>
-        <div className="flex shrink-0 flex-col border-t border-white/10 p-3">
+        <div className="shrink-0 space-y-3 border-t border-white/[0.06] bg-black/20 p-4 backdrop-blur-sm">
           {plan !== "pro" ? (
             <Link
               href="/billing"
-              className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition duration-200 hover:from-purple-500 hover:to-blue-500 touch-manipulation"
             >
               <Sparkles className="h-4 w-4" />
               Upgrade to Pro
             </Link>
           ) : null}
           <Link
-            href="/tutor"
-            className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
-          >
-            <GraduationCap className="h-4 w-4" />
-            AI Tutor
-          </Link>
-          <Link
-            href="/essay-feedback"
-            className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
-          >
-            <FilePenLine className="h-4 w-4" />
-            Essay Feedback
-          </Link>
-          <Link
             href="/profile"
-            className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="flex min-h-[3.25rem] items-center gap-3 rounded-xl p-2.5 transition duration-200 hover:bg-white/[0.06] touch-manipulation"
           >
-            <UserCircle className="h-4 w-4" />
-            Profile
+            {session?.user?.image ? (
+              // eslint-disable-next-line @next/next/no-img-element -- OAuth avatar
+              <img
+                src={session.user.image}
+                alt=""
+                width={40}
+                height={40}
+                className="h-10 w-10 shrink-0 rounded-xl border border-white/[0.08] object-cover"
+              />
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-purple-500/35 to-blue-500/25 text-xs font-semibold text-white/90">
+                {userInitials(session?.user?.name, session?.user?.email)}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white/90">
+                {session?.user?.name?.trim() || session?.user?.email?.split("@")[0] || "Account"}
+              </p>
+              <div className="mt-1">
+                {plan === "pro" ? (
+                  <span className="inline-flex rounded-md border border-purple-500/35 bg-purple-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-200/95">
+                    Pro
+                  </span>
+                ) : (
+                  <span className="inline-flex rounded-md border border-white/15 bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/55">
+                    Free
+                  </span>
+                )}
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />
           </Link>
-          <div className="mt-2">
-            <SignoutButton />
-          </div>
         </div>
       </aside>
 
       {/* Main content: grid of note cards OR editor panel */}
-      <main className="relative z-10 flex flex-1 flex-col overflow-hidden">
+      <main className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
+        {!selectedNoteId ? (
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-3 py-3 backdrop-blur-xl md:hidden">
+            <button
+              type="button"
+              aria-label="Open menu"
+              aria-expanded={mobileSidebarOpen}
+              onClick={() => setMobileSidebarOpen(true)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10 touch-manipulation"
+            >
+              <Menu className="h-6 w-6" strokeWidth={2} aria-hidden />
+            </button>
+            <StudaraWordmarkLink href="/notes" linkClassName="touch-manipulation" />
+            <div className="h-11 w-11 shrink-0" aria-hidden />
+          </header>
+        ) : null}
         <input
           ref={importDocumentInputRef}
           type="file"
@@ -896,13 +1070,29 @@ export function NoteApp({ userId }: { userId: string }) {
             You&apos;re a heavy user this month — you may experience slightly slower responses as we manage server load.
           </div>
         ) : null}
+        {studySetLoadError ? (
+          <div
+            role="alert"
+            className="flex shrink-0 items-center justify-between gap-3 border-b border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+          >
+            <span className="min-w-0">{studySetLoadError}</span>
+            <button
+              type="button"
+              onClick={() => setStudySetLoadError(null)}
+              className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
         {selectedNoteId ? (
           /* Editor panel (full) */
-          <div className="flex flex-1 flex-col overflow-hidden p-6">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-0 md:p-6">
           <EditorPanel
             selectedNote={selectedNote!}
             categories={categories}
-            plan={plan}
+            onOpenMobileMenu={() => setMobileSidebarOpen(true)}
+            richEditorKey={`${selectedNote!.id}-${editorContentRevision}`}
             editTitle={editTitle}
             setEditTitle={setEditTitle}
             editContent={editContent}
@@ -930,15 +1120,6 @@ export function NoteApp({ userId }: { userId: string }) {
               }
             }}
             onSuggestDismiss={() => setSuggestBanner(null)}
-            onSummarize={async () => {
-              const res = await fetch("/api/ai", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "summarize", content: editContent }),
-              });
-              const json = (await res.json()) as { result?: string };
-              if (json.result) setEditContent((c) => c + "\n\n---\nSummary: " + json.result);
-            }}
             onImprove={async () => {
               setToolbarError(null);
               setImproveLoading(true);
@@ -954,12 +1135,18 @@ export function NoteApp({ userId }: { userId: string }) {
                   return;
                 }
                 if (json.improved) {
-                  setEditContent(json.improved);
+                  const improvedHtml = normalizeImprovedNoteHtml(json.improved);
+                  setEditContent(improvedHtml);
+                  setEditorContentRevision((r) => r + 1);
                   if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
                     if (draftNote && selectedNote.id === draftNote.id) {
-                      setDraftNote((d) => (d ? { ...d, content: json.improved! } : null));
+                      setDraftNote((d) =>
+                        d
+                          ? { ...d, content: improvedHtml, improved_at: new Date().toISOString() }
+                          : null
+                      );
                     } else {
-                      actions.update(selectedNote.id, { content: json.improved });
+                      actions.update(selectedNote.id, { content: improvedHtml, record_improvement: true });
                     }
                   }
                   setImproveToast(true);
@@ -973,30 +1160,6 @@ export function NoteApp({ userId }: { userId: string }) {
                 setImproveLoading(false);
               }
             }}
-            onExtract={async () => {
-              setToolbarError(null);
-              setExtractLoading(true);
-              setExtractTasksModal(null);
-              try {
-                const res = await fetch("/api/ai/anthropic/extract-tasks", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ content: editContent }),
-                });
-                const json = (await res.json()) as { tasks?: string[]; error?: string };
-                if (json.tasks?.length) {
-                  setExtractTasksModal(json.tasks);
-                } else if (json.error) {
-                  setToolbarError(json.error);
-                } else {
-                  setExtractTasksModal(["No tasks found in this note."]);
-                }
-              } catch {
-                setToolbarError("Something went wrong. Please try again.");
-              } finally {
-                setExtractLoading(false);
-              }
-            }}
             onGenerateTitle={async () => {
               setToolbarError(null);
               setTitleLoading(true);
@@ -1004,7 +1167,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 const res = await fetch("/api/ai/anthropic/generate-title", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ content: editContent }),
+                  body: JSON.stringify({ content: htmlToPlainText(editContent) }),
                 });
                 const json = (await res.json()) as { title?: string; error?: string };
                 if (json.title) {
@@ -1034,7 +1197,7 @@ export function NoteApp({ userId }: { userId: string }) {
                 const res = await fetch("/api/ai/anthropic/suggest-tags", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ content: editContent }),
+                  body: JSON.stringify({ content: htmlToPlainText(editContent) }),
                 });
                 const json = (await res.json()) as { tags?: string[]; error?: string };
                 if (json.tags?.length) {
@@ -1065,20 +1228,56 @@ export function NoteApp({ userId }: { userId: string }) {
                 const res = await fetch("/api/ai/anthropic/summarize", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ content: editContent }),
+                  body: JSON.stringify({ content: htmlToPlainText(editContent) }),
                 });
                 const json = (await res.json()) as { summary?: string; code?: string; error?: string };
                 if (json.code && res.status === 402) {
                   setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
                   return;
                 }
-                if (json.summary) setSummaryBelow(json.summary);
-                else if (json.error) setSummaryBelow(`Error: ${json.error}`);
+                if (json.summary) {
+                  setSummaryBelow(json.summary);
+                  if (draftNote && selectedNote.id === draftNote.id) {
+                    setDraftNote((d) => (d ? { ...d, summarized_at: new Date().toISOString() } : null));
+                  } else if (selectedNote && !selectedNote.id.startsWith("draft-")) {
+                    void actions.update(selectedNote.id, { record_summarization: true });
+                  }
+                } else if (json.error) setSummaryBelow(`Error: ${json.error}`);
               } catch {
                 setSummaryBelow("Error: Failed to summarize");
               } finally {
                 setSummarizeLoading(false);
               }
+            }}
+            onExportPdf={async () => {
+              if (plan !== "pro") {
+                setUpgradeModal({ show: true, feature: "export" });
+                return;
+              }
+              const { default: jsPDF } = await import("jspdf");
+              const title = (editTitle || "Untitled").trim() || "note";
+              const doc = new jsPDF();
+              doc.setFontSize(16);
+              doc.text(title, 20, 20);
+              doc.setFontSize(11);
+              const lines = doc.splitTextToSize(htmlToPlainText(editContent || ""), 170);
+              doc.text(lines, 20, 30);
+              doc.save(`${title}.pdf`);
+            }}
+            onExportMd={() => {
+              if (plan !== "pro") {
+                setUpgradeModal({ show: true, feature: "export" });
+                return;
+              }
+              const title = (editTitle || "Untitled").trim() || "note";
+              const blob = new Blob([`# ${title}\n\n${htmlToPlainText(editContent || "")}`], {
+                type: "text/markdown",
+              });
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `${title}.md`;
+              a.click();
+              URL.revokeObjectURL(a.href);
             }}
             summaryBelow={summaryBelow}
             summaryLoading={summarizeLoading}
@@ -1095,7 +1294,7 @@ export function NoteApp({ userId }: { userId: string }) {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    content: editContent,
+                    content: htmlToPlainText(editContent),
                     categoryIds: categories.map((c) => c.id),
                     categoryNames: categories.map((c) => c.name),
                   }),
@@ -1115,13 +1314,10 @@ export function NoteApp({ userId }: { userId: string }) {
             }}
             autoCategorizeLoading={autoCategorizeLoading}
             improveLoading={improveLoading}
-            extractLoading={extractLoading}
             titleLoading={titleLoading}
             tagsLoading={tagsLoading}
-            extractTasksModal={extractTasksModal}
             suggestTagsChips={suggestTagsChips}
             toolbarError={toolbarError}
-            onExtractTasksClose={() => setExtractTasksModal(null)}
             onSuggestTagAccept={(tag) => {
               if (selectedNote) {
                 const current = selectedNote.tags ?? [];
@@ -1136,7 +1332,10 @@ export function NoteApp({ userId }: { userId: string }) {
             }}
             onSuggestTagDismiss={() => setSuggestTagsChips(null)}
             onToolbarErrorDismiss={() => setToolbarError(null)}
-            setUpgradeModal={setUpgradeModal}
+            studyProgressCompletion={computeStudyProgressCompletion(selectedNote!, {
+              hasSummaryInSession: !!summaryBelow,
+              hasSavedStudySet: noteHasSavedStudySet(selectedNote!.id, savedStudySets),
+            })}
             onDeleteRequest={() => {
               if (selectedNote) {
                 setDeleteNoteModal({
@@ -1150,9 +1349,9 @@ export function NoteApp({ userId }: { userId: string }) {
           </div>
         ) : (
           /* Grid of note cards */
-          <div className="flex flex-1 flex-col overflow-hidden p-6">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h1 className="text-xl font-semibold text-white">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-4 pt-2 md:p-6">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
+              <h1 className="text-lg font-semibold text-white md:text-xl">
                 {gridSelectMode
                   ? "Select notes"
                   : selectedCategoryId === "all"
@@ -1187,7 +1386,7 @@ export function NoteApp({ userId }: { userId: string }) {
                       setImportDocError(null);
                       importDocumentInputRef.current?.click();
                     }}
-                    className="gap-1.5 border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    className="gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/15"
                   >
                     <Upload className="h-3.5 w-3.5" />
                     Import Document
@@ -1200,18 +1399,27 @@ export function NoteApp({ userId }: { userId: string }) {
                     <BookOpen className="h-3.5 w-3.5" />
                     Study Multiple
                   </Button>
-                  <span className="text-sm text-white/50">⌘N new · ⌘K search</span>
+                  <span className="hidden text-sm text-white/50 lg:inline">⌘N new · ⌘K search</span>
                 </div>
               )}
             </div>
             {multiStudyError && (
               <p className="mb-3 text-sm text-red-400">{multiStudyError}</p>
             )}
-            {filteredNotes.length === 0 ? (
+            {notesLoadError ? (
+              <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-red-500/25 bg-red-500/10 p-12 text-center">
+                <p className="max-w-md text-sm text-red-100">{notesLoadError}</p>
+                <Button className="mt-6" onClick={() => void actions.refresh()}>
+                  Try again
+                </Button>
+              </div>
+            ) : filteredNotes.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-12">
                 <FileText className="h-12 w-12 text-white/30" />
                 <p className="mt-4 text-white/60">No notes yet</p>
-                <p className="mt-1 text-sm text-white/40">Create a note or import a PDF or Word file</p>
+                <p className="mt-1 text-sm text-white/40">
+                  Click New Note to create your first note, or import a PDF or Word file.
+                </p>
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <Button onClick={handleNewNote}>
                     <Plus className="mr-2 h-4 w-4" />
@@ -1224,7 +1432,7 @@ export function NoteApp({ userId }: { userId: string }) {
                       setImportDocError(null);
                       importDocumentInputRef.current?.click();
                     }}
-                    className="border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    className="border border-white/15 bg-white/10 text-white hover:bg-white/15"
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     Import Document
@@ -1232,19 +1440,25 @@ export function NoteApp({ userId }: { userId: string }) {
                 </div>
               </div>
             ) : (
-              <div className="grid flex-1 content-start gap-4 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid flex-1 grid-cols-1 content-start gap-4 overflow-y-auto overflow-x-hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredNotes.map((note) => (
                   <NoteCard
-                    key={note.id}
                     note={note}
                     categories={categories}
                     plan={plan}
+                    studyProgressCompletion={computeStudyProgressCompletion(note, {
+                      hasSummaryInSession: !!summaryCache[note.id],
+                      hasSavedStudySet: noteHasSavedStudySet(note.id, savedStudySets),
+                    })}
                     selectMode={gridSelectMode}
                     selected={gridSelectedIds.has(note.id)}
                     onToggleSelect={() => toggleGridNoteSelected(note.id)}
                     summary={summaryCache[note.id]}
                     summaryLoading={summaryLoading.has(note.id)}
-                    onSelect={() => setSelectedNoteId(note.id)}
+                    onSelect={() => {
+                      setSelectedNoteId(note.id);
+                      setMobileSidebarOpen(false);
+                    }}
                     onUpdateCategory={(catId) => actions.update(note.id, { category_id: catId })}
                     onTogglePin={() => actions.update(note.id, { pinned: !note.pinned })}
                     onRequestDelete={() =>
@@ -1255,7 +1469,7 @@ export function NoteApp({ userId }: { userId: string }) {
                       const res = await fetch("/api/ai/anthropic/summarize", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ content: note.content }),
+                        body: JSON.stringify({ content: htmlToPlainText(note.content) }),
                       });
                       setSummaryLoading((s) => {
                         const next = new Set(s);
@@ -1267,7 +1481,10 @@ export function NoteApp({ userId }: { userId: string }) {
                         setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
                         return;
                       }
-                      if (json.summary) setSummaryCache((c) => ({ ...c, [note.id]: json.summary! }));
+                      if (json.summary) {
+                        setSummaryCache((c) => ({ ...c, [note.id]: json.summary! }));
+                        void actions.update(note.id, { record_summarization: true });
+                      }
                     }}
                     onExportPdf={async () => {
                       if (plan !== "pro") {
@@ -1279,7 +1496,7 @@ export function NoteApp({ userId }: { userId: string }) {
                       doc.setFontSize(16);
                       doc.text(note.title, 20, 20);
                       doc.setFontSize(11);
-                      const lines = doc.splitTextToSize(note.content || "", 170);
+                      const lines = doc.splitTextToSize(htmlToPlainText(note.content || ""), 170);
                       doc.text(lines, 20, 30);
                       doc.save(`${note.title || "note"}.pdf`);
                     }}
@@ -1288,7 +1505,9 @@ export function NoteApp({ userId }: { userId: string }) {
                         setUpgradeModal({ show: true, feature: "export" });
                         return;
                       }
-                      const blob = new Blob([`# ${note.title}\n\n${note.content || ""}`], { type: "text/markdown" });
+                      const blob = new Blob([`# ${note.title}\n\n${htmlToPlainText(note.content || "")}`], {
+                        type: "text/markdown",
+                      });
                       const a = document.createElement("a");
                       a.href = URL.createObjectURL(blob);
                       a.download = `${note.title || "note"}.md`;
@@ -1374,7 +1593,7 @@ export function NoteApp({ userId }: { userId: string }) {
               } else {
                 const body: { kind: "flashcards"; content?: string; title?: string } = { kind: "flashcards" };
                 if (draftNote && nid === draftNote.id) {
-                  body.content = editContent;
+                  body.content = htmlToPlainText(editContent);
                   body.title = editTitle;
                 }
                 const post = await fetch(`/api/study/${nid}`, {
@@ -1422,7 +1641,7 @@ export function NoteApp({ userId }: { userId: string }) {
               } else {
                 const body: { kind: "quiz"; content?: string; title?: string } = { kind: "quiz" };
                 if (draftNote && nid === draftNote.id) {
-                  body.content = editContent;
+                  body.content = htmlToPlainText(editContent);
                   body.title = editTitle;
                 }
                 const post = await fetch(`/api/study/${nid}`, {
@@ -1513,6 +1732,23 @@ export function NoteApp({ userId }: { userId: string }) {
         </div>
       )}
 
+      {saveErrorMessage ? (
+        <div
+          role="alert"
+          className="fixed bottom-6 left-1/2 z-50 flex max-w-[min(100vw-2rem,24rem)] -translate-x-1/2 items-start gap-3 rounded-lg border border-red-500/35 bg-[#1a0a0f]/95 px-4 py-3 text-sm text-red-100 shadow-lg backdrop-blur"
+        >
+          <span className="min-w-0 flex-1 leading-snug">{saveErrorMessage}</span>
+          <button
+            type="button"
+            onClick={() => clearSaveErrorMessage()}
+            className="shrink-0 rounded-md p-1 text-red-300 transition hover:bg-red-500/20 hover:text-white"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
+
       <DeleteNoteModal
         open={!!deleteNoteModal}
         loading={deleteNoteLoading}
@@ -1549,16 +1785,19 @@ export function NoteApp({ userId }: { userId: string }) {
           }
         }}
       />
+
+      {showOnboarding === true ? (
+        <OnboardingModal open onFinished={handleOnboardingFinished} />
+      ) : null}
     </div>
-    <PomodoroPortal />
-    </PomodoroProvider>
   );
 }
 
 function EditorPanel({
   selectedNote,
   categories,
-  plan,
+  richEditorKey,
+  onOpenMobileMenu,
   editTitle,
   setEditTitle,
   editContent,
@@ -1568,34 +1807,32 @@ function EditorPanel({
   summaryLoading,
   autoCategorizeLoading,
   improveLoading,
-  extractLoading,
   titleLoading,
   tagsLoading,
-  extractTasksModal,
   suggestTagsChips,
   toolbarError,
   onBack,
   onUpdate,
   onSuggestApply,
   onSuggestDismiss,
-  onSummarize,
   onImprove,
-  onExtract,
   onGenerateTitle,
   onSuggestTags,
   onStudy,
   onClaudeSummarize,
   onAutoCategorize,
-  onExtractTasksClose,
+  onExportPdf,
+  onExportMd,
   onSuggestTagAccept,
   onSuggestTagDismiss,
   onToolbarErrorDismiss,
-  setUpgradeModal,
+  studyProgressCompletion,
   onDeleteRequest,
 }: {
   selectedNote: Note;
   categories: Category[];
-  plan: string;
+  richEditorKey: string;
+  onOpenMobileMenu?: () => void;
   editTitle: string;
   setEditTitle: (v: string) => void;
   editContent: string;
@@ -1605,49 +1842,80 @@ function EditorPanel({
   summaryLoading: boolean;
   autoCategorizeLoading: boolean;
   improveLoading: boolean;
-  extractLoading: boolean;
   titleLoading: boolean;
   tagsLoading: boolean;
-  extractTasksModal: string[] | null;
   suggestTagsChips: string[] | null;
   toolbarError: string | null;
   onBack: () => void;
   onUpdate: (patch: Partial<Pick<Note, "title" | "content" | "category_id" | "tags">>) => void;
   onSuggestApply: () => void;
   onSuggestDismiss: () => void;
-  onSummarize: () => void;
   onImprove: () => void;
-  onExtract: () => void;
   onGenerateTitle: () => void;
   onSuggestTags: () => void;
   onStudy: () => void;
   onClaudeSummarize: () => void;
   onAutoCategorize: () => void;
-  onExtractTasksClose: () => void;
+  onExportPdf: () => void | Promise<void>;
+  onExportMd: () => void;
   onSuggestTagAccept: (tag: string) => void;
   onSuggestTagDismiss: () => void;
   onToolbarErrorDismiss: () => void;
-  setUpgradeModal: (x: { show: boolean; message?: string; feature?: string }) => void;
+  studyProgressCompletion: StudyProgressCompletion;
   onDeleteRequest: () => void;
 }) {
-  const { openWidget } = usePomodoro();
+  function handleStudyProgressStep(step: StudyProgressStepId) {
+    switch (step) {
+      case "write":
+        requestAnimationFrame(() => {
+          document.querySelector<HTMLElement>(".studara-tiptap")?.focus();
+        });
+        break;
+      case "improve":
+        void onImprove();
+        break;
+      case "summarize":
+        void onClaudeSummarize();
+        break;
+      case "study":
+        onStudy();
+        break;
+      default:
+        break;
+    }
+  }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-xl">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-white/10 bg-black/20 backdrop-blur-xl md:rounded-2xl md:border">
+      <NoteStudyProgressTrail
+        completion={studyProgressCompletion}
+        onStepPress={handleStudyProgressStep}
+        disabled={improveLoading || summaryLoading}
+      />
+      <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 md:gap-4 md:px-4 md:py-3">
+        {onOpenMobileMenu ? (
+          <button
+            type="button"
+            aria-label="Open menu"
+            onClick={onOpenMobileMenu}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10 md:hidden touch-manipulation"
+          >
+            <Menu className="h-6 w-6" strokeWidth={2} aria-hidden />
+          </button>
+        ) : null}
         <button
+          type="button"
           onClick={onBack}
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/70 hover:bg-white/5 hover:text-white"
+          className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/5 hover:text-white touch-manipulation md:min-h-0 md:rounded-lg md:px-2 md:py-1.5"
         >
-          <ChevronRight className="h-4 w-4 rotate-180" />
-          Back
+          <ChevronRight className="h-4 w-4 rotate-180 shrink-0" />
+          <span className="hidden sm:inline">Back</span>
         </button>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+        <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-2 overflow-x-auto overflow-y-hidden py-1 [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible md:py-0 [&::-webkit-scrollbar]:hidden">
           <select
             value={selectedNote.category_id ?? ""}
             onChange={(e) => onUpdate({ category_id: e.target.value || null })}
-            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
+            className="min-h-11 shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-white md:min-h-0 md:py-1.5"
           >
             {selectedNote.category_id === "pending" && !categories.some((c) => c.id === "pending") && (
               <option value="pending">General (creating…)</option>
@@ -1659,38 +1927,36 @@ function EditorPanel({
               </option>
             ))}
           </select>
-          <Button size="sm" variant="ghost" onClick={onClaudeSummarize} disabled={summaryLoading}>
+          <Button size="sm" variant="ghost" onClick={() => void onClaudeSummarize()} disabled={summaryLoading}>
             {summaryLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
             Summarize
           </Button>
           {categories.length >= 2 && (
-            <Button size="sm" variant="ghost" onClick={onAutoCategorize} disabled={autoCategorizeLoading}>
+            <Button size="sm" variant="ghost" onClick={() => void onAutoCategorize()} disabled={autoCategorizeLoading}>
               {autoCategorizeLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tag className="mr-1.5 h-3.5 w-3.5" />}
               Auto-categorize
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={openWidget}
-            title="Pomodoro timer"
-            aria-label="Open Pomodoro timer"
-          >
-            <Timer className="h-3.5 w-3.5" />
-          </Button>
           <Button size="sm" variant="ghost" onClick={onStudy}>
             <BookOpen className="mr-1.5 h-3.5 w-3.5" />
             Study
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void onExportPdf()} className="border border-white/15 bg-white/10 text-white hover:bg-white/15">
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            PDF
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onExportMd} className="border border-white/15 bg-white/10 text-white hover:bg-white/15">
+            Markdown
           </Button>
         </div>
         <button
           type="button"
           onClick={onDeleteRequest}
-          className="shrink-0 rounded-lg p-2 text-white/50 transition hover:bg-red-500/15 hover:text-red-300"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/50 transition hover:bg-red-500/15 hover:text-red-300 touch-manipulation md:h-auto md:w-auto md:rounded-lg md:p-2"
           title="Delete note"
           aria-label="Delete note"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-5 w-5 md:h-4 md:w-4" />
         </button>
       </div>
       {suggestBanner && (
@@ -1699,27 +1965,30 @@ function EditorPanel({
             We suggest: <strong>{suggestBanner.name}</strong> — Apply?
           </span>
           <div className="flex gap-2">
-            <Button size="sm" onClick={onSuggestApply}>Apply</Button>
-            <Button size="sm" variant="ghost" onClick={onSuggestDismiss}>Dismiss</Button>
+            <Button size="sm" onClick={onSuggestApply}>
+              Apply
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onSuggestDismiss}>
+              Dismiss
+            </Button>
           </div>
         </div>
       )}
-      {/* Title */}
-      <div className="border-b border-white/10 px-6 py-4">
+      <div className="border-b border-white/10 px-4 py-3 md:px-6 md:py-4">
         <input
           value={editTitle}
           onChange={(e) => setEditTitle(e.target.value)}
-          className="w-full bg-transparent text-2xl font-semibold text-white outline-none placeholder:text-white/40"
+          className="w-full min-h-11 bg-transparent text-xl font-semibold text-white outline-none placeholder:text-white/40 md:text-2xl"
           placeholder="Note title"
         />
       </div>
-      {/* Body */}
-      <div className="flex flex-1 flex-col overflow-hidden p-6">
-        <textarea
-          value={editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          className="note-editor-scrollbar min-h-[300px] w-full flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/40 focus:ring-2 focus:ring-purple-500/40"
-          placeholder="Write your note..."
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 md:pb-6">
+        <NoteRichTextEditor
+          key={richEditorKey}
+          noteId={selectedNote.id}
+          initialHtml={editContent}
+          onHtmlChange={setEditContent}
+          className="min-h-0 flex-1"
         />
         {summaryBelow && (
           <div className="mt-4 rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-3">
@@ -1730,7 +1999,7 @@ function EditorPanel({
         {toolbarError && (
           <div className="mt-4 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
             <p className="text-sm text-red-200">{toolbarError}</p>
-            <button onClick={onToolbarErrorDismiss} className="text-red-300 hover:text-white">
+            <button type="button" onClick={onToolbarErrorDismiss} className="text-red-300 hover:text-white">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -1748,6 +2017,7 @@ function EditorPanel({
               </Badge>
             ))}
             <button
+              type="button"
               onClick={onSuggestTagDismiss}
               className="rounded px-2 py-0.5 text-xs text-white/50 hover:text-white/80"
             >
@@ -1756,44 +2026,20 @@ function EditorPanel({
           </div>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="ghost" onClick={onImprove} disabled={improveLoading}>
+          <Button size="sm" variant="ghost" onClick={() => void onImprove()} disabled={improveLoading}>
             {improveLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
             Improve
           </Button>
-          <Button size="sm" variant="ghost" onClick={onExtract} disabled={extractLoading}>
-            {extractLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-            Extract Tasks
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onGenerateTitle} disabled={titleLoading}>
+          <Button size="sm" variant="ghost" onClick={() => void onGenerateTitle()} disabled={titleLoading}>
             {titleLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
             Generate Title
           </Button>
-          <Button size="sm" variant="ghost" onClick={onSuggestTags} disabled={tagsLoading}>
+          <Button size="sm" variant="ghost" onClick={() => void onSuggestTags()} disabled={tagsLoading}>
             {tagsLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
             Suggest Tags
           </Button>
         </div>
       </div>
-      {extractTasksModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <Card className="mx-4 max-w-md p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Extracted Tasks</h3>
-              <button onClick={onExtractTasksClose} className="text-white/60 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <ul className="mt-4 space-y-2">
-              {extractTasksModal.map((task, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-white/90">
-                  <span className="mt-0.5 text-purple-400">•</span>
-                  <span>{task}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
@@ -1801,14 +2047,15 @@ function EditorPanel({
 function NoteCard({
   note,
   categories,
-  plan,
+  plan: _plan,
+  studyProgressCompletion,
   selectMode = false,
   selected = false,
   onToggleSelect,
   summary,
   summaryLoading,
   onSelect,
-  onUpdateCategory,
+  onUpdateCategory: _onUpdateCategory,
   onTogglePin,
   onRequestDelete,
   onSummarize,
@@ -1817,11 +2064,12 @@ function NoteCard({
   onStudy,
   exportOpen,
   onExportToggle,
-  setUpgradeModal,
+  setUpgradeModal: _setUpgradeModal,
 }: {
   note: Note;
   categories: Category[];
   plan: string;
+  studyProgressCompletion: StudyProgressCompletion;
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
@@ -1844,7 +2092,7 @@ function NoteCard({
   const categoryColor = category?.color;
   const date = note.updated_at ?? note.created_at ?? "";
   const formattedDate = date ? new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
-  const preview = (note.content || "").replace(/\n/g, " ").slice(0, 120) + ((note.content?.length ?? 0) > 120 ? "…" : "");
+  const preview = noteContentPreview(note.content || "");
 
   const [ctxMenu, setCtxMenu] = React.useState<{ x: number; y: number } | null>(null);
   const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1918,119 +2166,130 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "group rounded-2xl border border-white/10 bg-white/5 p-5 transition-[border-color,box-shadow,background-color] duration-200 ease-out",
-        selectMode ? "cursor-default" : "cursor-pointer hover:border-purple-500/30 hover:bg-white/10",
-        selectMode &&
-          !selected &&
-          "hover:border-white/[0.14] hover:bg-white/[0.06] hover:shadow-none",
-        selected &&
-          selectMode &&
-          "border-purple-500/45 bg-gradient-to-br from-purple-500/[0.14] to-blue-600/[0.07] shadow-[0_0_0_1px_rgba(168,85,247,0.35),0_0_28px_rgba(139,92,246,0.22),0_0_48px_rgba(59,130,246,0.08)] hover:border-purple-400/50 hover:from-purple-500/[0.16] hover:to-blue-600/[0.09]",
+        "group max-w-full overflow-x-hidden rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-500/30 hover:bg-white/10",
+        selectMode ? "cursor-default" : "cursor-pointer",
+        selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30",
         categoryColor && "border-l-4"
       )}
       style={categoryColor ? { borderLeftColor: categoryColor } : undefined}
     >
       <div className="flex items-start gap-3">
         {selectMode && (
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={selected}
-            onClick={(e) => {
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => {
               e.stopPropagation();
               onToggleSelect?.();
             }}
-            className={cn(
-              "relative mt-0.5 flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-md border transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0f]",
-              selected
-                ? "border-transparent shadow-[0_0_10px_rgba(168,85,247,0.35)]"
-                : "border-white/[0.22] bg-black/35 hover:border-white/40 hover:bg-white/[0.06]"
-            )}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-white/30 bg-white/10 text-purple-500 focus:ring-purple-500"
             aria-label={selected ? "Deselect note" : "Select note"}
-          >
-            <span
-              className={cn(
-                "absolute inset-0 rounded-[inherit] bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 transition-opacity duration-200 ease-out",
-                selected ? "opacity-100" : "opacity-0"
-              )}
-              aria-hidden
-            />
-            <Check
-              className={cn(
-                "relative z-[1] h-2.5 w-2.5 text-white transition-all duration-200 ease-out",
-                selected ? "scale-100 opacity-100" : "scale-[0.65] opacity-0"
-              )}
-              strokeWidth={3}
-              aria-hidden
-            />
-          </button>
+          />
         )}
         <div className="min-w-0 flex-1">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="flex-1 truncate font-semibold text-white">{note.title || "Untitled"}</h3>
-        {!selectMode && (
-        <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
-          <button onClick={(e) => { e.stopPropagation(); onTogglePin(); }} className="rounded p-1 text-white/50 hover:text-amber-400">
-            <Pin className={cn("h-3.5 w-3.5", note.pinned && "fill-amber-400 text-amber-400")} />
-          </button>
-          <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); onExportToggle(); }} className="rounded p-1 text-white/50 hover:text-white">
-              <Download className="h-3.5 w-3.5" />
-            </button>
-            {exportOpen && (
-              <div className="absolute right-0 top-full z-10 mt-1 min-w-[140px] rounded-lg border border-white/10 bg-black/95 py-1 shadow-xl">
-                <button onClick={(e) => { e.stopPropagation(); onExportPdf(); }} className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10">
-                  Export PDF
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="flex-1 truncate font-semibold text-white">{note.title || "Untitled"}</h3>
+            {!selectMode && (
+              <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTogglePin();
+                  }}
+                  className="rounded p-1 text-white/50 hover:text-amber-400"
+                >
+                  <Pin className={cn("h-3.5 w-3.5", note.pinned && "fill-amber-400 text-amber-400")} />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); onExportMd(); }} className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10">
-                  Export Markdown
+                <div className="relative" data-note-export-root={note.id}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onExportToggle();
+                    }}
+                    className="rounded p-1 text-white/50 hover:text-white"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                  {exportOpen && (
+                    <div className="absolute right-0 top-full z-10 mt-1 min-w-[140px] rounded-lg border border-white/10 bg-black/95 py-1 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onExportPdf();
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                      >
+                        Export PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onExportMd();
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                      >
+                        Export Markdown
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStudy();
+                  }}
+                  className="rounded p-1 text-white/50 hover:text-white"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
           </div>
-          <button onClick={(e) => { e.stopPropagation(); onStudy(); }} className="rounded p-1 text-white/50 hover:text-white">
-            <BookOpen className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        )}
-      </div>
-      <p className="mt-2 line-clamp-2 text-sm text-white/60">{preview || "No content"}</p>
-      <div className="mt-3 flex items-center justify-between">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
-            categoryColor ? "text-white/90" : categoryName === "Uncategorized" ? "bg-white/10 text-white/60" : "bg-purple-500/20 text-purple-300"
-          )}
-          style={categoryColor ? { backgroundColor: `${categoryColor}30`, color: categoryColor } : undefined}
-        >
-          {categoryColor && (
+          <p className="mt-2 line-clamp-2 text-sm text-white/60">{preview || "No content"}</p>
+          <div className="mt-3" title="Study progress">
+            <NoteStudyProgressBar completion={studyProgressCompletion} />
+          </div>
+          <div className="mt-3 flex items-center justify-between">
             <span
-              className="h-1.5 w-1.5 shrink-0 rounded-full"
-              style={{ backgroundColor: categoryColor }}
-              aria-hidden
-            />
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
+                categoryColor ? "text-white/90" : categoryName === "Uncategorized" ? "bg-white/10 text-white/60" : "bg-purple-500/20 text-purple-300"
+              )}
+              style={categoryColor ? { backgroundColor: `${categoryColor}30`, color: categoryColor } : undefined}
+            >
+              {categoryColor && (
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: categoryColor }}
+                  aria-hidden
+                />
+              )}
+              {categoryName}
+            </span>
+            <span className="text-xs text-white/50">{formattedDate}</span>
+          </div>
+          {(note.tags ?? []).length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {(note.tags ?? []).map((t) => (
+                <Badge key={t} className="text-xs">
+                  {t}
+                </Badge>
+              ))}
+            </div>
           )}
-          {categoryName}
-        </span>
-        <span className="text-xs text-white/50">{formattedDate}</span>
-      </div>
-      {(note.tags ?? []).length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {note.tags.map((t) => (
-            <Badge key={t} className="text-xs">{t}</Badge>
-          ))}
-        </div>
-      )}
-      {summary && <p className="mt-2 line-clamp-2 text-xs text-white/50">{summary}</p>}
-      {summaryLoading && <Loader2 className="mt-2 h-3 w-3 animate-spin text-white/50" />}
-      {!selectMode && !summary && !summaryLoading && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onSummarize(); }}
-          className="mt-2 text-xs text-purple-400 hover:underline"
-        >
-          Summarize
-        </button>
-      )}
+          {summary && <p className="mt-2 line-clamp-2 text-xs text-white/50">{summary}</p>}
+          {summaryLoading && <Loader2 className="mt-2 h-3 w-3 animate-spin text-white/50" />}
+          {!selectMode && !summary && !summaryLoading && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); onSummarize(); }} className="mt-2 text-xs text-purple-400 hover:underline">
+              Summarize
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -2071,6 +2330,8 @@ function CategoryTab({
   id,
   name,
   color,
+  icon,
+  count,
   selected,
   onClick,
   onRename,
@@ -2079,6 +2340,8 @@ function CategoryTab({
   id: string;
   name: string;
   color?: string;
+  icon?: React.ReactNode;
+  count?: number;
   selected: boolean;
   onClick: () => void;
   onRename?: () => void;
@@ -2089,41 +2352,70 @@ function CategoryTab({
   return (
     <div className="group relative">
       <button
+        type="button"
         onClick={onClick}
         className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm",
-          selected ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white/90"
+          "flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition duration-200",
+          selected
+            ? "bg-gradient-to-r from-purple-500/18 to-blue-500/10 text-white shadow-[inset_0_0_0_1px_rgba(168,85,247,0.25)]"
+            : "text-white/70 hover:bg-white/[0.05] hover:text-white/92"
         )}
       >
-        {color ? (
+        {icon ? (
+          <span className="shrink-0">{icon}</span>
+        ) : color ? (
           <span
-            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white/10"
             style={{ backgroundColor: color }}
             aria-hidden
           />
         ) : (
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-white/20" aria-hidden />
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-white/25 ring-2 ring-white/10" aria-hidden />
         )}
-        <span className="min-w-0 flex-1 truncate">{name}</span>
-        {!isAll && (onRename || onDelete) && (
+        <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
+        {count !== undefined ? (
+          <span
+            className={cn(
+              "shrink-0 tabular-nums text-xs",
+              selected ? "text-white/55" : "text-white/35"
+            )}
+          >
+            {count}
+          </span>
+        ) : null}
+        {!isAll && (onRename || onDelete) ? (
           <ChevronRight
-            className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover:opacity-100"
+            className="h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
               setMenu((m) => !m);
             }}
           />
-        )}
+        ) : null}
       </button>
       {menu && !isAll && (
-        <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-white/10 bg-black/90 py-1 shadow-lg">
+        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[8rem] rounded-xl border border-white/[0.08] bg-black/95 py-1 shadow-xl">
           {onRename && (
-            <button onClick={() => { onRename(); setMenu(false); }} className="block w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                onRename();
+                setMenu(false);
+              }}
+              className="block w-full px-3 py-2 text-left text-sm text-white transition hover:bg-white/10"
+            >
               Rename
             </button>
           )}
           {onDelete && (
-            <button onClick={() => { onDelete(); setMenu(false); }} className="block w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                onDelete();
+                setMenu(false);
+              }}
+              className="block w-full px-3 py-2 text-left text-sm text-red-400 transition hover:bg-white/10"
+            >
               Delete
             </button>
           )}
@@ -2285,11 +2577,11 @@ function StudyModal({
     const card = flashcards[cardIndex];
     const totalCards = flashcards.length;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
-        <Card className="mx-auto w-full max-w-lg border border-white/10 bg-[#0c0c12]/95 p-5 shadow-2xl backdrop-blur-sm sm:p-6">
-          <div className="flex items-start justify-between gap-3">
+      <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-md sm:items-center sm:p-4">
+        <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-white/10 bg-[#0c0c12]/95 shadow-2xl backdrop-blur-sm sm:max-h-[min(90dvh,880px)] sm:rounded-2xl sm:border sm:p-6 max-sm:flex-1">
+          <div className="flex shrink-0 items-start justify-between gap-3 px-4 pb-2 pt-4 sm:px-0 sm:pb-0 sm:pt-0">
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-semibold tracking-tight text-white">Flashcards</h3>
+              <h3 className="text-base font-semibold tracking-tight text-white sm:text-sm">Flashcards</h3>
               {studyScope === "multi" && (
                 <p className="mt-1 text-xs text-violet-300/90">From multiple notes</p>
               )}
@@ -2300,21 +2592,23 @@ function StudyModal({
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 rounded-lg p-1.5 text-white/50 transition hover:bg-white/10 hover:text-white"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/50 transition hover:bg-white/10 hover:text-white touch-manipulation sm:h-auto sm:w-auto sm:rounded-lg sm:p-1.5"
               aria-label="Close"
             >
-              <X className="h-5 w-5" />
+              <X className="h-6 w-6 sm:h-5 sm:w-5" />
             </button>
           </div>
 
           {error && (
-            <p className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-200">{error}</p>
+            <p className="mx-4 mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-200 sm:mx-0">
+              {error}
+            </p>
           )}
 
-          <p className="mt-3 text-center text-xs text-white/45">Click the card to flip</p>
+          <p className="mt-3 px-4 text-center text-sm text-white/45 sm:px-0">Tap the card to flip</p>
 
-          {/* Fixed-size flip card: full width, min 200px height; gradient accent border */}
-          <div className="mt-3 w-full">
+          {/* Fixed-size flip card: full width, taller on mobile for easy tapping */}
+          <div className="mt-3 min-h-0 flex-1 px-3 sm:px-0">
             <div className="rounded-2xl bg-gradient-to-br from-violet-500/50 via-indigo-500/35 to-cyan-500/40 p-[1px] shadow-[0_0_40px_-12px_rgba(139,92,246,0.35)]">
               <div className="perspective-[1400px] w-full">
                 <div
@@ -2328,30 +2622,30 @@ function StudyModal({
                     }
                   }}
                   className={cn(
-                    "relative min-h-[200px] w-full cursor-pointer transition-transform duration-500 ease-out [transform-style:preserve-3d]",
+                    "relative min-h-[min(48dvh,320px)] w-full cursor-pointer transition-transform duration-500 ease-out [transform-style:preserve-3d] sm:min-h-[220px]",
                     cardFlipped && "[transform:rotateY(180deg)]"
                   )}
                   aria-label={cardFlipped ? "Show question (front)" : "Show answer (back)"}
                 >
                   {/* Front — term / question */}
                   <div
-                    className="absolute inset-0 flex min-h-[200px] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-white/[0.08] bg-[#12121a] px-5 py-6 text-center [backface-visibility:hidden] [transform:rotateY(0deg)]"
+                    className="absolute inset-0 flex min-h-[min(48dvh,320px)] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-white/[0.08] bg-[#12121a] px-5 py-8 text-center [backface-visibility:hidden] [transform:rotateY(0deg)] sm:min-h-[220px] sm:py-6"
                   >
                     <span className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-indigo-300">
                       Question
                     </span>
-                    <p className="max-w-full text-base font-medium leading-relaxed text-white/95 [overflow-wrap:anywhere]">
+                    <p className="max-w-full text-lg font-medium leading-relaxed text-white/95 [overflow-wrap:anywhere] sm:text-base">
                       {card.front}
                     </p>
                   </div>
                   {/* Back — definition / answer */}
                   <div
-                    className="absolute inset-0 flex min-h-[200px] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-white/[0.08] bg-[#12121a] px-5 py-6 text-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
+                    className="absolute inset-0 flex min-h-[min(48dvh,320px)] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-white/[0.08] bg-[#12121a] px-5 py-8 text-center [backface-visibility:hidden] [transform:rotateY(180deg)] sm:min-h-[220px] sm:py-6"
                   >
                     <span className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-violet-300">
                       Answer
                     </span>
-                    <p className="max-w-full text-base leading-relaxed text-white/90 [overflow-wrap:anywhere]">
+                    <p className="max-w-full text-lg leading-relaxed text-white/90 [overflow-wrap:anywhere] sm:text-base">
                       {card.back}
                     </p>
                   </div>
@@ -2360,14 +2654,14 @@ function StudyModal({
             </div>
           </div>
 
-          <p className="mt-4 text-center text-sm font-medium tabular-nums text-white/55">
+          <p className="mt-4 px-4 text-center text-base font-medium tabular-nums text-white/55 sm:px-0 sm:text-sm">
             {cardIndex + 1} of {totalCards}
           </p>
 
           {canPersistStudy && (
             <Button
               type="button"
-              className="mt-3 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-md shadow-violet-500/20 disabled:opacity-50"
+              className="mx-4 mt-3 w-[calc(100%-2rem)] border-0 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-base font-medium text-white shadow-md shadow-violet-500/20 disabled:opacity-50 sm:mx-0 sm:w-full sm:py-2 sm:text-sm"
               onClick={() => void onSaveFlashcards()}
               disabled={studySaveLoading === "flashcards"}
             >
@@ -2380,26 +2674,26 @@ function StudyModal({
             </Button>
           )}
 
-          <div className="mt-3 flex w-full items-center justify-center gap-3">
+          <div className="mt-3 flex w-full shrink-0 items-stretch justify-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pb-0">
             <Button
               type="button"
               variant="ghost"
-              className="min-w-[7.5rem] border border-white/10 bg-white/[0.04] text-white hover:bg-white/10"
+              className="min-h-12 min-w-0 flex-1 gap-2 border border-white/10 bg-white/[0.04] px-4 text-base text-white hover:bg-white/10 touch-manipulation sm:min-h-10 sm:min-w-[7.5rem] sm:flex-initial sm:text-sm"
               onClick={onCardPrev}
               disabled={cardIndex === 0}
             >
-              <ChevronLeft className="mr-1 h-4 w-4 opacity-80" />
+              <ChevronLeft className="h-5 w-5 shrink-0 opacity-80 sm:mr-1 sm:h-4 sm:w-4" />
               Previous
             </Button>
             <Button
               type="button"
               variant="ghost"
-              className="min-w-[7.5rem] border border-white/10 bg-white/[0.04] text-white hover:bg-white/10"
+              className="min-h-12 min-w-0 flex-1 gap-2 border border-white/10 bg-white/[0.04] px-4 text-base text-white hover:bg-white/10 touch-manipulation sm:min-h-10 sm:min-w-[7.5rem] sm:flex-initial sm:text-sm"
               onClick={onCardNext}
               disabled={cardIndex === totalCards - 1}
             >
               Next
-              <ChevronRight className="ml-1 h-4 w-4 opacity-80" />
+              <ChevronRight className="h-5 w-5 shrink-0 opacity-80 sm:ml-1 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </Card>
@@ -2479,9 +2773,9 @@ function StudyModal({
         : null);
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
-        <Card className="mx-auto w-full max-w-lg border border-white/10 bg-[#0c0c12]/95 p-5 shadow-2xl backdrop-blur-sm sm:p-6">
-          <div className="flex items-start justify-between gap-3">
+      <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-md sm:items-center sm:p-4">
+        <Card className="mx-auto flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-y-auto overflow-x-hidden rounded-none border-0 border-white/10 bg-[#0c0c12]/95 shadow-2xl backdrop-blur-sm sm:max-h-[min(92dvh,900px)] sm:rounded-2xl sm:border sm:p-6">
+          <div className="flex shrink-0 items-start justify-between gap-3 px-4 pt-4 sm:px-0 sm:pt-0">
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium uppercase tracking-wider text-white/40">Quiz</p>
               <p className="mt-1 text-sm font-medium tabular-nums text-white/70">
@@ -2506,20 +2800,20 @@ function StudyModal({
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 rounded-lg p-1.5 text-white/50 transition hover:bg-white/10 hover:text-white"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/50 transition hover:bg-white/10 hover:text-white touch-manipulation sm:h-auto sm:w-auto sm:rounded-lg sm:p-1.5"
               aria-label="Close"
             >
-              <X className="h-5 w-5" />
+              <X className="h-6 w-6 sm:h-5 sm:w-5" />
             </button>
           </div>
 
-          <div className="mt-5 w-full">
+          <div className="mt-5 w-full flex-1 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pb-0">
             <div className="rounded-2xl bg-gradient-to-br from-violet-500/50 via-indigo-500/35 to-cyan-500/40 p-[1px] shadow-[0_0_40px_-12px_rgba(139,92,246,0.35)]">
-              <div className="flex min-h-[320px] flex-col rounded-[15px] border border-white/[0.08] bg-[#12121a] p-5 sm:min-h-[340px] sm:p-6">
-                <h3 className="text-center text-base font-bold leading-snug text-white sm:text-lg [overflow-wrap:anywhere]">
+              <div className="flex min-h-[min(52dvh,360px)] flex-col rounded-[15px] border border-white/[0.08] bg-[#12121a] p-4 sm:min-h-[340px] sm:p-6">
+                <h3 className="text-center text-lg font-bold leading-snug text-white [overflow-wrap:anywhere] sm:text-lg">
                   {q.question}
                 </h3>
-                <div className="mt-5 flex flex-1 flex-col gap-2">
+                <div className="mt-5 flex flex-1 flex-col gap-3">
                   {fourOptions.map((opt, i) => {
                     const isCorrect = i === q.correctIndex;
                     const isPicked = quizSelected === i;
@@ -2531,7 +2825,7 @@ function StudyModal({
                         onClick={() => onQuizSelect(i)}
                         disabled={revealed || !String(opt).trim()}
                         className={cn(
-                          "flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition",
+                          "flex min-h-14 w-full touch-manipulation items-start gap-3 rounded-xl border px-4 py-4 text-left text-base leading-snug transition sm:min-h-0 sm:py-3 sm:text-sm",
                           !revealed && String(opt).trim() && "border-white/10 bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10",
                           !String(opt).trim() && "cursor-not-allowed border-dashed border-white/[0.08] bg-white/[0.02] opacity-40",
                           revealed && isCorrect && "border-emerald-500/70 bg-emerald-500/15 text-emerald-100",
@@ -2541,7 +2835,7 @@ function StudyModal({
                       >
                         <span
                           className={cn(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold",
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold sm:h-7 sm:w-7 sm:text-xs",
                             !revealed && "bg-white/10 text-white/80",
                             revealed && isCorrect && "bg-emerald-500/30 text-emerald-100",
                             revealed && !isCorrect && isPicked && "bg-red-500/30 text-red-100",
@@ -2568,7 +2862,7 @@ function StudyModal({
                   <div className="mt-auto pt-4">
                     <Button
                       type="button"
-                      className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-md shadow-violet-500/20"
+                      className="min-h-12 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-base font-medium text-white shadow-md shadow-violet-500/20 touch-manipulation sm:min-h-10 sm:text-sm"
                       onClick={onQuizNext}
                     >
                       {quizIndex < total - 1 ? (

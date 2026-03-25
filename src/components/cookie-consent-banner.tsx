@@ -13,7 +13,7 @@ export function CookieConsentBanner() {
     setMounted(true);
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "accepted") {
+      if (stored === "accepted" || stored === "rejected") {
         setHidden(true);
       } else {
         setHidden(false);
@@ -26,6 +26,15 @@ export function CookieConsentBanner() {
   function accept() {
     try {
       localStorage.setItem(STORAGE_KEY, "accepted");
+    } catch {
+      /* ignore quota / private mode */
+    }
+    setHidden(true);
+  }
+
+  function reject() {
+    try {
+      localStorage.setItem(STORAGE_KEY, "rejected");
     } catch {
       /* ignore quota / private mode */
     }
@@ -45,8 +54,8 @@ export function CookieConsentBanner() {
       <div className="pointer-events-auto w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0a0a0f]/95 px-4 py-4 shadow-2xl backdrop-blur-xl sm:px-6 sm:py-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <p className="text-sm leading-relaxed text-white/80">
-            We use cookies to keep you logged in and improve your experience. By continuing to use Studara, you accept our
-            cookie policy.
+            We use cookies to keep you logged in and improve your experience. You can accept all cookies as described in our
+            cookie policy, or reject non-essential cookies.
           </p>
           <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
             <Link
@@ -55,6 +64,13 @@ export function CookieConsentBanner() {
             >
               Learn More
             </Link>
+            <button
+              type="button"
+              onClick={reject}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-medium text-white/85 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
+            >
+              Reject
+            </button>
             <button
               type="button"
               onClick={accept}

@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/cn";
 
 const headerSelectClass =
-  "min-w-[8.5rem] rounded-lg border border-white/[0.1] bg-white/[0.05] py-2 pl-2.5 pr-7 text-xs font-medium text-white/90 outline-none transition focus:border-purple-500/45 focus:ring-2 focus:ring-purple-500/20 sm:min-w-[9.5rem] sm:pl-3 sm:text-sm";
+  "min-h-11 min-w-0 flex-1 rounded-lg border border-white/[0.1] bg-white/[0.05] py-2 pl-2.5 pr-7 text-base font-medium text-white/90 outline-none transition focus:border-purple-500/45 focus:ring-2 focus:ring-purple-500/20 sm:min-h-10 sm:min-w-[8.5rem] sm:flex-none sm:pl-3 sm:text-xs md:min-w-[9.5rem] md:text-sm";
 
 function wordCount(s: string): number {
   const t = s.trim();
@@ -225,78 +225,43 @@ export function EssayFeedbackPage() {
   );
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#060608] text-white lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
+    <div className="flex min-h-dvh max-w-[100vw] flex-col overflow-x-hidden bg-[#060608] text-white lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-32 left-1/2 h-[480px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/14 via-indigo-600/10 to-fuchsia-600/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-[320px] w-[480px] rounded-full bg-indigo-600/8 blur-3xl" />
       </div>
 
       <header className="relative z-20 shrink-0 border-b border-white/[0.06] bg-[#08080c]/90 backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6 sm:py-3.5">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-4 sm:gap-4 sm:px-8 sm:py-5">
+          <Link
+            href="/notes"
+            className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 rounded-xl px-3 py-2 text-base text-white/50 transition duration-200 hover:bg-white/[0.05] hover:text-white/85 sm:min-h-0 sm:px-2 sm:text-sm"
+          >
+            <ArrowLeft className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
+            Notes
+          </Link>
+          <div className="hidden h-8 w-px bg-white/[0.08] sm:block" aria-hidden />
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <Link
-              href="/notes"
-              className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-white/45 transition hover:bg-white/[0.05] hover:text-white/80 sm:text-sm"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Back</span>
-            </Link>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-purple-500/25 to-indigo-500/15 shadow-inner">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-purple-500/25 to-indigo-500/15 shadow-inner">
               <FilePenLine className="h-5 w-5 text-purple-100/95" strokeWidth={1.75} />
             </div>
-            <h1 className="min-w-0 text-lg font-semibold tracking-tight text-white sm:text-xl">
-              Essay Feedback
-            </h1>
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Essay feedback</h1>
+              <p className="mt-0.5 text-sm text-white/45">AI-powered draft review</p>
+            </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <label className="sr-only" htmlFor="essay-type-select">
-              Essay type
-            </label>
-            <select
-              id="essay-type-select"
-              className={headerSelectClass}
-              value={essayType}
-              onChange={(e) => setEssayType(e.target.value)}
-              disabled={loading}
+          {plan === "free" && remaining !== null ? (
+            <span
+              className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/55"
+              title="3 free basic feedbacks per month"
             >
-              {ESSAY_TYPE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <label className="sr-only" htmlFor="grade-level-select">
-              Grade level
-            </label>
-            <select
-              id="grade-level-select"
-              className={headerSelectClass}
-              value={gradeLevel}
-              onChange={(e) => setGradeLevel(e.target.value)}
-              disabled={loading}
-            >
-              {GRADE_LEVEL_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            {plan === "free" && remaining !== null ? (
-              <span
-                className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-medium text-white/55 sm:text-xs"
-                title="3 free basic feedbacks per month"
-              >
-                <span className="hidden sm:inline">3 free basic feedbacks per month · </span>
-                <span className="sm:hidden">Basic · </span>
-                {remaining} left
-              </span>
-            ) : plan === "pro" ? (
-              <span className="rounded-full border border-purple-500/25 bg-purple-500/10 px-2.5 py-1 text-[10px] font-medium text-purple-200/90 sm:text-xs">
-                Unlimited advanced feedback
-              </span>
-            ) : null}
-          </div>
+              {remaining} free left this month
+            </span>
+          ) : plan === "pro" ? (
+            <span className="rounded-full border border-purple-500/25 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-200/90">
+              Pro · unlimited
+            </span>
+          ) : null}
         </div>
       </header>
 
@@ -305,16 +270,44 @@ export function EssayFeedbackPage() {
         className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         {!hasResults ? (
-          <div className="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-4 px-4 py-6 sm:px-6 sm:py-8">
-            <p className="text-center text-sm text-white/40">
-              Paste your draft below.{" "}
-              <span className="text-white/55">
-                Free: 3 basic feedbacks per month (key sections). Pro: full sections, grade estimate, and
-                inline highlights.
-              </span>
-            </p>
-            {essayCard}
-            {submitButton}
+          <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-6 px-4 py-8 sm:gap-8 sm:px-8 sm:py-10 lg:flex-row lg:gap-10">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                <label className="sr-only" htmlFor="essay-type-select">
+                  Essay type
+                </label>
+                <select
+                  id="essay-type-select"
+                  className={headerSelectClass}
+                  value={essayType}
+                  onChange={(e) => setEssayType(e.target.value)}
+                  disabled={loading}
+                >
+                  {ESSAY_TYPE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <label className="sr-only" htmlFor="grade-level-select">
+                  Grade level
+                </label>
+                <select
+                  id="grade-level-select"
+                  className={headerSelectClass}
+                  value={gradeLevel}
+                  onChange={(e) => setGradeLevel(e.target.value)}
+                  disabled={loading}
+                >
+                  {GRADE_LEVEL_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {essayCard}
+              {submitButton}
             {highlightsClearedNotice ? (
               <p className="text-center text-xs leading-relaxed text-white/40">
                 Highlights cleared — edit your essay and click Get Feedback again for updated analysis.
@@ -333,9 +326,28 @@ export function EssayFeedbackPage() {
                 ) : null}
               </div>
             ) : null}
+            </div>
+            <aside className="hidden w-full max-w-sm shrink-0 lg:block">
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 backdrop-blur-sm">
+                <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Tips</p>
+                <ul className="mt-4 space-y-3 text-sm leading-relaxed text-white/55">
+                  <li>Choose essay type and grade level so feedback matches your assignment.</li>
+                  <li>Pro unlocks grade estimates, full rubric sections, and inline highlights.</li>
+                  <li>Free includes three basic feedbacks per month on key areas.</li>
+                </ul>
+              </div>
+            </aside>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 backdrop-blur-sm lg:hidden">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Tips</p>
+              <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-white/55">
+                <li>Choose essay type and grade level so feedback matches your assignment.</li>
+                <li>Pro unlocks grade estimates, full rubric sections, and inline highlights.</li>
+                <li>Free includes three basic feedbacks per month on key areas.</li>
+              </ul>
+            </div>
           </div>
         ) : (
-          <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col overflow-hidden px-4 py-4 sm:px-6 sm:py-5">
+          <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col overflow-hidden px-4 py-6 sm:px-8 sm:py-8">
             {error ? (
               <div className="mb-4 shrink-0 rounded-xl border border-red-500/25 bg-red-500/[0.08] px-4 py-3 text-sm text-red-200/95">
                 {error}
@@ -349,8 +361,42 @@ export function EssayFeedbackPage() {
                 ) : null}
               </div>
             ) : null}
-            <div className="flex min-h-0 flex-1 flex-col gap-4 sm:gap-5 lg:flex-row">
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:basis-0">
+            <div className="flex min-h-0 flex-1 flex-col gap-8 lg:flex-row lg:gap-10">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 lg:basis-0 lg:max-w-[52%]">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                  <label className="sr-only" htmlFor="essay-type-select-results">
+                    Essay type
+                  </label>
+                  <select
+                    id="essay-type-select-results"
+                    className={headerSelectClass}
+                    value={essayType}
+                    onChange={(e) => setEssayType(e.target.value)}
+                    disabled={loading}
+                  >
+                    {ESSAY_TYPE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="sr-only" htmlFor="grade-level-select-results">
+                    Grade level
+                  </label>
+                  <select
+                    id="grade-level-select-results"
+                    className={headerSelectClass}
+                    value={gradeLevel}
+                    onChange={(e) => setGradeLevel(e.target.value)}
+                    disabled={loading}
+                  >
+                    {GRADE_LEVEL_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {essayCard}
                 {highlightsClearedNotice ? (
                   <p className="shrink-0 text-xs leading-relaxed text-white/40">
@@ -359,9 +405,9 @@ export function EssayFeedbackPage() {
                 ) : null}
                 {submitButton}
               </div>
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 lg:basis-0">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:basis-0">
                 <div className="flex shrink-0 flex-col gap-1">
-                  <span className="text-xs font-medium uppercase tracking-wide text-white/45">
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40">
                     Feedback
                   </span>
                   {plan === "free" ? (

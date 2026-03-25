@@ -27,7 +27,5 @@ export async function GET() {
     proEstimatedSpendCents = st.estimatedSpendCents;
   }
 
-  console.log("[api/me/plan]", { sessionUserId, plan, proHeavyUsage });
-
   return NextResponse.json({ plan, proHeavyUsage, proEstimatedSpendCents });
 }

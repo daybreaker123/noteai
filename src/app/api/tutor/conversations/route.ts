@@ -19,10 +19,6 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     const userId = typeof session?.user?.id === "string" ? session.user.id.trim() : "";
-    console.log("[tutor/conversations GET] session", {
-      hasUserId: Boolean(userId),
-      userIdPrefix: userId ? `${userId.slice(0, 10)}…` : null,
-    });
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -34,7 +30,6 @@ export async function GET() {
     const month = new Date().toISOString().slice(0, 7);
 
     const plan = await getUserPlanFromDb(userId);
-    console.log("[tutor/conversations GET] plan resolved", { plan });
 
     let tutorMessagesUsed = 0;
     let tutorImagesUsed = 0;
@@ -52,11 +47,6 @@ export async function GET() {
       tutorMessagesUsed = usage?.tutor_messages ?? 0;
       tutorImagesUsed = usage?.tutor_images ?? 0;
     }
-
-    console.log("[tutor/conversations GET] querying tutor_conversations", {
-      userIdPrefix: `${userId.slice(0, 10)}…`,
-      filter: "user_id = session user id",
-    });
 
     const { data: conversations, error: convError } = await supabaseAdmin
       .from("tutor_conversations")
@@ -80,12 +70,6 @@ export async function GET() {
         { status: 500 }
       );
     }
-
-    console.log("[tutor/conversations GET] ok", {
-      userIdPrefix: `${userId.slice(0, 10)}…`,
-      count: conversations?.length ?? 0,
-      firstIds: (conversations ?? []).slice(0, 3).map((c) => c.id),
-    });
 
     return NextResponse.json({
       plan,
@@ -125,10 +109,6 @@ export async function POST(req: Request) {
     const title = (body.title?.trim() || "New chat").slice(0, 120);
 
     const conversationInsert = { user_id: userId, title };
-    console.log("[tutor/conversations POST] tutor_conversations insert", {
-      table: "tutor_conversations",
-      payload: { ...conversationInsert, user_id: `${userId.slice(0, 10)}…` },
-    });
 
     const { data: row, error } = await supabaseAdmin
       .from("tutor_conversations")

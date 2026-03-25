@@ -80,8 +80,6 @@ export async function POST(req: Request) {
   const userId = session.user.id.trim();
   const email = session.user.email?.trim() ?? "";
 
-  console.info(`${LOG_PREFIX} checkout for user_id (getServerSession, same as notes/Supabase):`, userId);
-
   try {
     const checkout = await stripe.checkout.sessions.create({
       mode: "subscription",

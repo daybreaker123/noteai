@@ -1,20 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Category, Note, ApiError } from "./api-types";
+import { FREE_NOTE_TOTAL } from "./plan-limits";
 
-const FREE_NOTE_LIMIT = 50;
 const FREE_SUMMARY_LIMIT = 10;
+
+const SAVE_ERROR_MESSAGE = "Failed to save note — please check your connection.";
 
 export function useNotesRemote(userId: string | null) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notesLoadError, setNotesLoadError] = useState<string | null>(null);
   const [plan, setPlan] = useState<"free" | "pro">("free");
   const [proHeavyUsage, setProHeavyUsage] = useState(false);
   const [proEstimatedSpendCents, setProEstimatedSpendCents] = useState(0);
   const [upgradeModal, setUpgradeModal] = useState<{ show: boolean; message?: string; feature?: string }>({ show: false });
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const saveErrorClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSaveError = useCallback(() => {
+    setSaveErrorMessage(SAVE_ERROR_MESSAGE);
+    if (saveErrorClearRef.current) clearTimeout(saveErrorClearRef.current);
+    saveErrorClearRef.current = setTimeout(() => {
+      setSaveErrorMessage(null);
+      saveErrorClearRef.current = null;
+    }, 6000);
+  }, []);
+
+  const clearSaveErrorMessage = useCallback(() => {
+    if (saveErrorClearRef.current) clearTimeout(saveErrorClearRef.current);
+    saveErrorClearRef.current = null;
+    setSaveErrorMessage(null);
+  }, []);
 
   const fetchPlan = useCallback(async () => {
     const res = await fetch("/api/me/plan");
@@ -43,17 +63,29 @@ export function useNotesRemote(userId: string | null) {
 
   const fetchNotes = useCallback(async () => {
     const res = await fetch("/api/notes");
-    if (!res.ok) return;
-    const data = (await res.json()) as Note[];
+    const json = (await res.json().catch(() => null)) as Note[] | ApiError | null;
+    if (!res.ok) {
+      const msg =
+        json && typeof json === "object" && "error" in json && typeof (json as ApiError).error === "string"
+          ? (json as ApiError).error
+          : "Could not load notes";
+      setNotesLoadError(msg);
+      setNotes([]);
+      return;
+    }
+    setNotesLoadError(null);
+    const data = json as Note[];
     setNotes(Array.isArray(data) ? data : []);
   }, []);
 
   const load = useCallback(async () => {
     if (!userId) {
       setLoading(false);
+      setNotesLoadError(null);
       return;
     }
     setLoading(true);
+    setNotesLoadError(null);
     await Promise.all([fetchPlan(), fetchCategories(), fetchNotes()]);
     setLoading(false);
   }, [userId, fetchPlan, fetchCategories, fetchNotes]);
@@ -122,6 +154,8 @@ export function useNotesRemote(userId: string | null) {
         content: raw.content,
         pinned: raw.pinned,
         tags: Array.isArray(raw.tags) ? raw.tags : [],
+        improved_at: raw.improved_at ?? null,
+        summarized_at: raw.summarized_at ?? null,
         created_at: raw.created_at,
         updated_at: raw.updated_at,
       };
@@ -129,7 +163,13 @@ export function useNotesRemote(userId: string | null) {
       return { ok: true, note, truncated };
     },
 
-    async update(id: string, patch: Partial<Pick<Note, "title" | "content" | "category_id" | "pinned" | "tags">>) {
+    async update(
+      id: string,
+      patch: Partial<Pick<Note, "title" | "content" | "category_id" | "pinned" | "tags">> & {
+        record_improvement?: boolean;
+        record_summarization?: boolean;
+      }
+    ) {
       if (!id || id.startsWith("draft-")) return;
       try {
         const res = await fetch(`/api/notes/${id}`, {
@@ -139,11 +179,14 @@ export function useNotesRemote(userId: string | null) {
         });
         const json = (await res.json().catch(() => null)) as Note | ApiError;
         if (handleApiError(res, json as ApiError)) return;
-        if (!res.ok) return;
+        if (!res.ok) {
+          showSaveError();
+          return;
+        }
         const note = json as Note;
         setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
       } catch {
-        // Network error (e.g. "Failed to fetch") - silently skip to avoid breaking the UI
+        showSaveError();
       }
     },
 
@@ -208,6 +251,7 @@ export function useNotesRemote(userId: string | null) {
     categories,
     notes,
     loading,
+    notesLoadError,
     plan,
     proHeavyUsage,
     proEstimatedSpendCents,
@@ -216,8 +260,10 @@ export function useNotesRemote(userId: string | null) {
     setUpgradeModal,
     categoryError,
     clearCategoryError: useCallback(() => setCategoryError(null), []),
+    saveErrorMessage,
+    clearSaveErrorMessage,
     actions,
-    FREE_NOTE_LIMIT,
+    FREE_NOTE_LIMIT: FREE_NOTE_TOTAL,
     FREE_SUMMARY_LIMIT,
   };
 }

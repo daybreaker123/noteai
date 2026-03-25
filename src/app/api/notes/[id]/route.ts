@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getEmbedding } from "@/lib/openai-embeddings";
 
 export async function PATCH(
   req: Request,
@@ -25,6 +24,10 @@ export async function PATCH(
     category_id?: string | null;
     pinned?: boolean;
     tags?: string[];
+    /** Server sets `improved_at` to now() when true (idempotent). */
+    record_improvement?: boolean;
+    /** Server sets `summarized_at` to now() when true (idempotent). */
+    record_summarization?: boolean;
   };
   const update: Record<string, unknown> = {};
   if (body.title !== undefined) update.title = body.title;
@@ -34,6 +37,9 @@ export async function PATCH(
   }
   if (body.pinned !== undefined) update.pinned = body.pinned;
   if (body.tags !== undefined) update.tags = body.tags;
+  const now = new Date().toISOString();
+  if (body.record_improvement === true) update.improved_at = now;
+  if (body.record_summarization === true) update.summarized_at = now;
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
@@ -45,25 +51,6 @@ export async function PATCH(
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const planRes = await supabaseAdmin
-    .from("user_plans")
-    .select("plan")
-    .eq("user_id", session.user.id)
-    .single();
-  const plan = planRes.data?.plan === "pro" ? "pro" : "free";
-  if (plan === "pro" && (body.content !== undefined || body.title !== undefined)) {
-    const text = [data?.title ?? "", data?.content ?? ""].join("\n").slice(0, 8000);
-    if (text.trim()) {
-      const embedding = await getEmbedding(text);
-      if (embedding) {
-        await supabaseAdmin
-          .from("notes")
-          .update({ embedding })
-          .eq("id", id)
-          .eq("user_id", session.user.id);
-      }
-    }
-  }
   return NextResponse.json(data);
 }
 

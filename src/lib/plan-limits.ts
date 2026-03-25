@@ -1,4 +1,4 @@
-/** Free-tier limits (must match API routes). */
+/** Free-tier limits (must match API routes and `useNotesRemote`). */
 export const FREE_NOTE_TOTAL = 50;
 export const FREE_SUMMARY_PER_MONTH = 10;
 export const FREE_IMPROVE_PER_MONTH = 5;

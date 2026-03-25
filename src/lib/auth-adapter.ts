@@ -9,7 +9,6 @@ const LOG = "[auth][google-oauth]";
 
 /**
  * Wraps PrismaAdapter to:
- * - Log Google OAuth adapter steps (account lookup, user create, link).
  * - Block NextAuth's "link new Google identity to existing JWT session user" path when the Google
  *   account email does not match that session user (prevents logging into the wrong Studara user).
  *
@@ -23,35 +22,17 @@ export function createStudaraAuthAdapter(client: PrismaClient): Adapter {
   return {
     ...base,
     async getUserByAccount(providerAccount) {
-      const u = (await base.getUserByAccount?.(providerAccount)) ?? null;
-      if (providerAccount.provider === "google") {
-        console.log(LOG, "getUserByAccount", {
-          providerAccountId: providerAccount.providerAccountId,
-          foundUserId: u?.id ?? null,
-          email: u?.email ?? null,
-        });
-      }
-      return u;
+      return (await base.getUserByAccount?.(providerAccount)) ?? null;
     },
 
     async createUser(data) {
-      const u = (await base.createUser?.(data)) as AdapterUser;
-      console.log(LOG, "createUser", {
-        createdUserId: u?.id ?? null,
-        email: u?.email ?? null,
-      });
-      return u;
+      return (await base.createUser?.(data)) as AdapterUser;
     },
 
     async linkAccount(data) {
       const isGoogle = data.provider === "google";
 
       if (isGoogle) {
-        console.log(LOG, "linkAccount (incoming)", {
-          providerAccountId: data.providerAccountId,
-          targetUserId: data.userId,
-        });
-
         const existing = await client.account.findUnique({
           where: {
             provider_providerAccountId: {
@@ -61,10 +42,6 @@ export function createStudaraAuthAdapter(client: PrismaClient): Adapter {
           },
         });
         if (existing) {
-          console.log(LOG, "linkAccount: row already exists, delegating", {
-            providerAccountId: data.providerAccountId,
-            userId: existing.userId,
-          });
           return base.linkAccount?.(data) as Promise<AdapterAccount | null | undefined>;
         }
 
@@ -81,20 +58,12 @@ export function createStudaraAuthAdapter(client: PrismaClient): Adapter {
           const googleEmail = payload?.email?.toLowerCase()?.trim() ?? "";
 
           if (googleSub && googleSub !== data.providerAccountId) {
-            console.error(LOG, "linkAccount: Google sub !== providerAccountId", {
-              googleSub,
-              providerAccountId: data.providerAccountId,
-            });
+            console.error(LOG, "linkAccount: Google sub !== providerAccountId");
             throw new AccountNotLinkedError("Google account id mismatch.");
           }
 
           if (sessionEmail && googleEmail && sessionEmail !== googleEmail) {
-            console.error(LOG, "linkAccount: REFUSE — JWT session user email !== Google id_token email", {
-              sessionUserId: data.userId,
-              sessionEmail,
-              googleEmail,
-              providerAccountId: data.providerAccountId,
-            });
+            console.error(LOG, "linkAccount: REFUSE — session email does not match Google id_token email");
             throw new AccountNotLinkedError(
               "This Google account does not match your current Studara session. Sign out, then sign in with Google again."
             );
@@ -103,12 +72,6 @@ export function createStudaraAuthAdapter(client: PrismaClient): Adapter {
       }
 
       const result = await base.linkAccount?.(data);
-      if (isGoogle) {
-        console.log(LOG, "linkAccount (completed)", {
-          providerAccountId: data.providerAccountId,
-          userId: data.userId,
-        });
-      }
       return result as AdapterAccount | null | undefined;
     },
   };

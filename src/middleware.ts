@@ -15,5 +15,6 @@ export const config = {
     "/tutor",
     "/tutor/:path*",
     "/essay-feedback",
+    "/study-sets",
   ],
 };

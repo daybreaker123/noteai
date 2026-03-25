@@ -23,7 +23,6 @@ export async function POST(req: Request) {
   const prompts: Record<string, string> = {
     summarize: "Summarize the following note in 3-5 sentences. Be concise.",
     improve: "Improve the clarity and structure of the following note. Keep the same tone and length.",
-    extract: "Extract actionable tasks from the following note. Return as a bullet list.",
     title: "Generate a short, descriptive title (3-8 words) for this note. Return only the title, no quotes.",
     tags: "Suggest 3-5 relevant tags for this note. Return only comma-separated tags, lowercase.",
   };

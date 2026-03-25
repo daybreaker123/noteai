@@ -2,16 +2,18 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-
-const FREE_NOTE_LIMIT = 50;
+import { FREE_NOTE_TOTAL } from "@/lib/plan-limits";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!supabaseAdmin) {
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json(
+      { error: "Notes database is not configured" },
+      { status: 503 }
+    );
   }
   const { data, error } = await supabaseAdmin
     .from("notes")
@@ -19,7 +21,12 @@ export async function GET() {
     .eq("user_id", session.user.id)
     .order("pinned", { ascending: false })
     .order("updated_at", { ascending: false });
-  if (error) return NextResponse.json([], { status: 200 });
+  if (error) {
+    return NextResponse.json(
+      { error: error.message || "Failed to load notes" },
+      { status: 500 }
+    );
+  }
   return NextResponse.json(data ?? []);
 }
 
@@ -48,7 +55,7 @@ export async function POST(req: Request) {
       .from("notes")
       .select("*", { count: "exact", head: true })
       .eq("user_id", session.user.id);
-    if ((count ?? 0) >= FREE_NOTE_LIMIT) {
+    if ((count ?? 0) >= FREE_NOTE_TOTAL) {
       return NextResponse.json(
         {
           error: "You've reached the free limit — upgrade to Pro for unlimited notes",

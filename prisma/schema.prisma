@@ -43,6 +43,8 @@ model User {
   image              String?
   password           String?
   createdAt          DateTime             @default(now())
+  /** Set when the user finishes or skips the first-time onboarding flow. */
+  onboardingCompletedAt DateTime?
   accounts           Account[]
   sessions           Session[]
   passwordResetTokens PasswordResetToken[]

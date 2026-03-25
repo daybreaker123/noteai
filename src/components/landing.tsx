@@ -468,7 +468,7 @@ export function Landing() {
                 initials: "DT",
                 name: "David T.",
                 role: "Grad student",
-                quote: "Semantic search is a game changer. I find connections between classes I didn't even know I had.",
+                quote: "Search across my notes and turn them into flashcards — I finally connect ideas between classes.",
               },
             ].map((t) => (
               <Card key={t.name} className="flex flex-col p-6">

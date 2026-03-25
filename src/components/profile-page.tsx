@@ -128,10 +128,6 @@ export function ProfilePage() {
       return;
     }
     const json = (await res.json()) as ProfilePayload;
-    console.log("[profile] /api/me/profile → plan.tier:", json.plan.tier, "planRawFromSupabase:", json.plan.planRawFromSupabase, {
-      plan: json.plan,
-      limits: json.limits,
-    });
     setData(json);
     setNameEdit(json.user.name?.trim() ?? "");
   }, [router]);
@@ -259,25 +255,25 @@ export function ProfilePage() {
         <div className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-purple-500/[0.07] blur-[100px]" />
       </div>
 
-      <div className="relative mx-auto max-w-2xl px-4 py-10">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative mx-auto max-w-3xl px-5 py-12 sm:px-8">
+        <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/notes"
-            className="inline-flex items-center gap-2 text-sm text-white/60 transition hover:text-white/90"
+            className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm text-white/55 transition duration-200 hover:bg-white/[0.05] hover:text-white/90"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Notes
+            Back to notes
           </Link>
           <StudaraWordmarkLink href="/" />
         </div>
 
-        <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-        <p className="mt-1 text-sm text-white/50">Manage your account and plan</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">Profile</h1>
+        <p className="mt-2 text-base text-white/45">Account, plan, and usage in one place</p>
 
-        <div className="mt-10 space-y-6">
+        <div className="mt-12 space-y-8">
           {/* Profile */}
-          <Card className="border-white/10 bg-black/30 p-6 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">Profile</h2>
+          <Card className="border-white/[0.08] bg-black/25 p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Profile</h2>
             <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start">
               <div className="flex shrink-0 justify-center sm:justify-start">
                 {user.image ? (
@@ -324,8 +320,8 @@ export function ProfilePage() {
           </Card>
 
           {/* Plan */}
-          <Card className="border-white/10 bg-black/30 p-6 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">Plan</h2>
+          <Card className="border-white/[0.08] bg-black/25 p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Plan &amp; billing</h2>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span className="text-lg font-medium text-white/90">Current plan</span>
               {plan.tier === "pro" ? (
@@ -381,8 +377,8 @@ export function ProfilePage() {
           </Card>
 
           {/* Usage */}
-          <Card className="border-white/10 bg-black/30 p-6 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">Usage</h2>
+          <Card className="border-white/[0.08] bg-black/25 p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Usage</h2>
             <p className="mt-1 text-xs text-white/45">
               {plan.tier === "pro"
                 ? `Activity this month (${usage.month}) · Pro includes unlimited AI usage`
@@ -427,8 +423,8 @@ export function ProfilePage() {
           </Card>
 
           {/* Account */}
-          <Card className="border-white/10 bg-black/30 p-6 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">Account</h2>
+          <Card className="border-white/[0.08] bg-black/25 p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Account actions</h2>
             <p className="mt-3 text-sm text-white/70">
               Member since{" "}
               <span className="font-medium text-white/90">{memberSince}</span>

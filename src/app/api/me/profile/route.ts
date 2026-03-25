@@ -34,8 +34,6 @@ export async function GET() {
   const session = await getServerSession(authOptions);
   const sessionUserId = session?.user?.id?.trim() ?? null;
 
-  console.log("[api/me/profile] session.user.id (cuid):", sessionUserId ?? "(null)");
-
   if (!sessionUserId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -45,7 +43,7 @@ export async function GET() {
     select: { id: true, name: true, email: true, image: true, createdAt: true },
   });
   if (!user) {
-    console.warn("[api/me/profile] Prisma user not found for session id:", sessionUserId);
+    console.warn("[api/me/profile] Prisma user not found for authenticated session");
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
@@ -74,14 +72,6 @@ export async function GET() {
       data,
       error: planError,
     } = await supabaseAdmin.from("user_plans").select("plan").eq("user_id", sessionUserId).single();
-
-    console.log("[api/me/profile] user_plans: .select('plan').eq('user_id', session.user.id).single()", {
-      sessionUserId,
-      data,
-      error: planError
-        ? { message: planError.message, code: planError.code, details: planError.details }
-        : null,
-    });
 
     if (planError && planError.code !== "PGRST116") {
       console.error("[api/me/profile] user_plans plan query failed:", planError.message);
@@ -121,11 +111,6 @@ export async function GET() {
   const planRaw =
     planValue != null && typeof planValue === "string" ? planValue.trim().toLowerCase() : "";
   const tier: "free" | "pro" = planRaw === "pro" ? "pro" : "free";
-
-  console.log("[api/me/profile] resolved tier:", {
-    planRawFromDb: planValue,
-    tier,
-  });
 
   return NextResponse.json({
     user: {

@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       },
     });
 
-    console.info(`${LOG} user created`, { id: user.id, email: user.email, dbHost: safeDbHost() });
+    console.info(`${LOG} user created`, { dbHost: safeDbHost() });
 
     if (user.email) {
       void sendWelcomeEmail(user.email, user.name);

@@ -39,21 +39,14 @@ async function upsertProWithSubscription(
   if (periodEndSec != null) {
     row.subscription_current_period_end = new Date(periodEndSec * 1000).toISOString();
   }
-  const { error, data } = await supabaseAdmin.from("user_plans").upsert(row, { onConflict: "user_id" }).select();
+  const { error } = await supabaseAdmin.from("user_plans").upsert(row, { onConflict: "user_id" }).select();
   if (error) {
     console.error(`${LOG} user_plans upsert PostgREST error`, {
       message: error.message,
       details: error.details,
       hint: error.hint,
       code: error.code,
-      userId,
       stripe_subscription_id: subscriptionId,
-    });
-  } else {
-    console.log(`${LOG} user_plans upsert ok`, {
-      userId,
-      stripe_subscription_id: subscriptionId,
-      returnedRows: Array.isArray(data) ? data.length : 0,
     });
   }
   return { error };
@@ -135,14 +128,6 @@ export async function POST(req: Request) {
         periodEndSec = getSubscriptionPeriodEndUnix(sub);
         cancelAtPeriodEnd = sub.cancel_at_period_end;
       }
-
-      console.log(`${LOG} checkout.session.completed`, {
-        sessionId: session.id,
-        userId,
-        subscriptionId,
-        hasSubscriptionId: Boolean(subscriptionId),
-        source: fromMeta ? "metadata.user_id" : "client_reference_id",
-      });
 
       const { error } = await upsertProWithSubscription(
         userId,

@@ -15,14 +15,20 @@ export function StudaraWordmarkLink({
   href,
   className,
   linkClassName,
+  onClick,
 }: {
   href: string;
   className?: string;
   /** Extra classes on the `Link` wrapper */
   linkClassName?: string;
+  onClick?: () => void;
 }) {
   return (
-    <Link href={href} className={cn("inline-flex shrink-0 bg-transparent p-0", linkClassName)}>
+    <Link
+      href={href}
+      onClick={onClick}
+      className={cn("inline-flex shrink-0 bg-transparent p-0", linkClassName)}
+    >
       <StudaraWordmark className={className} />
     </Link>
   );

@@ -25,7 +25,7 @@ export async function sendPasswordResetEmail(to: string, rawToken: string): Prom
       console.error(`${LOG} password reset send failed:`, error);
       return { ok: false, error: String(error.message ?? error) };
     }
-    console.info(`${LOG} password reset sent`, { to });
+    console.info(`${LOG} password reset sent`);
     return { ok: true };
   } catch (e) {
     console.error(`${LOG} password reset send exception:`, e);
@@ -50,7 +50,7 @@ export async function sendWelcomeEmail(to: string, name: string | null): Promise
     if (error) {
       console.error(`${LOG} welcome send failed:`, error);
     } else {
-      console.info(`${LOG} welcome sent`, { to });
+      console.info(`${LOG} welcome sent`);
     }
   } catch (e) {
     console.error(`${LOG} welcome send exception:`, e);
@@ -96,7 +96,7 @@ export async function sendProUpgradeEmail(opts: {
     if (error) {
       console.error(`${LOG} Pro upgrade send failed:`, error);
     } else {
-      console.info(`${LOG} Pro upgrade sent`, { to: opts.to });
+      console.info(`${LOG} Pro upgrade sent`);
     }
   } catch (e) {
     console.error(`${LOG} Pro upgrade send exception:`, e);

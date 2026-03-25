@@ -53,7 +53,7 @@ export function buildProUpgradeEmailHtml(opts: {
               </p>
               <ul style="margin:12px 0 0;padding:0 0 0 20px;color:rgba(255,255,255,0.78);font-size:15px;line-height:1.65;">
                 <li style="margin-bottom:6px;"><strong style="color:#fafafa;">Unlimited</strong> notes &amp; organization</li>
-                <li style="margin-bottom:6px;"><strong style="color:#fafafa;">Unlimited</strong> AI — summaries, improvements, semantic search</li>
+                <li style="margin-bottom:6px;"><strong style="color:#fafafa;">Unlimited</strong> AI — summaries and improvements</li>
                 <li style="margin-bottom:6px;">AI Tutor with unlimited messages &amp; higher image limits</li>
                 <li style="margin-bottom:6px;">Flashcards, quizzes, study sets &amp; multi-note study flows</li>
                 <li>Priority experience during heavy usage periods</li>

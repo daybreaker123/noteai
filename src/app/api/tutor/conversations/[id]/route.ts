@@ -44,6 +44,5 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: delErr.message }, { status: 500 });
   }
 
-  console.log("[tutor/conversations DELETE] ok", { conversationId, userIdPrefix: `${userId.slice(0, 8)}…` });
   return NextResponse.json({ ok: true });
 }

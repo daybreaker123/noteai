@@ -82,41 +82,12 @@ export const authOptions: NextAuthOptions = {
     },
   },
   callbacks: {
-    /**
-     * Runs after NextAuth looks up Account by (provider, providerAccountId), before the DB
-     * user/session handler. Logs providerAccountId + email + whether a linked user already exists.
-     */
-    async signIn({ user, account, profile }) {
+    async signIn({ account }) {
       if (account?.provider === "google") {
         if (!account.providerAccountId) {
           console.error(GOOGLE_OAUTH_LOG, "signIn: missing providerAccountId");
           return false;
         }
-        const emailFromProfile =
-          profile && typeof profile === "object" && "email" in profile
-            ? String((profile as { email?: string }).email ?? "")
-            : "";
-        const email =
-          emailFromProfile.trim().toLowerCase() ||
-          (typeof user.email === "string" ? user.email.trim().toLowerCase() : "");
-
-        const existing = await prisma.account.findUnique({
-          where: {
-            provider_providerAccountId: {
-              provider: "google",
-              providerAccountId: account.providerAccountId,
-            },
-          },
-          include: { user: { select: { id: true, email: true } } },
-        });
-
-        console.log(GOOGLE_OAUTH_LOG, "signIn callback", {
-          providerAccountId: account.providerAccountId,
-          email: email || null,
-          existingUserId: existing?.user?.id ?? null,
-          /** `user` is the DB user if getUserByAccount matched, else OAuth profile-shaped user */
-          signInPayloadUserId: "id" in user && typeof user.id === "string" ? user.id : null,
-        });
       }
       return true;
     },
@@ -134,20 +105,8 @@ export const authOptions: NextAuthOptions = {
       }
       return baseNorm;
     },
-    async jwt({ token, user, account, profile, trigger, isNewUser }) {
-      if (account?.provider === "google") {
-        console.log(GOOGLE_OAUTH_LOG, "jwt callback", {
-          trigger: trigger ?? null,
-          isNewUser: isNewUser ?? null,
-          providerAccountId: account.providerAccountId ?? null,
-          profileEmail:
-            profile && typeof profile === "object" && "email" in profile
-              ? String((profile as { email?: string }).email ?? "")
-              : null,
-          userObjectId: user?.id ?? null,
-          tokenSubBefore: token.sub ?? null,
-        });
-      }
+    async jwt({ token, user, account }) {
+      void account;
       if (user) token.id = user.id;
       return token;
     },

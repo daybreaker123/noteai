@@ -21,7 +21,6 @@ const PRO_FEATURES = [
   "Unlimited tutor image uploads",
   "Optional: use your notes as context in the AI Tutor",
   "AI auto-categorization",
-  "Semantic AI search",
   "PDF and Markdown export",
   "Study mode with flashcards and quizzes",
   "Priority support",

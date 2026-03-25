@@ -8,12 +8,11 @@ import {
   NOTE_IMPORT_MAX_CHARS,
   noteTitleFromImportFileName,
 } from "@/lib/note-import-utils";
+import { FREE_NOTE_TOTAL } from "@/lib/plan-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-const FREE_NOTE_LIMIT = 50;
 
 const PDF_MIME = "application/pdf";
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -76,7 +75,7 @@ export async function POST(req: Request) {
       .from("notes")
       .select("*", { count: "exact", head: true })
       .eq("user_id", session.user.id);
-    if ((count ?? 0) >= FREE_NOTE_LIMIT) {
+    if ((count ?? 0) >= FREE_NOTE_TOTAL) {
       return NextResponse.json(
         {
           error: "You've reached the free limit — upgrade to Pro for unlimited notes",

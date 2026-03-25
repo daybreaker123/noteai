@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { htmlToPlainText } from "@/lib/note-content-html";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -120,7 +121,8 @@ export async function POST(req: Request) {
 
   const parts = ordered.map((n) => {
     const title = (n.title ?? "Untitled").trim() || "Untitled";
-    const content = (n.content ?? "").trim() || "(empty)";
+    const raw = (n.content ?? "").trim() || "(empty)";
+    const content = raw === "(empty)" ? raw : htmlToPlainText(raw);
     return `## ${title}\n\n${content}`;
   });
   let combined = parts.join("\n\n---\n\n");

@@ -8,7 +8,6 @@ import { StudaraWordmark, StudaraWordmarkLink } from "@/components/studara-wordm
 import { cn } from "@/lib/cn";
 import { TutorImageLightbox } from "@/components/tutor-image-lightbox";
 import { TutorMarkdown } from "@/components/tutor-markdown";
-import { SignoutButton } from "@/components/signout-button";
 import {
   fileToImagePayloadFromFile,
   type StoredImageAttachment,
@@ -32,8 +31,8 @@ import {
   Send,
   Sparkles,
   Trash2,
-  UserCircle,
   X,
+  Menu,
 } from "lucide-react";
 
 const USE_MY_NOTES_STORAGE_KEY = "studara-tutor-use-my-notes";
@@ -128,6 +127,16 @@ export function TutorPage() {
   const lastMessagesLoadedForConversationRef = React.useRef<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = React.useState<string | null>(null);
   const [useMyNotes, setUseMyNotes] = React.useState(false);
+  const [mobileTutorSidebarOpen, setMobileTutorSidebarOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!mobileTutorSidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileTutorSidebarOpen]);
 
   React.useEffect(() => {
     try {
@@ -192,7 +201,6 @@ export function TutorPage() {
   }, []);
 
   const loadConversations = React.useCallback(async (opts?: { silent?: boolean }) => {
-    console.log("[tutor:conversations] fetch start", { silent: Boolean(opts?.silent) });
     if (!opts?.silent) {
       setLoadingList(true);
     }
@@ -216,10 +224,6 @@ export function TutorPage() {
         tutorImagesLimit?: number | null;
       };
       const list = json.conversations ?? [];
-      console.log("[tutor:conversations] fetch ok", {
-        count: list.length,
-        firstIds: list.slice(0, 3).map((c) => c.id),
-      });
       setConversations(sortConversationsByRecent(list));
       setTutorUsed(json.tutorMessagesUsed ?? 0);
       setTutorLimit(json.tutorMessagesLimit ?? null);
@@ -230,13 +234,11 @@ export function TutorPage() {
     } finally {
       if (!opts?.silent) {
         setLoadingList(false);
-        console.log("[tutor:conversations] loadingList -> false");
       }
     }
   }, []);
 
   const loadMessages = React.useCallback(async (conversationId: string, opts?: { silent?: boolean }) => {
-    console.log("[tutor:messages] fetch start", { conversationId, silent: Boolean(opts?.silent) });
     if (!opts?.silent) {
       setLoadingMessages(true);
     }
@@ -245,7 +247,6 @@ export function TutorPage() {
       if (!res.ok) {
         const body = await res.text().catch(() => "");
         console.warn("[tutor:messages] fetch failed", {
-          conversationId,
           status: res.status,
           bodyPreview: body.slice(0, 200),
         });
@@ -254,11 +255,10 @@ export function TutorPage() {
       }
       const json = (await res.json()) as { messages?: ChatMessage[] };
       const rows = (json.messages ?? []) as ChatMessage[];
-      console.log("[tutor:messages] fetch ok", { conversationId, messageCount: rows.length });
       setMessages(rows);
       lastMessagesLoadedForConversationRef.current = conversationId;
     } catch (e) {
-      console.warn("[tutor:messages] fetch threw", { conversationId, error: e });
+      console.warn("[tutor:messages] fetch threw", e);
       lastMessagesLoadedForConversationRef.current = null;
     } finally {
       if (!opts?.silent) {
@@ -300,6 +300,7 @@ export function TutorPage() {
     if (id === activeConversationId) return;
     lastMessagesLoadedForConversationRef.current = null;
     setActiveConversationId(id);
+    setMobileTutorSidebarOpen(false);
     void loadMessages(id);
   };
 
@@ -332,6 +333,7 @@ export function TutorPage() {
   };
 
   const newChat = () => {
+    setMobileTutorSidebarOpen(false);
     setActiveConversationId(null);
     lastMessagesLoadedForConversationRef.current = null;
     setMessages([]);
@@ -671,15 +673,27 @@ export function TutorPage() {
   }, []);
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-[#0a0a0f] text-white">
+    <div className="relative flex h-dvh max-w-[100vw] flex-col overflow-x-hidden overflow-y-hidden bg-[#0a0a0f] text-white">
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -top-32 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/12 via-blue-500/8 to-fuchsia-500/8 blur-3xl" />
       </div>
 
       <header className="relative z-10 shrink-0 border-b border-white/[0.08] bg-[#08080c]/92 backdrop-blur-xl backdrop-saturate-150">
-        <div className="mx-auto flex h-14 max-w-[2000px] items-center justify-between gap-3 px-4 sm:h-[3.25rem] sm:px-5">
-          <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
-            <StudaraWordmarkLink href="/notes" linkClassName="shrink-0 opacity-95 transition hover:opacity-100" />
+        <div className="mx-auto flex h-14 max-w-[2000px] items-center justify-between gap-3 px-3 sm:h-[3.25rem] sm:px-5">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              aria-label="Open conversations"
+              aria-expanded={mobileTutorSidebarOpen}
+              onClick={() => setMobileTutorSidebarOpen(true)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10 md:hidden touch-manipulation"
+            >
+              <Menu className="h-6 w-6" strokeWidth={2} aria-hidden />
+            </button>
+            <StudaraWordmarkLink
+              href="/notes"
+              linkClassName="shrink-0 touch-manipulation opacity-95 transition hover:opacity-100"
+            />
             <span className="hidden h-5 w-px shrink-0 bg-white/[0.1] sm:block" aria-hidden />
             <div className="flex min-w-0 items-center gap-2">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-gradient-to-br from-purple-500/35 to-blue-500/25 shadow-sm shadow-purple-900/20">
@@ -688,22 +702,6 @@ export function TutorPage() {
               <h1 className="truncate text-[0.9375rem] font-semibold tracking-tight text-white/95 sm:text-base">
                 AI Tutor
               </h1>
-              {useMyNotes ? (
-                <>
-                  <span
-                    className="flex h-2 w-2 shrink-0 rounded-full bg-purple-400 shadow-[0_0_10px_rgba(192,132,252,0.9)] sm:hidden"
-                    title="Notes context is on"
-                    aria-hidden
-                  />
-                  <span
-                    className="hidden items-center gap-1.5 rounded-full border border-purple-500/35 bg-gradient-to-r from-purple-500/20 to-blue-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-100/95 shadow-[0_0_14px_rgba(168,85,247,0.25)] sm:inline-flex"
-                    title="Your saved notes are sent as context with each message"
-                  >
-                    <FileStack className="h-3 w-3 opacity-90" aria-hidden />
-                    Notes on
-                  </span>
-                </>
-              ) : null}
             </div>
           </div>
           <p className="hidden shrink-0 items-center gap-1.5 text-right text-[11px] leading-tight text-white/38 sm:flex">
@@ -724,19 +722,35 @@ export function TutorPage() {
         </div>
       </header>
 
-      <div className="relative z-10 flex min-h-0 flex-1">
-        <aside className="flex w-[15.5rem] shrink-0 flex-col border-r border-white/[0.08] bg-black/25 backdrop-blur-xl md:w-64">
-          <div className="shrink-0 border-b border-white/[0.06] p-3">
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1">
+        <div
+          role="presentation"
+          aria-hidden={!mobileTutorSidebarOpen}
+          className={cn(
+            "fixed inset-0 z-[35] bg-black/55 backdrop-blur-sm transition-opacity duration-300 md:hidden",
+            mobileTutorSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
+          )}
+          onClick={() => setMobileTutorSidebarOpen(false)}
+        />
+        <aside
+          className={cn(
+            "flex w-[min(17rem,92vw)] shrink-0 flex-col border-r border-white/[0.06] bg-black/20 backdrop-blur-xl md:w-72",
+            "fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:relative md:z-10 md:translate-x-0",
+            mobileTutorSidebarOpen ? "translate-x-0 shadow-2xl shadow-black/40" : "-translate-x-full md:translate-x-0"
+          )}
+        >
+          <div className="shrink-0 px-4 pb-3 pt-5">
             <button
               type="button"
               onClick={newChat}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-900/20 transition hover:from-purple-500 hover:to-blue-500"
+              className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
             >
               <Plus className="h-4 w-4" strokeWidth={2.5} />
-              New Chat
+              New chat
             </button>
           </div>
-          <div className="tutor-sidebar-scrollbar min-h-0 flex-1 overflow-y-auto px-2 py-2">
+          <div className="mx-4 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+          <div className="tutor-sidebar-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-4">
             {loadingList ? (
               <div className="flex justify-center py-4 text-white/40">
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -744,17 +758,17 @@ export function TutorPage() {
             ) : conversations.length === 0 ? (
               <p className="px-2 text-xs text-white/40">No chats yet — start below.</p>
             ) : (
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {conversations.map((c) => (
-                  <li key={c.id} className="flex items-stretch gap-0.5 rounded-xl">
+                  <li key={c.id} className="flex items-stretch gap-1 rounded-xl">
                     <button
                       type="button"
                       onClick={() => selectConversation(c.id)}
                       className={cn(
-                        "min-w-0 flex-1 truncate rounded-xl border border-transparent px-3 py-2.5 text-left text-sm transition",
+                        "min-h-11 min-w-0 flex-1 touch-manipulation truncate rounded-xl border border-transparent px-3 py-2.5 text-left text-sm transition duration-200",
                         c.id === activeConversationId
                           ? "border-purple-500/35 bg-gradient-to-r from-purple-500/15 to-blue-500/10 text-white shadow-sm shadow-purple-900/10"
-                          : "text-white/65 hover:border-white/[0.06] hover:bg-white/[0.04] hover:text-white"
+                          : "text-white/65 hover:border-white/[0.06] hover:bg-white/[0.05] hover:text-white/92"
                       )}
                     >
                       {c.title || "Chat"}
@@ -768,7 +782,7 @@ export function TutorPage() {
                         setConversationToDelete({ id: c.id, title: c.title || "Chat" });
                       }}
                       className={cn(
-                        "shrink-0 rounded-xl p-2 text-white/30 transition hover:bg-red-500/12 hover:text-red-300/95",
+                        "flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-white/30 transition hover:bg-red-500/12 hover:text-red-300/95",
                         c.id === activeConversationId && "text-white/45"
                       )}
                     >
@@ -779,22 +793,15 @@ export function TutorPage() {
               </ul>
             )}
           </div>
-          <div className="shrink-0 border-t border-white/[0.06] p-2">
+          <div className="shrink-0 border-t border-white/[0.06] bg-black/15 p-4 backdrop-blur-sm">
             <Link
-              href="/dashboard"
-              className="mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/[0.05] hover:text-white"
+              href="/notes"
+              onClick={() => setMobileTutorSidebarOpen(false)}
+              className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-white/60 transition duration-200 hover:bg-white/[0.05] hover:text-white/90"
             >
-              <ArrowLeft className="h-4 w-4 shrink-0 opacity-70" />
-              Back to Notes
+              <ArrowLeft className="h-4 w-4 shrink-0 text-white/45" />
+              Back to notes
             </Link>
-            <Link
-              href="/profile"
-              className="mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/[0.05] hover:text-white"
-            >
-              <UserCircle className="h-4 w-4 shrink-0 opacity-70" />
-              Profile
-            </Link>
-            <SignoutButton />
           </div>
         </aside>
 
@@ -833,7 +840,10 @@ export function TutorPage() {
               </p>
             </div>
           ) : null}
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+          <div
+            ref={scrollRef}
+            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 sm:px-8 md:pb-8 max-md:pb-[calc(13rem+env(safe-area-inset-bottom))]"
+          >
             {loadingMessages && messages.length === 0 && !sending ? (
               <div className="flex h-full items-center justify-center text-white/40">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -968,7 +978,7 @@ export function TutorPage() {
               e.preventDefault();
               void sendMessage();
             }}
-            className="shrink-0 border-t border-white/[0.06] bg-[#08080c]/85 px-4 py-4 shadow-[0_-12px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl backdrop-saturate-150 sm:px-6 sm:py-5"
+            className="shrink-0 border-t border-white/[0.06] bg-[#08080c]/95 px-4 py-3 shadow-[0_-12px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl backdrop-saturate-150 sm:px-6 sm:py-5 md:static max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
             <div className="mx-auto max-w-3xl space-y-3">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -1047,7 +1057,7 @@ export function TutorPage() {
                   </button>
                 </div>
               ) : null}
-              <div className="flex items-end gap-2 sm:gap-3">
+              <div className="flex items-end gap-0 rounded-full border border-white/[0.1] bg-black/40 py-1.5 pl-2 pr-1.5 shadow-inner shadow-black/25 transition focus-within:border-purple-500/40 focus-within:ring-2 focus-within:ring-purple-500/20">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1065,7 +1075,7 @@ export function TutorPage() {
                       tutorImagesUsed >= tutorImagesLimit)
                   }
                   onClick={() => fileInputRef.current?.click()}
-                  className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.06] hover:text-white/55 disabled:opacity-35"
+                  className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-white/40 transition duration-200 hover:bg-white/[0.06] hover:text-white/70 disabled:opacity-35 sm:h-10 sm:w-10"
                   aria-label="Attach file"
                   title={
                     showFreeUsage &&
@@ -1088,15 +1098,15 @@ export function TutorPage() {
                       void sendMessage();
                     }
                   }}
-                  placeholder="Message… paste images or attach files"
-                  rows={2}
+                  placeholder="Ask anything…"
+                  rows={1}
                   disabled={sending || extractingDocument}
-                  className="min-h-[52px] flex-1 resize-none rounded-[1.75rem] border border-white/[0.1] bg-black/35 px-5 py-3.5 text-sm leading-relaxed text-white shadow-inner shadow-black/30 placeholder:text-white/32 transition focus:border-purple-500/55 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:shadow-[0_0_24px_rgba(168,85,247,0.14)] disabled:opacity-45"
+                  className="min-h-[44px] flex-1 resize-none border-0 bg-transparent py-2.5 pr-2 text-sm leading-relaxed text-white placeholder:text-white/35 outline-none ring-0 disabled:opacity-45"
                 />
                 <button
                   type="submit"
                   disabled={sending || extractingDocument || (!input.trim() && !pendingAttachment)}
-                  className="mb-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 text-white shadow-lg shadow-purple-900/35 transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-35"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 text-white shadow-lg shadow-purple-900/35 transition duration-200 hover:brightness-110 disabled:pointer-events-none disabled:opacity-35"
                   aria-label="Send message"
                 >
                   {sending ? (

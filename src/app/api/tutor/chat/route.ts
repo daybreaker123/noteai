@@ -214,13 +214,6 @@ export async function POST(req: Request) {
 
   if (!conversationId) {
     const conversationInsert = { user_id: userId, title: "New chat" };
-    console.log("[tutor/chat] tutor_conversations insert (new thread)", {
-      table: "tutor_conversations",
-      payload: conversationInsert,
-      nullFields: Object.fromEntries(
-        Object.entries(conversationInsert).filter(([, v]) => v === null || v === undefined)
-      ),
-    });
     const { data: created, error: createErr } = await supabaseAdmin
       .from("tutor_conversations")
       .insert(conversationInsert)
@@ -256,21 +249,6 @@ export async function POST(req: Request) {
     content: visibleContent,
     attachments: combinedAttachments ?? undefined,
   };
-
-  console.log("[tutor/chat] tutor_messages insert (user)", {
-    table: "tutor_messages",
-    payload: {
-      ...userMessagePayload,
-      content:
-        visibleContent.length > 0
-          ? `${visibleContent.slice(0, 200)}${visibleContent.length > 200 ? "…" : ""}`
-          : "[no visible text — attachment only]",
-      attachments: userMessagePayload.attachments ? "[present]" : undefined,
-    },
-    nullFields: Object.fromEntries(
-      Object.entries(userMessagePayload).filter(([, v]) => v === null || v === undefined)
-    ),
-  });
 
   const { error: userMsgErr } = await supabaseAdmin.from("tutor_messages").insert(userMessagePayload);
   if (userMsgErr) {
@@ -410,17 +388,6 @@ ${notesBody}`;
             role: "assistant" as const,
             content: fullAssistant,
           };
-          console.log("[tutor/chat] tutor_messages insert (assistant)", {
-            table: "tutor_messages",
-            payload: {
-              ...assistantPayload,
-              content: `${fullAssistant.slice(0, 200)}${fullAssistant.length > 200 ? "…" : ""}`,
-              contentLength: fullAssistant.length,
-            },
-            nullFields: Object.fromEntries(
-              Object.entries(assistantPayload).filter(([, v]) => v === null || v === undefined)
-            ),
-          });
           const { error: asstErr } = await supabaseAdmin.from("tutor_messages").insert(assistantPayload);
           if (asstErr) {
             console.error("tutor assistant save failed", asstErr);

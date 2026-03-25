@@ -63,7 +63,7 @@ export async function POST() {
       );
     }
 
-    console.info(`${LOG_PREFIX} cancel_at_period_end set for user ${sessionUserId}, sub ${subId}`);
+    console.info(`${LOG_PREFIX} cancel_at_period_end set for subscription`);
     return NextResponse.json({
       ok: true,
       subscriptionCurrentPeriodEnd: periodEnd,

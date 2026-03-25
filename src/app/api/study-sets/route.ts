@@ -116,7 +116,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("study_sets")
-    .select("id, title, kind, payload, created_at")
+    .select("id, title, kind, payload, created_at, note_id, note_ids")
     .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -125,13 +125,19 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const sets: StudySetSummary[] = (data ?? []).map((row) => ({
-    id: row.id,
-    title: row.title ?? "Study set",
-    kind: row.kind as StudySetKind,
-    created_at: row.created_at ?? new Date().toISOString(),
-    item_count: studySetItemCount(row.kind as StudySetKind, row.payload),
-  }));
+  const sets: StudySetSummary[] = (data ?? []).map((row) => {
+    const rawIds = row.note_ids;
+    const note_ids = Array.isArray(rawIds) ? rawIds.map((x) => String(x)) : undefined;
+    return {
+      id: row.id,
+      title: row.title ?? "Study set",
+      kind: row.kind as StudySetKind,
+      created_at: row.created_at ?? new Date().toISOString(),
+      item_count: studySetItemCount(row.kind as StudySetKind, row.payload),
+      note_id: row.note_id ?? null,
+      note_ids,
+    };
+  });
 
   return NextResponse.json({ sets });
 }

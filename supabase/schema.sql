@@ -1,9 +1,6 @@
 -- Studara Supabase schema
 -- Run this in your Supabase SQL editor
 
--- Enable pgvector for semantic search
-create extension if not exists vector;
-
 -- Categories (per user)
 create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
@@ -25,14 +22,14 @@ create table if not exists public.notes (
   content text not null default '',
   pinned boolean not null default false,
   tags text[] default '{}',
-  embedding vector(1536),
+  improved_at timestamptz,
+  summarized_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
 create index if not exists idx_notes_user_id on public.notes(user_id);
 create index if not exists idx_notes_category_id on public.notes(category_id);
-create index if not exists idx_notes_embedding on public.notes using ivfflat (embedding vector_cosine_ops) with (lists = 100);
 
 -- User plans (free | pro)
 create table if not exists public.user_plans (
@@ -132,32 +129,3 @@ drop trigger if exists tutor_messages_touch_conversation on public.tutor_message
 create trigger tutor_messages_touch_conversation
   after insert on public.tutor_messages
   for each row execute function public.touch_tutor_conversation_from_message();
-
--- Semantic search function (pgvector)
-create or replace function public.match_notes(
-  p_user_id text,
-  p_embedding vector(1536),
-  p_match_count int default 10
-)
-returns table (
-  id uuid,
-  title text,
-  content text,
-  category_id uuid,
-  similarity float
-) as $$
-begin
-  return query
-  select
-    n.id,
-    n.title,
-    n.content,
-    n.category_id,
-    1 - (n.embedding <=> p_embedding) as similarity
-  from public.notes n
-  where n.user_id = p_user_id
-    and n.embedding is not null
-  order by n.embedding <=> p_embedding
-  limit p_match_count;
-end;
-$$ language plpgsql;

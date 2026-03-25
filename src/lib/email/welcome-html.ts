@@ -37,7 +37,7 @@ export function buildWelcomeEmailHtml(opts: { name: string | null; dashboardUrl:
               </p>
               <ul style="margin:12px 0 0;padding:0 0 0 20px;color:rgba(255,255,255,0.78);font-size:15px;line-height:1.65;">
                 <li style="margin-bottom:6px;">Create and organize notes (up to <strong style="color:#fafafa;">50</strong> total)</li>
-                <li style="margin-bottom:6px;">AI summaries, improvements, semantic search &amp; study tools within monthly limits</li>
+                <li style="margin-bottom:6px;">AI summaries, improvements &amp; study tools within monthly limits</li>
                 <li style="margin-bottom:6px;">AI Tutor chat with generous free monthly messages</li>
                 <li>Flashcards, quizzes, and more — all in one place</li>
               </ul>

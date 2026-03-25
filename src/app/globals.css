@@ -74,3 +74,178 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
 .studara-study-modal-enter {
   animation: studara-study-modal-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Route / full-page content entrance (mobile-friendly slide + fade) */
+@keyframes studara-page-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.studara-page-transition {
+  animation: studara-page-in 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studara-page-transition {
+    animation: none;
+  }
+}
+
+/* Tiptap note editor (dark) */
+.studara-tiptap-root .studara-tiptap {
+  min-height: min(42dvh, 240px);
+}
+
+@media (min-width: 768px) {
+  .studara-tiptap-root .studara-tiptap {
+    min-height: 280px;
+  }
+}
+
+.studara-tiptap:focus {
+  outline: none;
+}
+
+.studara-tiptap p {
+  margin: 0.35em 0;
+}
+
+.studara-tiptap h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0.75em 0 0.35em;
+}
+
+.studara-tiptap h2 {
+  font-size: 1.35rem;
+  font-weight: 650;
+  line-height: 1.25;
+  margin: 0.65em 0 0.3em;
+}
+
+.studara-tiptap h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.55em 0 0.25em;
+}
+
+.studara-tiptap ul,
+.studara-tiptap ol {
+  margin: 0.35em 0;
+  padding-left: 1.35rem;
+}
+
+.studara-tiptap li {
+  margin: 0.2em 0;
+}
+
+.studara-tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.studara-tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.studara-tiptap ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.studara-tiptap blockquote {
+  margin: 0.5em 0;
+  padding-left: 1rem;
+  border-left: 3px solid rgba(167, 139, 250, 0.45);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.studara-tiptap hr {
+  margin: 1rem 0;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.studara-tiptap code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.86em;
+  padding: 0.12em 0.35em;
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(252, 211, 77, 0.95);
+}
+
+.studara-tiptap pre,
+.studara-tiptap pre.hljs,
+.studara-code-block {
+  margin: 0.65em 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  overflow-x: auto;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.studara-tiptap pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+.studara-tiptap .hljs-keyword,
+.studara-tiptap .hljs-selector-tag {
+  color: #c084fc;
+}
+
+.studara-tiptap .hljs-string,
+.studara-tiptap .hljs-attr {
+  color: #86efac;
+}
+
+.studara-tiptap .hljs-number,
+.studara-tiptap .hljs-literal {
+  color: #fcd34d;
+}
+
+.studara-tiptap .hljs-comment {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.studara-tiptap .hljs-function,
+.studara-tiptap .hljs-title {
+  color: #93c5fd;
+}
+
+.studara-tiptap table {
+  width: 100%;
+  margin: 0.65em 0;
+  border-collapse: collapse;
+}
+
+.studara-tiptap th,
+.studara-tiptap td {
+  min-width: 2.5rem;
+}
+
+.studara-tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
