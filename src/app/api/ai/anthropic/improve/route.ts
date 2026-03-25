@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { anthropicComplete, ANTHROPIC_MODEL_SONNET, hasAnthropicKey } from "@/lib/anthropic";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 const FREE_IMPROVE_LIMIT = 5;
 
@@ -103,7 +104,8 @@ Return only the improved notes, no preamble or commentary.`;
       }
     }
 
-    return NextResponse.json({ improved: text });
+    const streak = await recordStudyActivity(session.user.id);
+    return NextResponse.json({ improved: text, ...streakJson(streak) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Improvement failed" },

@@ -93,6 +93,47 @@ create table if not exists public.study_sets (
 create index if not exists idx_study_sets_user_note on public.study_sets(user_id, note_id);
 create index if not exists idx_study_sets_user_created on public.study_sets(user_id, created_at desc);
 
+-- SM-2 progress per card (saved flashcard sets only)
+create table if not exists public.flashcard_progress (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  study_set_id uuid not null references public.study_sets (id) on delete cascade,
+  card_index integer not null check (card_index >= 0),
+  ease_factor double precision not null default 2.5,
+  interval_days integer not null default 1,
+  repetitions integer not null default 0,
+  next_review_at timestamptz not null,
+  last_rating text not null check (last_rating in ('hard', 'good', 'easy')),
+  updated_at timestamptz not null default now(),
+  unique (user_id, study_set_id, card_index)
+);
+
+create index if not exists idx_flashcard_progress_user_next
+  on public.flashcard_progress (user_id, next_review_at);
+
+create index if not exists idx_flashcard_progress_study_set
+  on public.flashcard_progress (study_set_id);
+
+-- Study streak + weekly quiz completions (server-side writes)
+create table if not exists public.user_stats (
+  user_id text primary key,
+  current_streak integer not null default 0,
+  longest_streak integer not null default 0,
+  last_activity_date date,
+  celebrated_milestones jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.quiz_completions (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  study_set_id uuid references public.study_sets (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_quiz_completions_user_created
+  on public.quiz_completions (user_id, created_at desc);
+
 -- Updated_at trigger
 create or replace function public.set_updated_at()
 returns trigger as $$

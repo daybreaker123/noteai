@@ -20,6 +20,7 @@ import {
   type EssayFeedbackStructured,
 } from "@/lib/essay-feedback-types";
 import { ESSAY_TYPE_OPTIONS, GRADE_LEVEL_OPTIONS } from "@/lib/essay-feedback-options";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 export const runtime = "nodejs";
 
@@ -236,6 +237,7 @@ ${essay}`;
       .single();
     const usedAfter = after?.essay_feedback ?? 0;
 
+    const streak = await recordStudyActivity(userId);
     return NextResponse.json({
       feedback: responseFeedback,
       feedbackStructured: responseStructured,
@@ -246,6 +248,7 @@ ${essay}`;
       essayFeedbackLimit: plan === "pro" ? null : FREE_ESSAY_FEEDBACK_LIMIT,
       essayFeedbackRemaining:
         plan === "pro" ? null : Math.max(0, FREE_ESSAY_FEEDBACK_LIMIT - usedAfter),
+      ...streakJson(streak),
     });
   } catch (err) {
     return NextResponse.json(

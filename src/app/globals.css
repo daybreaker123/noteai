@@ -75,6 +75,40 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
   animation: studara-study-modal-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes studara-streak-milestone-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.studara-streak-milestone-enter {
+  animation: studara-streak-milestone-pop 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes studara-streak-confetti-fall {
+  from {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.85;
+  }
+  to {
+    transform: translateY(100px) rotate(200deg);
+    opacity: 0;
+  }
+}
+
+.studara-streak-confetti-bit {
+  animation: studara-streak-confetti-fall 1.4s ease-out forwards;
+}
+
 /* Route / full-page content entrance (mobile-friendly slide + fade) */
 @keyframes studara-page-in {
   from {
@@ -94,6 +128,11 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
 @media (prefers-reduced-motion: reduce) {
   .studara-page-transition {
     animation: none;
+  }
+
+  .studara-streak-milestone-enter,
+  .studara-streak-confetti-bit {
+    animation: none !important;
   }
 }
 

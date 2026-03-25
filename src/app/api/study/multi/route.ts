@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { anthropicComplete, ANTHROPIC_MODEL_SONNET, hasAnthropicKey } from "@/lib/anthropic";
 import { buildStudySetTitleFromNoteTitles } from "@/lib/study-set-utils";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 const MAX_COMBINED_CHARS = 24_000;
 const MAX_NOTE_IDS = 40;
@@ -164,7 +165,8 @@ export async function POST(req: Request) {
       if (plan !== "pro") {
         await incrementFreeStudyMultiple(session.user.id);
       }
-      return NextResponse.json({ cards });
+      const streak = await recordStudyActivity(session.user.id);
+      return NextResponse.json({ cards, ...streakJson(streak) });
     }
 
     const system = `You are a quiz assistant. The user provided multiple notes (separated by ---). Create 8 multiple choice questions that test understanding across ALL notes. Each question has 4 options and one correct answer (index 0-3). Include a one-sentence "explanation" for why the correct answer is right. Return JSON: {"questions":[{"question":"...","options":["a","b","c","d"],"correctIndex":0,"explanation":"..."}]}`;
@@ -188,7 +190,8 @@ export async function POST(req: Request) {
     if (plan !== "pro") {
       await incrementFreeStudyMultiple(session.user.id);
     }
-    return NextResponse.json({ questions });
+    const streak = await recordStudyActivity(session.user.id);
+    return NextResponse.json({ questions, ...streakJson(streak) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Generation failed" },

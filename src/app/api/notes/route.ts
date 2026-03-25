@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { FREE_NOTE_TOTAL } from "@/lib/plan-limits";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -78,5 +79,6 @@ export async function POST(req: Request) {
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  const streak = await recordStudyActivity(session.user.id);
+  return NextResponse.json({ ...data, ...streakJson(streak) });
 }

@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Category, Note, ApiError } from "./api-types";
+import type { StreakMilestone } from "./streak-client";
 import { FREE_NOTE_TOTAL } from "./plan-limits";
 
 const FREE_SUMMARY_LIMIT = 10;
 
 const SAVE_ERROR_MESSAGE = "Failed to save note — please check your connection.";
 
-export function useNotesRemote(userId: string | null) {
+export function useNotesRemote(
+  userId: string | null,
+  options?: { onStreakMilestone?: (m: StreakMilestone) => void }
+) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +24,16 @@ export function useNotesRemote(userId: string | null) {
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const saveErrorClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onStreakMilestoneRef = useRef(options?.onStreakMilestone);
+  onStreakMilestoneRef.current = options?.onStreakMilestone;
+
+  const emitStreakFromResponse = useCallback((json: unknown) => {
+    const o = json as { streak?: { milestone?: unknown } };
+    const m = o.streak?.milestone;
+    if (m === 7 || m === 30 || m === 100) {
+      onStreakMilestoneRef.current?.(m);
+    }
+  }, []);
 
   const showSaveError = useCallback(() => {
     setSaveErrorMessage(SAVE_ERROR_MESSAGE);
@@ -114,6 +128,7 @@ export function useNotesRemote(userId: string | null) {
       const json = (await res.json().catch(() => null)) as Note | ApiError;
       if (handleApiError(res, json as ApiError)) return null;
       if (!res.ok) return null;
+      emitStreakFromResponse(json);
       const note = json as Note;
       setNotes((prev) => [...prev, note]);
       return note;
@@ -145,6 +160,7 @@ export function useNotesRemote(userId: string | null) {
         return { ok: false, error: err };
       }
       const raw = json as Note & { truncated?: boolean };
+      emitStreakFromResponse(raw);
       const truncated = raw.truncated === true;
       const note: Note = {
         id: raw.id,

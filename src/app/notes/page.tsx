@@ -9,6 +9,7 @@ function NotesContent() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const openStudySet = searchParams.get("openStudySet");
+  const reviewDueSet = searchParams.get("reviewDueSet");
 
   if (status === "loading") {
     return (
@@ -22,7 +23,13 @@ function NotesContent() {
     return null;
   }
 
-  return <NoteApp userId={session.user.id} initialOpenStudySetId={openStudySet} />;
+  return (
+    <NoteApp
+      userId={session.user.id}
+      initialOpenStudySetId={openStudySet}
+      initialReviewDueSetId={reviewDueSet}
+    />
+  );
 }
 
 export default function NotesPage() {

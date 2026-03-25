@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { anthropicComplete, ANTHROPIC_MODEL_HAIKU, hasAnthropicKey } from "@/lib/anthropic";
 import { sanitizeGeneratedNoteTitle } from "@/lib/sanitize-note-title";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -28,7 +29,8 @@ export async function POST(req: Request) {
       usage: { userId: session.user.id },
     });
     const title = sanitizeGeneratedNoteTitle(text);
-    return NextResponse.json({ title });
+    const streak = await recordStudyActivity(session.user.id);
+    return NextResponse.json({ title, ...streakJson(streak) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Title generation failed" },

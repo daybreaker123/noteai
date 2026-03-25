@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { anthropicComplete, ANTHROPIC_MODEL_HAIKU, hasAnthropicKey } from "@/lib/anthropic";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 const FREE_SUMMARY_LIMIT = 10;
 
@@ -86,7 +87,8 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ summary: text });
+    const streak = await recordStudyActivity(session.user.id);
+    return NextResponse.json({ summary: text, ...streakJson(streak) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Summarization failed" },

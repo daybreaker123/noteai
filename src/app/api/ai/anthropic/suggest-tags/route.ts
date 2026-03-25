@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { anthropicComplete, ANTHROPIC_MODEL_HAIKU, hasAnthropicKey } from "@/lib/anthropic";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -31,7 +32,8 @@ export async function POST(req: Request) {
       .map((t) => t.trim().toLowerCase().replace(/[^a-z0-9-]/g, ""))
       .filter((t) => t.length > 0)
       .slice(0, 5);
-    return NextResponse.json({ tags });
+    const streak = await recordStudyActivity(session.user.id);
+    return NextResponse.json({ tags, ...streakJson(streak) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Tag suggestion failed" },

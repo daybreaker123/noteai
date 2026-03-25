@@ -23,6 +23,7 @@ import {
   type StoredDocumentContextAttachment,
   type StoredImageAttachment,
 } from "@/lib/tutor-anthropic-content";
+import { recordStudyActivity } from "@/lib/user-study-stats";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -436,6 +437,17 @@ ${notesBody}`;
                   )
                 );
               }
+            }
+            const streak = await recordStudyActivity(userId);
+            if (streak.milestone) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    streakMilestone: streak.milestone,
+                    streakCurrent: streak.current_streak,
+                  })}\n\n`
+                )
+              );
             }
           }
         }

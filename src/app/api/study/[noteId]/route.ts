@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { anthropicComplete, ANTHROPIC_MODEL_SONNET, hasAnthropicKey } from "@/lib/anthropic";
 import { rowMatchesSingleNoteCache } from "@/lib/study-set-utils";
 import { htmlToPlainText } from "@/lib/note-content-html";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 async function latestPayloadForSingleNoteCache(
   userId: string,
@@ -149,7 +150,8 @@ export async function POST(
         });
         if (insErr) console.error("[study] study_sets insert flashcards", insErr);
       }
-      return NextResponse.json({ cards });
+      const streak = await recordStudyActivity(session.user.id);
+      return NextResponse.json({ cards, ...streakJson(streak) });
     }
     const system = `You are a quiz assistant. Create 5 multiple choice questions from the note. Each question has 4 options and one correct answer (index 0-3). Include a one-sentence "explanation" for why the correct answer is right. Return JSON: {"questions":[{"question":"...","options":["a","b","c","d"],"correctIndex":0,"explanation":"..."}]}`;
     const text = await anthropicComplete(system, `Create a quiz from this note:\n\n${content}`, {
@@ -167,7 +169,8 @@ export async function POST(
       explanation: typeof q.explanation === "string" ? q.explanation.trim() : undefined,
     }));
     // Quizzes are not auto-persisted to study_sets — user saves explicitly from the results screen.
-    return NextResponse.json({ questions });
+    const streak = await recordStudyActivity(session.user.id);
+    return NextResponse.json({ questions, ...streakJson(streak) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Generation failed" },

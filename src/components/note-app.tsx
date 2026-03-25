@@ -26,6 +26,8 @@ import {
   type StudyProgressCompletion,
   type StudyProgressStepId,
 } from "@/lib/note-study-progress";
+import type { FlashcardRating } from "@/lib/sm2-spaced-repetition";
+import { parseStreakMilestoneFromJson, type StreakMilestone } from "@/lib/streak-client";
 import {
   Plus,
   Search,
@@ -50,7 +52,21 @@ import {
   LayoutGrid,
   FolderPlus,
   Menu,
+  Flame,
+  Layers,
 } from "lucide-react";
+
+type StudaraUserStats = {
+  current_streak: number;
+  longest_streak: number;
+  studied_today: boolean;
+  total_notes: number;
+  flashcard_sets_studied_this_week: number;
+  quizzes_this_week: number;
+  summarizations_this_month: number;
+  recent_study_set_id: string | null;
+  recent_study_set_title: string | null;
+};
 
 const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
   study: "Study Mode turns your notes into flashcards and quizzes. Generate practice questions and test your knowledge with AI.",
@@ -82,10 +98,16 @@ function userInitials(name: string | null | undefined, email: string | null | un
 export function NoteApp({
   userId,
   initialOpenStudySetId = null,
+  initialReviewDueSetId = null,
 }: {
   userId: string;
   initialOpenStudySetId?: string | null;
+  initialReviewDueSetId?: string | null;
 }) {
+  const [streakMilestone, setStreakMilestone] = React.useState<StreakMilestone | null>(null);
+  const [userStats, setUserStats] = React.useState<StudaraUserStats | null>(null);
+  const flashcardEphemeralStreakRef = React.useRef(false);
+
   const {
     categories,
     notes,
@@ -102,7 +124,45 @@ export function NoteApp({
     clearSaveErrorMessage,
     actions,
     FREE_NOTE_LIMIT,
-  } = useNotesRemote(userId);
+  } = useNotesRemote(userId, { onStreakMilestone: (m) => setStreakMilestone(m) });
+
+  const consumeStreakJson = React.useCallback((json: unknown) => {
+    const m = parseStreakMilestoneFromJson(json);
+    if (m) setStreakMilestone(m);
+  }, []);
+
+  const loadUserStats = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/user-stats");
+      if (!res.ok) return;
+      const data = (await res.json()) as StudaraUserStats;
+      setUserStats(data);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (userId && !loading) void loadUserStats();
+  }, [userId, loading, loadUserStats]);
+
+  const reportQuizSessionComplete = React.useCallback(
+    async (savedSetId: string | null) => {
+      try {
+        const res = await fetch("/api/user-stats/quiz-complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study_set_id: savedSetId }),
+        });
+        const j = await res.json().catch(() => null);
+        consumeStreakJson(j);
+        void loadUserStats();
+      } catch {
+        /* ignore */
+      }
+    },
+    [consumeStreakJson, loadUserStats]
+  );
 
   const router = useRouter();
   const { data: session } = useSession();
@@ -113,7 +173,7 @@ export function NoteApp({
   type StudyModalState =
     | { kind: "single"; noteId: string }
     | { kind: "multi"; noteIds: string[] }
-    | { kind: "saved"; setId: string; title: string };
+    | { kind: "saved"; setId: string; title: string; reviewDueOnly?: boolean };
   const [studyModal, setStudyModal] = React.useState<StudyModalState | null>(null);
   const [savedStudySets, setSavedStudySets] = React.useState<StudySetSummary[]>([]);
   const [gridSelectMode, setGridSelectMode] = React.useState(false);
@@ -129,6 +189,11 @@ export function NoteApp({
   const [quizSelected, setQuizSelected] = React.useState<number | null>(null);
   const [cardIndex, setCardIndex] = React.useState(0);
   const [cardFlipped, setCardFlipped] = React.useState(false);
+  const [flashcardOriginalIndices, setFlashcardOriginalIndices] = React.useState<number[]>([]);
+  const [flashcardReviewDueTotal, setFlashcardReviewDueTotal] = React.useState<number | null>(null);
+  const [flashcardSessionReviewed, setFlashcardSessionReviewed] = React.useState(0);
+  const [flashcardsSessionComplete, setFlashcardsSessionComplete] = React.useState(false);
+  const [flashcardRatingLoading, setFlashcardRatingLoading] = React.useState(false);
   const [exportMenu, setExportMenu] = React.useState<string | null>(null);
   const [studySetLoadError, setStudySetLoadError] = React.useState<string | null>(null);
   const [suggestBanner, setSuggestBanner] = React.useState<{ categoryId: string; name: string } | null>(null);
@@ -159,10 +224,35 @@ export function NoteApp({
   const [deleteNoteLoading, setDeleteNoteLoading] = React.useState(false);
   const [importDocLoading, setImportDocLoading] = React.useState(false);
   const [importDocError, setImportDocError] = React.useState<string | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
   const importDocumentInputRef = React.useRef<HTMLInputElement>(null);
   const sidebarSearchInputRef = React.useRef<HTMLInputElement>(null);
   const processedOpenStudyRef = React.useRef<string | null>(null);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
+  const processedReviewDueRef = React.useRef<string | null>(null);
+  const studyModalRef = React.useRef<StudyModalState | null>(null);
+  const flashcardsLenRef = React.useRef(0);
+  const cardIndexRef = React.useRef(0);
+  const flashcardOriginalIndicesRef = React.useRef<number[]>([]);
+  studyModalRef.current = studyModal;
+  flashcardsLenRef.current = flashcards.length;
+  cardIndexRef.current = cardIndex;
+  flashcardOriginalIndicesRef.current = flashcardOriginalIndices;
+
+  const primeFlashcardSession = React.useCallback(
+    (
+      cards: { front: string; back: string }[],
+      opts?: { originalIndices?: number[]; reviewDueTotal?: number | null }
+    ) => {
+      setFlashcards(cards);
+      setFlashcardOriginalIndices(opts?.originalIndices ?? cards.map((_, i) => i));
+      setFlashcardReviewDueTotal(opts?.reviewDueTotal ?? null);
+      setFlashcardSessionReviewed(0);
+      setFlashcardsSessionComplete(false);
+      setCardIndex(0);
+      setCardFlipped(false);
+    },
+    []
+  );
 
   React.useEffect(() => {
     if (!mobileSidebarOpen) return;
@@ -722,11 +812,10 @@ export function NoteApp({
         setStudyError(json.error ?? "Generation failed");
         return;
       }
+      consumeStreakJson(json);
       if (kind === "flashcards") {
-        setFlashcards(json.cards ?? []);
+        primeFlashcardSession(json.cards ?? []);
         setStudyMode("flashcards");
-        setCardIndex(0);
-        setCardFlipped(false);
       } else {
         setQuizQuestions(json.questions ?? []);
         setStudyMode("quiz");
@@ -764,10 +853,8 @@ export function NoteApp({
         return;
       }
       if (data.kind === "flashcards") {
-        setFlashcards(data.payload?.cards ?? []);
+        primeFlashcardSession(data.payload?.cards ?? []);
         setStudyMode("flashcards");
-        setCardIndex(0);
-        setCardFlipped(false);
       } else {
         setQuizQuestions(data.payload?.questions ?? []);
         setStudyMode("quiz");
@@ -783,6 +870,100 @@ export function NoteApp({
     }
   }
 
+  const loadDueReviewSet = React.useCallback(
+    async (setId: string) => {
+      setStudyError(null);
+      setStudySetLoadError(null);
+      setStudyLoading("flashcards");
+      try {
+        const res = await fetch(`/api/study-sets/${setId}/due`);
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+          title?: string;
+          cards?: { front: string; back: string }[];
+          original_indices?: number[];
+          due_total?: number;
+        } | null;
+        if (!res.ok) {
+          const msg = data && typeof data.error === "string" ? data.error : "Could not load due cards";
+          setStudySetLoadError(msg);
+          return;
+        }
+        const cards = data?.cards ?? [];
+        const orig = data?.original_indices ?? [];
+        if (cards.length === 0) {
+          setStudySetLoadError("No flashcards due for review today.");
+          return;
+        }
+        if (orig.length !== cards.length) {
+          setStudySetLoadError("Invalid due cards response");
+          return;
+        }
+        primeFlashcardSession(cards, { originalIndices: orig, reviewDueTotal: data?.due_total ?? cards.length });
+        setStudyMode("flashcards");
+        setStudyModal({ kind: "saved", setId, title: data?.title ?? "Study set", reviewDueOnly: true });
+      } catch {
+        setStudySetLoadError("Could not load due cards");
+      } finally {
+        setStudyLoading(null);
+      }
+    },
+    [primeFlashcardSession]
+  );
+
+  const handleFlashcardRate = React.useCallback(async (rating: FlashcardRating) => {
+    if (flashcardsSessionComplete || flashcardRatingLoading) return;
+    const m = studyModalRef.current;
+    const ci = cardIndexRef.current;
+    const indices = flashcardOriginalIndicesRef.current;
+    const originalIndex = indices[ci] ?? ci;
+    const len = flashcardsLenRef.current;
+
+    if (m?.kind === "saved") {
+      setFlashcardRatingLoading(true);
+      try {
+        const res = await fetch("/api/flashcard-progress/rate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            study_set_id: m.setId,
+            card_index: originalIndex,
+            rating,
+          }),
+        });
+        const j = (await res.json().catch(() => null)) as { error?: string } | null;
+        if (!res.ok) {
+          setStudyError(j?.error ?? "Could not save flashcard progress");
+        } else {
+          consumeStreakJson(j);
+          void loadUserStats();
+        }
+      } catch {
+        setStudyError("Could not save flashcard progress");
+      } finally {
+        setFlashcardRatingLoading(false);
+      }
+    } else if (m && !flashcardEphemeralStreakRef.current) {
+      flashcardEphemeralStreakRef.current = true;
+      try {
+        const res = await fetch("/api/user-stats/record-activity", { method: "POST" });
+        const j = await res.json().catch(() => null);
+        consumeStreakJson(j);
+        void loadUserStats();
+      } catch {
+        /* ignore */
+      }
+    }
+
+    setFlashcardSessionReviewed((r) => r + 1);
+    if (ci >= len - 1) {
+      setFlashcardsSessionComplete(true);
+    } else {
+      setCardIndex(ci + 1);
+      setCardFlipped(false);
+    }
+  }, [flashcardsSessionComplete, flashcardRatingLoading, consumeStreakJson, loadUserStats]);
+
   React.useEffect(() => {
     if (!initialOpenStudySetId || loading) return;
     if (showOnboarding !== false) return;
@@ -796,6 +977,20 @@ export function NoteApp({
   React.useEffect(() => {
     if (!initialOpenStudySetId) processedOpenStudyRef.current = null;
   }, [initialOpenStudySetId]);
+
+  React.useEffect(() => {
+    if (!initialReviewDueSetId || loading) return;
+    if (showOnboarding !== false) return;
+    if (processedReviewDueRef.current === initialReviewDueSetId) return;
+    processedReviewDueRef.current = initialReviewDueSetId;
+    void loadDueReviewSet(initialReviewDueSetId).finally(() => {
+      router.replace("/notes", { scroll: false });
+    });
+  }, [initialReviewDueSetId, loading, showOnboarding, router, loadDueReviewSet]);
+
+  React.useEffect(() => {
+    if (!initialReviewDueSetId) processedReviewDueRef.current = null;
+  }, [initialReviewDueSetId]);
 
   if (loading) {
     return (
@@ -1070,6 +1265,33 @@ export function NoteApp({
             You&apos;re a heavy user this month — you may experience slightly slower responses as we manage server load.
           </div>
         ) : null}
+        {!selectedNoteId &&
+        userStats &&
+        !userStats.studied_today &&
+        userStats.current_streak > 0 &&
+        userStats.recent_study_set_id ? (
+          <div
+            role="status"
+            className="flex shrink-0 flex-col gap-2 border-b border-violet-500/20 bg-violet-500/10 px-4 py-3 text-sm text-violet-100/95 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          >
+            <p className="min-w-0 leading-snug">
+              <span className="font-medium text-white">Keep your streak alive!</span>{" "}
+              You haven&apos;t studied today yet.
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                void loadAndOpenStudySet(
+                  userStats.recent_study_set_id!,
+                  userStats.recent_study_set_title ?? undefined
+                )
+              }
+              className="shrink-0 rounded-lg border border-violet-400/35 bg-violet-500/20 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-500/30"
+            >
+              Open {userStats.recent_study_set_title ? `“${userStats.recent_study_set_title.slice(0, 32)}${userStats.recent_study_set_title.length > 32 ? "…" : ""}”` : "latest set"}
+            </button>
+          </div>
+        ) : null}
         {studySetLoadError ? (
           <div
             role="alert"
@@ -1135,6 +1357,7 @@ export function NoteApp({
                   return;
                 }
                 if (json.improved) {
+                  consumeStreakJson(json);
                   const improvedHtml = normalizeImprovedNoteHtml(json.improved);
                   setEditContent(improvedHtml);
                   setEditorContentRevision((r) => r + 1);
@@ -1171,6 +1394,7 @@ export function NoteApp({
                 });
                 const json = (await res.json()) as { title?: string; error?: string };
                 if (json.title) {
+                  consumeStreakJson(json);
                   const title = sanitizeGeneratedNoteTitle(json.title);
                   setEditTitle(title);
                   if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
@@ -1201,6 +1425,7 @@ export function NoteApp({
                 });
                 const json = (await res.json()) as { tags?: string[]; error?: string };
                 if (json.tags?.length) {
+                  consumeStreakJson(json);
                   setSuggestTagsChips(json.tags);
                 } else if (json.error) {
                   setToolbarError(json.error);
@@ -1236,6 +1461,8 @@ export function NoteApp({
                   return;
                 }
                 if (json.summary) {
+                  consumeStreakJson(json);
+                  void loadUserStats();
                   setSummaryBelow(json.summary);
                   if (draftNote && selectedNote.id === draftNote.id) {
                     setDraftNote((d) => (d ? { ...d, summarized_at: new Date().toISOString() } : null));
@@ -1304,7 +1531,10 @@ export function NoteApp({
                   setUpgradeModal({ show: true, feature: "autoCategorize" });
                   return;
                 }
-                if (json.category) setSuggestBanner({ categoryId: json.category.id, name: json.category.name });
+                if (json.category) {
+                  consumeStreakJson(json);
+                  setSuggestBanner({ categoryId: json.category.id, name: json.category.name });
+                }
                 else if (json.error) setUpgradeModal({ show: true, message: json.error });
               } catch {
                 setUpgradeModal({ show: true, message: "Failed to suggest category" });
@@ -1403,6 +1633,52 @@ export function NoteApp({
                 </div>
               )}
             </div>
+            {userStats && !gridSelectMode ? (
+              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-orange-500/15 to-rose-500/10 p-4 ring-1 ring-orange-400/15">
+                  <div className="flex items-center gap-2 text-orange-200/90">
+                    <Flame className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Streak</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">{userStats.current_streak}</p>
+                  <p className="mt-0.5 text-xs text-white/45">day{userStats.current_streak === 1 ? "" : "s"} in a row</p>
+                </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                  <div className="flex items-center gap-2 text-violet-200/85">
+                    <FileText className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Notes</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">{userStats.total_notes}</p>
+                  <p className="mt-0.5 text-xs text-white/45">total created</p>
+                </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                  <div className="flex items-center gap-2 text-cyan-200/85">
+                    <Layers className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Flashcards</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">
+                    {userStats.flashcard_sets_studied_this_week}
+                  </p>
+                  <p className="mt-0.5 text-xs text-white/45">sets studied this week</p>
+                </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                  <div className="flex items-center gap-2 text-emerald-200/85">
+                    <HelpCircle className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Quizzes</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">{userStats.quizzes_this_week}</p>
+                  <p className="mt-0.5 text-xs text-white/45">completed this week</p>
+                </div>
+                <div className="col-span-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 sm:col-span-1">
+                  <div className="flex items-center gap-2 text-amber-200/85">
+                    <Sparkles className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Summaries</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">{userStats.summarizations_this_month}</p>
+                  <p className="mt-0.5 text-xs text-white/45">AI summarizations this month</p>
+                </div>
+              </div>
+            ) : null}
             {multiStudyError && (
               <p className="mb-3 text-sm text-red-400">{multiStudyError}</p>
             )}
@@ -1482,6 +1758,8 @@ export function NoteApp({
                         return;
                       }
                       if (json.summary) {
+                        consumeStreakJson(json);
+                        void loadUserStats();
                         setSummaryCache((c) => ({ ...c, [note.id]: json.summary! }));
                         void actions.update(note.id, { record_summarization: true });
                       }
@@ -1540,6 +1818,7 @@ export function NoteApp({
             studyModal.kind === "saved" ? "saved" : studyModal.kind === "multi" ? "multi" : "single"
           }
           savedSetTitle={studyModal.kind === "saved" ? studyModal.title : undefined}
+          reviewDueOnly={studyModal.kind === "saved" && !!studyModal.reviewDueOnly}
           mode={studyMode}
           flashcards={flashcards}
           quizQuestions={quizQuestions}
@@ -1551,9 +1830,15 @@ export function NoteApp({
           loading={studyLoading}
           error={studyError}
           onClose={() => {
+            flashcardEphemeralStreakRef.current = false;
             setStudyModal(null);
             setStudyMode("menu");
             setFlashcards([]);
+            setFlashcardOriginalIndices([]);
+            setFlashcardReviewDueTotal(null);
+            setFlashcardSessionReviewed(0);
+            setFlashcardsSessionComplete(false);
+            setFlashcardRatingLoading(false);
             setQuizQuestions([]);
             setCardIndex(0);
             setCardFlipped(false);
@@ -1563,7 +1848,10 @@ export function NoteApp({
             setStudyLoading(null);
             setStudySaveLoading(null);
             setStudyError(null);
+            void loadUserStats();
           }}
+          savedStudySetId={studyModal.kind === "saved" ? studyModal.setId : null}
+          onQuizSessionComplete={(id) => void reportQuizSessionComplete(id)}
           canPersistStudy={studyModal.kind !== "saved"}
           studySaveLoading={studySaveLoading}
           onSaveFlashcards={saveFlashcardSetToSupabase}
@@ -1588,7 +1876,7 @@ export function NoteApp({
               const payload = json?.flashcards;
               const cards = (payload && typeof payload === "object" && "cards" in payload ? payload.cards : null) ?? null;
               if (cards?.length) {
-                setFlashcards(cards);
+                primeFlashcardSession(cards);
                 setStudyMode("flashcards");
               } else {
                 const body: { kind: "flashcards"; content?: string; title?: string } = { kind: "flashcards" };
@@ -1607,7 +1895,8 @@ export function NoteApp({
                   return;
                 }
                 if (j.error) setStudyError(j.error);
-                setFlashcards(j.cards ?? []);
+                consumeStreakJson(j);
+                primeFlashcardSession(j.cards ?? []);
                 setStudyMode("flashcards");
                 void refreshStudySets();
               }
@@ -1655,6 +1944,7 @@ export function NoteApp({
                   return;
                 }
                 if (j.error) setStudyError(j.error);
+                consumeStreakJson(j);
                 setQuizQuestions(j.questions ?? []);
                 setStudyMode("quiz");
                 void refreshStudySets();
@@ -1665,6 +1955,11 @@ export function NoteApp({
               setStudyLoading(null);
             }
           }}
+          flashcardReviewDueTotal={flashcardReviewDueTotal}
+          flashcardSessionReviewed={flashcardSessionReviewed}
+          flashcardsSessionComplete={flashcardsSessionComplete}
+          flashcardRatingLoading={flashcardRatingLoading}
+          onFlashcardRate={(r) => void handleFlashcardRate(r)}
           onCardPrev={() => {
             setCardIndex((i) => Math.max(0, i - 1));
             setCardFlipped(false);
@@ -1697,6 +1992,10 @@ export function NoteApp({
           }}
         />
       )}
+
+      {streakMilestone ? (
+        <StreakMilestoneModal milestone={streakMilestone} onClose={() => setStreakMilestone(null)} />
+      ) : null}
 
       {/* Upgrade modal */}
       {upgradeModal.show && (
@@ -2425,6 +2724,64 @@ function CategoryTab({
   );
 }
 
+function StreakMilestoneModal({
+  milestone,
+  onClose,
+}: {
+  milestone: StreakMilestone;
+  onClose: () => void;
+}) {
+  const copy: Record<StreakMilestone, { title: string; subtitle: string }> = {
+    7: { title: "One week strong", subtitle: "7-day study streak" },
+    30: { title: "Building mastery", subtitle: "30-day study streak" },
+    100: { title: "Legendary focus", subtitle: "100-day study streak" },
+  };
+  const { title, subtitle } = copy[milestone];
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+      role="dialog"
+      aria-modal
+      aria-labelledby="streak-milestone-title"
+    >
+      <Card className="studara-streak-milestone-enter relative w-full max-w-sm overflow-hidden border border-violet-400/25 bg-[#0c0c12]/95 p-8 text-center shadow-2xl shadow-violet-900/20">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          {[...Array(12)].map((_, i) => (
+            <span
+              key={i}
+              className="studara-streak-confetti-bit absolute h-2 w-2 rounded-full opacity-70"
+              style={{
+                left: `${8 + (i * 7) % 84}%`,
+                top: `${12 + ((i * 13) % 40)}%`,
+                background: i % 3 === 0 ? "rgb(167, 139, 250)" : i % 3 === 1 ? "rgb(34, 211, 238)" : "rgb(251, 191, 36)",
+                animationDelay: `${i * 0.06}s`,
+              }}
+            />
+          ))}
+        </div>
+        <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/40 via-orange-500/35 to-rose-500/30 ring-2 ring-amber-300/30">
+          <Flame className="h-11 w-11 text-amber-100" strokeWidth={1.5} aria-hidden />
+        </div>
+        <p className="relative mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-violet-300/90">Milestone</p>
+        <h2 id="streak-milestone-title" className="relative mt-2 text-2xl font-bold text-white">
+          {title}
+        </h2>
+        <p className="relative mt-1 text-sm text-white/60">{subtitle}</p>
+        <p className="relative mt-4 text-5xl font-black tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-orange-200 to-rose-200">
+          {milestone}
+        </p>
+        <Button
+          type="button"
+          className="relative mt-8 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white"
+          onClick={onClose}
+        >
+          Keep going
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
 function quizEncouragementMessage(score: number, total: number): string {
   if (total <= 0) return "Thanks for completing the quiz!";
   const pct = (score / total) * 100;
@@ -2438,6 +2795,7 @@ function quizEncouragementMessage(score: number, total: number): string {
 function StudyModal({
   studyScope = "single",
   savedSetTitle,
+  reviewDueOnly = false,
   mode,
   flashcards,
   quizQuestions,
@@ -2455,6 +2813,11 @@ function StudyModal({
   onCardPrev,
   onCardNext,
   onCardFlip,
+  flashcardReviewDueTotal,
+  flashcardSessionReviewed,
+  flashcardsSessionComplete,
+  flashcardRatingLoading,
+  onFlashcardRate,
   onQuizSelect,
   onQuizNext,
   onQuizTryAgain,
@@ -2462,9 +2825,14 @@ function StudyModal({
   studySaveLoading,
   onSaveFlashcards,
   onSaveQuiz,
+  savedStudySetId = null,
+  onQuizSessionComplete,
 }: {
   studyScope?: "single" | "multi" | "saved";
   savedSetTitle?: string;
+  reviewDueOnly?: boolean;
+  savedStudySetId?: string | null;
+  onQuizSessionComplete?: (savedSetId: string | null) => void;
   mode: string;
   flashcards: { front: string; back: string }[];
   quizQuestions: { question: string; options: string[]; correctIndex: number; explanation?: string }[];
@@ -2482,6 +2850,11 @@ function StudyModal({
   onCardPrev: () => void;
   onCardNext: () => void;
   onCardFlip: () => void;
+  flashcardReviewDueTotal: number | null;
+  flashcardSessionReviewed: number;
+  flashcardsSessionComplete: boolean;
+  flashcardRatingLoading: boolean;
+  onFlashcardRate: (rating: FlashcardRating) => void;
   onQuizSelect: (i: number) => void;
   onQuizNext: () => void;
   onQuizTryAgain: () => void;
@@ -2494,6 +2867,15 @@ function StudyModal({
   const total = quizQuestions.length;
   const done = quizIndex >= total - 1 && quizSelected !== null;
   const finalScore = quizScore ?? 0;
+
+  const quizWasDoneRef = React.useRef(false);
+  React.useEffect(() => {
+    const isDone = mode === "quiz" && done;
+    if (isDone && !quizWasDoneRef.current) {
+      onQuizSessionComplete?.(savedStudySetId ?? null);
+    }
+    quizWasDoneRef.current = isDone;
+  }, [mode, done, savedStudySetId, onQuizSessionComplete]);
 
   if (mode === "menu") {
     return (
@@ -2574,8 +2956,32 @@ function StudyModal({
   }
 
   if (mode === "flashcards" && flashcards.length > 0) {
-    const card = flashcards[cardIndex];
     const totalCards = flashcards.length;
+
+    if (flashcardsSessionComplete) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-md sm:items-center sm:p-4">
+          <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-white/10 bg-[#0c0c12]/95 p-6 shadow-2xl backdrop-blur-sm sm:rounded-2xl sm:border max-sm:flex-1">
+            <div className="flex flex-1 flex-col items-center justify-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/35 to-violet-500/25 ring-1 ring-white/10">
+                <SquareStack className="h-8 w-8 text-emerald-200" strokeWidth={1.5} />
+              </div>
+              <h3 className="mt-5 text-xl font-semibold text-white">Session complete</h3>
+              <p className="mt-2 max-w-xs text-sm text-white/55">
+                {reviewDueOnly
+                  ? `You reviewed all ${totalCards} due card${totalCards === 1 ? "" : "s"}. Great work — spaced repetition will surface them again when it’s time.`
+                  : "Nice work. Keep rating cards when you flip them to build your personal review schedule."}
+              </p>
+              <Button type="button" className="mt-8 w-full max-w-xs border-0 bg-gradient-to-r from-violet-600 to-indigo-600" onClick={onClose}>
+                Done
+              </Button>
+            </div>
+          </Card>
+        </div>
+      );
+    }
+
+    const card = flashcards[cardIndex];
     return (
       <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-md sm:items-center sm:p-4">
         <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-white/10 bg-[#0c0c12]/95 shadow-2xl backdrop-blur-sm sm:max-h-[min(90dvh,880px)] sm:rounded-2xl sm:border sm:p-6 max-sm:flex-1">
@@ -2587,6 +2993,9 @@ function StudyModal({
               )}
               {studyScope === "saved" && savedSetTitle && (
                 <p className="mt-1 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
+              )}
+              {reviewDueOnly && (
+                <p className="mt-1 text-xs font-medium text-amber-200/90">Due for review today</p>
               )}
             </div>
             <button
@@ -2604,6 +3013,25 @@ function StudyModal({
               {error}
             </p>
           )}
+
+          {flashcardReviewDueTotal != null && flashcardReviewDueTotal > 0 ? (
+            <div className="mt-3 px-4 sm:px-0">
+              <div className="mb-1 flex justify-between text-xs text-white/50">
+                <span>Due today</span>
+                <span className="tabular-nums">
+                  {flashcardSessionReviewed} / {flashcardReviewDueTotal} reviewed
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-emerald-400 transition-[width] duration-300"
+                  style={{
+                    width: `${Math.min(100, (flashcardSessionReviewed / flashcardReviewDueTotal) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
 
           <p className="mt-3 px-4 text-center text-sm text-white/45 sm:px-0">Tap the card to flip</p>
 
@@ -2657,6 +3085,38 @@ function StudyModal({
           <p className="mt-4 px-4 text-center text-base font-medium tabular-nums text-white/55 sm:px-0 sm:text-sm">
             {cardIndex + 1} of {totalCards}
           </p>
+
+          {cardFlipped ? (
+            <div className="mt-4 space-y-2 px-4 sm:px-0">
+              <p className="text-center text-xs text-white/45">How well did you recall this?</p>
+              <div className="flex gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  disabled={flashcardRatingLoading}
+                  onClick={() => onFlashcardRate("hard")}
+                  className="min-h-12 flex-1 rounded-xl border border-red-500/40 bg-red-500/15 px-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/25 disabled:opacity-50 touch-manipulation"
+                >
+                  Hard
+                </button>
+                <button
+                  type="button"
+                  disabled={flashcardRatingLoading}
+                  onClick={() => onFlashcardRate("good")}
+                  className="min-h-12 flex-1 rounded-xl border border-amber-500/45 bg-amber-500/15 px-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-50 touch-manipulation"
+                >
+                  Good
+                </button>
+                <button
+                  type="button"
+                  disabled={flashcardRatingLoading}
+                  onClick={() => onFlashcardRate("easy")}
+                  className="min-h-12 flex-1 rounded-xl border border-emerald-500/45 bg-emerald-500/15 px-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/25 disabled:opacity-50 touch-manipulation"
+                >
+                  Easy
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {canPersistStudy && (
             <Button

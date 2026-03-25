@@ -9,6 +9,7 @@ import {
   noteTitleFromImportFileName,
 } from "@/lib/note-import-utils";
 import { FREE_NOTE_TOTAL } from "@/lib/plan-limits";
+import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,5 +140,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Couldn't save your note. Please try again." }, { status: 500 });
   }
 
-  return NextResponse.json({ ...data, truncated });
+  const streak = await recordStudyActivity(session.user.id);
+  return NextResponse.json({ ...data, truncated, ...streakJson(streak) });
 }

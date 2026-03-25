@@ -9,6 +9,7 @@ import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { Button, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Note, StudySetSummary } from "@/lib/api-types";
+import type { FlashcardDueSummaryItem } from "@/lib/flashcard-progress-types";
 
 export function StudySetsPage() {
   const { status } = useSession();
@@ -18,13 +19,15 @@ export function StudySetsPage() {
   const [loading, setLoading] = React.useState(true);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [dueItems, setDueItems] = React.useState<FlashcardDueSummaryItem[]>([]);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [setsRes, notesRes] = await Promise.all([
+      const [setsRes, notesRes, dueRes] = await Promise.all([
         fetch("/api/study-sets", { credentials: "include" }),
         fetch("/api/notes", { credentials: "include" }),
+        fetch("/api/flashcard-progress/due-summary", { credentials: "include" }),
       ]);
       if (setsRes.ok) {
         const j = (await setsRes.json()) as { sets?: StudySetSummary[] };
@@ -37,6 +40,12 @@ export function StudySetsPage() {
         setNotes(Array.isArray(n) ? n : []);
       } else {
         setNotes([]);
+      }
+      if (dueRes.ok) {
+        const d = (await dueRes.json()) as { items?: FlashcardDueSummaryItem[] };
+        setDueItems(Array.isArray(d.items) ? d.items : []);
+      } else {
+        setDueItems([]);
       }
     } finally {
       setLoading(false);
@@ -139,7 +148,43 @@ export function StudySetsPage() {
           <div className="flex justify-center py-24">
             <Loader2 className="h-9 w-9 animate-spin text-white/35" />
           </div>
-        ) : sets.length === 0 ? (
+        ) : (
+          <>
+            {dueItems.length > 0 ? (
+              <section className="mb-10 rounded-2xl border border-amber-500/25 bg-amber-500/[0.07] p-5 sm:p-6">
+                <h2 className="text-lg font-semibold text-white">Due for review</h2>
+                <p className="mt-1 text-sm text-white/50">
+                  Flashcards scheduled for today (SM-2 spaced repetition). Review only what&apos;s due — not the full set.
+                </p>
+                <ul className="mt-4 space-y-3">
+                  {dueItems.map((d) => (
+                    <li
+                      key={d.id}
+                      className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-white">{d.title}</p>
+                        <p className="mt-0.5 text-xs text-white/45">
+                          {d.due_count} of {d.total_cards} card{d.due_count === 1 ? "" : "s"} due today
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full shrink-0 border-0 bg-gradient-to-r from-amber-600/90 to-orange-600/90 text-white hover:from-amber-500 hover:to-orange-500 sm:w-auto"
+                        onClick={() =>
+                          router.push(`/notes?reviewDueSet=${encodeURIComponent(d.id)}`)
+                        }
+                      >
+                        Review due cards
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {sets.length === 0 ? (
           <div className="mx-auto flex max-w-md flex-col items-center rounded-2xl border border-white/[0.06] bg-white/[0.03] px-8 py-16 text-center backdrop-blur-sm">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/15 to-blue-500/10">
               <Bookmark className="h-8 w-8 text-white/35" />
@@ -155,7 +200,7 @@ export function StudySetsPage() {
               Back to notes
             </Link>
           </div>
-        ) : (
+            ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {sets.map((s) => (
               <div
@@ -216,6 +261,8 @@ export function StudySetsPage() {
               </div>
             ))}
           </div>
+            )}
+          </>
         )}
       </main>
     </div>
