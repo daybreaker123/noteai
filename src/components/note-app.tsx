@@ -1719,6 +1719,7 @@ export function NoteApp({
               <div className="grid flex-1 grid-cols-1 content-start gap-4 overflow-y-auto overflow-x-hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredNotes.map((note) => (
                   <NoteCard
+                    key={note.id}
                     note={note}
                     categories={categories}
                     plan={plan}
