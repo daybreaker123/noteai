@@ -130,29 +130,64 @@ export function VoiceToNotesControl({
       };
 
       let res: Response;
+      let voiceUploadPath: "blob_token" | "formdata_fallback" = "formdata_fallback";
       try {
         const pathname = safeVoicePathname(filename);
+        console.log("[voice-to-notes] PATH attempt: BLOB_TOKEN", {
+          pathname,
+          ...meta,
+        });
+
         const tokenRes = await fetch("/api/notes/voice-blob-token", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ pathname }),
         });
+
+        const tokenRawBody = await tokenRes.text();
+        let tokenJson: { token?: string; error?: string; code?: string } = {};
+        try {
+          tokenJson = tokenRawBody ? (JSON.parse(tokenRawBody) as typeof tokenJson) : {};
+        } catch {
+          console.error("[voice-to-notes] /api/notes/voice-blob-token non-JSON body", {
+            status: tokenRes.status,
+            ok: tokenRes.ok,
+            bodyPreview: tokenRawBody.slice(0, 2000),
+          });
+        }
+
         if (!tokenRes.ok) {
-          const errJson = (await tokenRes.json().catch(() => ({}))) as { error?: string; code?: string };
-          if (errJson.code === "PRO_FEATURE_VOICE_TRANSCRIPTION" && tokenRes.status === 402) {
+          console.error("[voice-to-notes] /api/notes/voice-blob-token failed", {
+            status: tokenRes.status,
+            statusText: tokenRes.statusText,
+            body: tokenRawBody.slice(0, 4000),
+            parsed: tokenJson,
+          });
+          if (tokenJson.code === "PRO_FEATURE_VOICE_TRANSCRIPTION" && tokenRes.status === 402) {
+            console.log("[voice-to-notes] PATH aborted: Pro required (402 from voice-blob-token)");
             onRequirePro();
             return;
           }
-          throw new Error(errJson.error ?? `Blob token failed (${tokenRes.status})`);
+          throw new Error(tokenJson.error ?? `Blob token failed (${tokenRes.status})`);
         }
-        const { token } = (await tokenRes.json()) as { token?: string };
+
+        const token = tokenJson.token;
         if (!token) {
+          console.error("[voice-to-notes] /api/notes/voice-blob-token OK but missing token", {
+            status: tokenRes.status,
+            body: tokenRawBody.slice(0, 2000),
+            parsed: tokenJson,
+          });
           throw new Error("Missing upload token");
         }
 
+        console.log("[voice-to-notes] /api/notes/voice-blob-token OK, calling put()", {
+          pathname,
+          multipart: file.size >= 5 * 1024 * 1024,
+        });
+
         const { put } = await import("@vercel/blob/client");
-        console.log("[voice-to-notes] Vercel Blob put() → transcription (JSON)", meta);
         const uploaded = await put(pathname, file, {
           access: "public",
           token,
@@ -162,6 +197,9 @@ export function VoiceToNotesControl({
               ? file.type
               : undefined,
         });
+
+        console.log("[voice-to-notes] put() succeeded", { url: uploaded.url });
+
         res = await fetch("/api/notes/voice-transcription", {
           method: "POST",
           credentials: "include",
@@ -178,20 +216,32 @@ export function VoiceToNotesControl({
             skip_persist: draftVoiceAppend,
           }),
         });
+        voiceUploadPath = "blob_token";
+        console.log("[voice-to-notes] PATH used: BLOB_TOKEN → JSON transcription request sent");
       } catch (blobErr) {
-        console.warn("[voice-to-notes] blob upload failed; falling back to direct FormData", blobErr);
+        voiceUploadPath = "formdata_fallback";
+        console.warn("[voice-to-notes] PATH used: FORMDATA_FALLBACK (blob token or put() failed)", {
+          error: blobErr instanceof Error ? blobErr.message : String(blobErr),
+          stack: blobErr instanceof Error ? blobErr.stack : undefined,
+        });
         const fd = new FormData();
         fd.append("audio", file, filename);
         if (categoryId) fd.append("category_id", categoryId);
         if (appendNoteId) fd.append("append_note_id", appendNoteId);
         if (draftVoiceAppend) fd.append("skip_persist", "true");
-        console.log("[voice-to-notes] POST /api/notes/voice-transcription (FormData fallback)", meta);
         res = await fetch("/api/notes/voice-transcription", {
           method: "POST",
           credentials: "include",
           body: fd,
         });
+        console.log("[voice-to-notes] FORMDATA_FALLBACK: POST /api/notes/voice-transcription", meta);
       }
+
+      console.log("[voice-to-notes] transcription fetch complete", {
+        path: voiceUploadPath,
+        status: res.status,
+        ok: res.ok,
+      });
 
       const rawBody = await res.text();
       console.log("[voice-to-notes] voice-transcription response", {
