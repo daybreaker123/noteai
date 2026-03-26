@@ -36,7 +36,6 @@ import {
 import { NoteTemplatePickerModal } from "@/components/note-template-picker-modal";
 import { VoiceToNotesControl } from "@/components/voice-to-notes-control";
 import { ShareResourceModal } from "@/components/share-resource-modal";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { noteTemplateDefaultTitle, noteTemplateHtml, type NoteTemplateId } from "@/lib/note-templates";
 import {
   fetchGoogleDocsClientConfig,
@@ -2088,7 +2087,6 @@ export function NoteApp({
           </div>
         </nav>
         <div className="shrink-0 space-y-3 border-t border-[var(--sidebar-border)] bg-[var(--sidebar-footer-bg)] p-4 backdrop-blur-sm">
-          <ThemeToggle />
           {plan !== "pro" ? (
             <Link
               href="/billing"

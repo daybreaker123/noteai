@@ -4,11 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, Moon, Sparkles, Sun } from "lucide-react";
 import { Button, Card, Badge, Input } from "@/components/ui";
 import { DeleteAccountModal } from "@/components/delete-account-modal";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { cn } from "@/lib/cn";
+import { useStudaraTheme } from "@/components/theme-provider";
 import type { PlanLimits } from "@/lib/plan-limits";
 
 type ProfilePayload = {
@@ -98,6 +99,43 @@ function AiUnlimitedRow({ label }: { label: string }) {
     <div className="flex items-center justify-between text-sm">
       <span className="text-[var(--muted)]">{label}</span>
       <span className="font-medium text-purple-200/95">Unlimited</span>
+    </div>
+  );
+}
+
+function AppearanceThemeRow() {
+  const { theme, toggleTheme } = useStudaraTheme();
+  const isDark = theme === "dark";
+
+  return (
+    <div className="mt-4 flex items-center justify-between gap-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)]"
+          aria-hidden
+        >
+          {isDark ? (
+            <Sun className="h-[18px] w-[18px] text-amber-300/90" strokeWidth={2} />
+          ) : (
+            <Moon className="h-[18px] w-[18px] text-violet-400/90" strokeWidth={2} />
+          )}
+        </span>
+        <span className="text-sm font-medium text-[var(--text)]">Theme</span>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={isDark}
+        aria-label={isDark ? "Dark mode on, switch to light" : "Light mode on, switch to dark"}
+        onClick={toggleTheme}
+        className={cn(
+          "inline-flex h-7 w-[2.75rem] shrink-0 items-center rounded-full p-0.5 transition-colors duration-200",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
+          isDark ? "justify-end bg-purple-600/85" : "justify-start bg-[var(--btn-default-bg)] ring-1 ring-inset ring-[var(--border)]"
+        )}
+      >
+        <span className="pointer-events-none h-6 w-6 rounded-full bg-white shadow-sm" />
+      </button>
     </div>
   );
 }
@@ -266,7 +304,6 @@ export function ProfilePage() {
             Back to notes
           </Link>
           <div className="flex items-center gap-2">
-            <ThemeToggle variant="icon" />
             <StudaraWordmarkLink href="/" />
           </div>
         </div>
@@ -321,6 +358,12 @@ export function ProfilePage() {
                 </div>
               </div>
             </div>
+          </Card>
+
+          {/* Appearance */}
+          <Card className="border-[var(--border-subtle)] bg-[var(--chrome-25)] p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold tracking-[0.14em] text-[var(--muted)]">Appearance</h2>
+            <AppearanceThemeRow />
           </Card>
 
           {/* Plan */}
