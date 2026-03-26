@@ -2,7 +2,9 @@ import { resend, getEmailFrom } from "@/lib/email/resend-client";
 import { buildPasswordResetEmailHtml } from "@/lib/email/password-reset-html";
 import { buildWelcomeEmailHtml, getWelcomeDashboardUrl } from "@/lib/email/welcome-html";
 import { buildProUpgradeEmailHtml, type BillingCycleLabel } from "@/lib/email/pro-upgrade-html";
+import { buildWeeklyStudyReportEmailHtml } from "@/lib/email/weekly-study-report-html";
 import { getSiteUrl } from "@/lib/site-url";
+import type { WeeklyStudyReportStats } from "@/lib/weekly-study-report-stats";
 
 const LOG = "[email]";
 
@@ -100,5 +102,41 @@ export async function sendProUpgradeEmail(opts: {
     }
   } catch (e) {
     console.error(`${LOG} Pro upgrade send exception:`, e);
+  }
+}
+
+export async function sendWeeklyStudyReportEmail(opts: {
+  to: string;
+  name: string | null;
+  stats: WeeklyStudyReportStats;
+  motivationalLine: string;
+  notesUrl: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!resend) {
+    console.warn(`${LOG} RESEND_API_KEY not set — skipping weekly study report`);
+    return { ok: false, error: "Email not configured" };
+  }
+  const html = buildWeeklyStudyReportEmailHtml({
+    name: opts.name,
+    stats: opts.stats,
+    motivationalLine: opts.motivationalLine,
+    notesUrl: opts.notesUrl,
+  });
+  try {
+    const { error } = await resend.emails.send({
+      from: getEmailFrom(),
+      to: opts.to,
+      subject: "Your Weekly Study Report · Studara",
+      html,
+    });
+    if (error) {
+      console.error(`${LOG} weekly report send failed:`, error);
+      return { ok: false, error: String(error.message ?? error) };
+    }
+    console.info(`${LOG} weekly study report sent → ${opts.to}`);
+    return { ok: true };
+  } catch (e) {
+    console.error(`${LOG} weekly report send exception:`, e);
+    return { ok: false, error: e instanceof Error ? e.message : "Send failed" };
   }
 }

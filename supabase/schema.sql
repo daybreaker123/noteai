@@ -51,7 +51,11 @@ create table if not exists public.ai_usage (
   tutor_images int not null default 0,
   study_multiple int not null default 0,
   essay_feedback int not null default 0,
+  study_guide int not null default 0,
+  citations int not null default 0,
   pro_estimated_api_cents int not null default 0,
+  voice_transcription int not null default 0,
+  slides_analysis int not null default 0,
   primary key (user_id, month)
 );
 
@@ -92,6 +96,21 @@ create table if not exists public.study_sets (
 
 create index if not exists idx_study_sets_user_note on public.study_sets(user_id, note_id);
 create index if not exists idx_study_sets_user_created on public.study_sets(user_id, created_at desc);
+
+-- Public share links (notes + study sets)
+create table if not exists public.shared_content (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  content_type text not null check (content_type in ('note', 'study_set')),
+  content_id uuid not null,
+  is_public boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (content_type, content_id)
+);
+
+create index if not exists idx_shared_content_user_id on public.shared_content (user_id);
+create index if not exists idx_shared_content_content on public.shared_content (content_type, content_id);
 
 -- SM-2 progress per card (saved flashcard sets only)
 create table if not exists public.flashcard_progress (

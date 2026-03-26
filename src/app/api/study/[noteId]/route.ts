@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { anthropicComplete, ANTHROPIC_MODEL_SONNET, hasAnthropicKey } from "@/lib/anthropic";
 import { rowMatchesSingleNoteCache } from "@/lib/study-set-utils";
 import { htmlToPlainText } from "@/lib/note-content-html";
 import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
+
+async function isOnboardingSampleNote(userId: string, noteId: string): Promise<boolean> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { onboardingCompletedAt: true, onboardingSampleNoteId: true },
+  });
+  return u?.onboardingCompletedAt == null && u.onboardingSampleNoteId === noteId;
+}
 
 async function latestPayloadForSingleNoteCache(
   userId: string,
@@ -43,7 +52,8 @@ export async function GET(
     .eq("user_id", session.user.id)
     .single();
   plan = planRow?.plan === "pro" ? "pro" : "free";
-  if (plan !== "pro") {
+  const allowOnboarding = plan !== "pro" && (await isOnboardingSampleNote(session.user.id, noteId));
+  if (plan !== "pro" && !allowOnboarding) {
     return NextResponse.json(
       {
         error: "Study Mode is a Pro feature — upgrade to Pro",
@@ -85,7 +95,8 @@ export async function POST(
   } else {
     plan = "pro";
   }
-  if (plan !== "pro") {
+  const allowOnboardingPost = plan !== "pro" && (await isOnboardingSampleNote(session.user.id, noteId));
+  if (plan !== "pro" && !allowOnboardingPost) {
     return NextResponse.json(
       {
         error: "Study Mode is a Pro feature — upgrade to Pro",

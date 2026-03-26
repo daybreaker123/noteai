@@ -28,6 +28,7 @@ function NotesContent() {
       userId={session.user.id}
       initialOpenStudySetId={openStudySet}
       initialReviewDueSetId={reviewDueSet}
+      minimalChromeUntilStudyOpen={Boolean(openStudySet || reviewDueSet)}
     />
   );
 }

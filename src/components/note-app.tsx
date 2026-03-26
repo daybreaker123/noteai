@@ -12,11 +12,32 @@ import { DeleteNoteModal } from "@/components/delete-note-modal";
 import { Button, Card, Input, Textarea, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { sanitizeGeneratedNoteTitle } from "@/lib/sanitize-note-title";
-import { NOTE_IMPORT_FILE_ACCEPT } from "@/lib/note-import-utils";
-import { ensureEditorHtml, htmlToPlainText, normalizeImprovedNoteHtml, noteContentPreview } from "@/lib/note-content-html";
+import { NOTE_IMPORT_FILE_ACCEPT, SLIDES_ANALYZE_FILE_ACCEPT } from "@/lib/note-import-utils";
+import {
+  ensureEditorHtml,
+  htmlToPlainText,
+  normalizeImprovedNoteHtml,
+  noteContentPreview,
+} from "@/lib/note-content-html";
+import { studyGuideMarkdownToHtml } from "@/lib/study-guide-markdown";
+import { TutorMarkdown } from "@/components/tutor-markdown";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { NoteRichTextEditor } from "@/components/note-rich-text-editor";
-import { OnboardingModal } from "@/components/onboarding-modal";
+import { GuidedOnboarding } from "@/components/guided-onboarding";
+import {
+  getOnboardingDemoFlashcards,
+  getOnboardingImprovedFallbackHtml,
+  isOnboardingPersona,
+  type OnboardingPersona,
+} from "@/lib/onboarding-persona";
+import { NoteTemplatePickerModal } from "@/components/note-template-picker-modal";
+import { VoiceToNotesControl } from "@/components/voice-to-notes-control";
+import { ShareResourceModal } from "@/components/share-resource-modal";
+import { noteTemplateDefaultTitle, noteTemplateHtml, type NoteTemplateId } from "@/lib/note-templates";
+import {
+  fetchGoogleDocsClientConfig,
+  pickGoogleDocWithAccessToken,
+} from "@/lib/google-docs-import-client";
 import type { Note, Category, StudySetSummary } from "@/lib/api-types";
 import { buildStudySetTitleFromNoteTitles } from "@/lib/study-set-utils";
 import { NoteStudyProgressBar, NoteStudyProgressTrail } from "@/components/note-study-progress";
@@ -35,6 +56,8 @@ import {
   Sparkles,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  Cloud,
   X,
   Download,
   BookOpen,
@@ -54,6 +77,9 @@ import {
   Menu,
   Flame,
   Layers,
+  Quote,
+  Link2,
+  Presentation,
 } from "lucide-react";
 
 type StudaraUserStats = {
@@ -72,6 +98,12 @@ const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
   study: "Study Mode turns your notes into flashcards and quizzes. Generate practice questions and test your knowledge with AI.",
   export: "Export your notes as PDF or Markdown for sharing, printing, or use in other apps.",
   autoCategorize: "Auto-categorization suggests the best category for your note using AI.",
+  studyGuide:
+    "AI Study Guide combines every note in a category into one exam-ready guide with summaries, key concepts, and a review checklist.",
+  voiceTranscription:
+    "Voice to Notes records or uploads lecture audio, transcribes it with AI, and turns it into structured study notes.",
+  slidesAnalysis:
+    "Analyze Slides turns PowerPoint or PDF lecture decks into detailed, structured study notes with Claude.",
 };
 
 /** Skip global ⌘N / ⌘K when typing in the editor or any form field. */
@@ -99,14 +131,33 @@ export function NoteApp({
   userId,
   initialOpenStudySetId = null,
   initialReviewDueSetId = null,
+  studyReturnPath = null,
+  minimalChromeUntilStudyOpen = false,
 }: {
   userId: string;
   initialOpenStudySetId?: string | null;
   initialReviewDueSetId?: string | null;
+  /** When set, closing a saved-set study modal navigates here (e.g. `/study-sets`). */
+  studyReturnPath?: string | null;
+  /** Hide notes sidebar/grid until the study modal opens (avoids flash when opening from Study Sets). */
+  minimalChromeUntilStudyOpen?: boolean;
 }) {
   const [streakMilestone, setStreakMilestone] = React.useState<StreakMilestone | null>(null);
   const [userStats, setUserStats] = React.useState<StudaraUserStats | null>(null);
   const flashcardEphemeralStreakRef = React.useRef(false);
+  const [studyEmbedDismissed, setStudyEmbedDismissed] = React.useState(false);
+  const [studyGuideModal, setStudyGuideModal] = React.useState<{
+    categoryId: string;
+    categoryName: string;
+  } | null>(null);
+  const [studyGuideLoading, setStudyGuideLoading] = React.useState(false);
+  const [studyGuideText, setStudyGuideText] = React.useState<string | null>(null);
+  const [studyGuideError, setStudyGuideError] = React.useState<string | null>(null);
+  const [saveStudyGuideLoading, setSaveStudyGuideLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    setStudyEmbedDismissed(false);
+  }, [initialOpenStudySetId, initialReviewDueSetId]);
 
   const {
     categories,
@@ -130,6 +181,103 @@ export function NoteApp({
     const m = parseStreakMilestoneFromJson(json);
     if (m) setStreakMilestone(m);
   }, []);
+
+  const closeStudyGuideModal = React.useCallback(() => {
+    setStudyGuideModal(null);
+    setStudyGuideText(null);
+    setStudyGuideError(null);
+    setStudyGuideLoading(false);
+    setSaveStudyGuideLoading(false);
+  }, []);
+
+  const requestStudyGuide = React.useCallback(
+    (categoryId: string, categoryName: string) => {
+      if (plan !== "pro") {
+        setUpgradeModal({ show: true, feature: "studyGuide" });
+        return;
+      }
+      setStudyGuideModal({ categoryId, categoryName });
+      setStudyGuideText(null);
+      setStudyGuideError(null);
+      setStudyGuideLoading(true);
+      void (async () => {
+        try {
+          const res = await fetch("/api/ai/anthropic/study-guide", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category_id: categoryId }),
+          });
+          const json = (await res.json().catch(() => null)) as {
+            study_guide?: string;
+            error?: string;
+            code?: string;
+          };
+          if (json?.code === "PRO_REQUIRED_STUDY_GUIDE" && res.status === 402) {
+            setUpgradeModal({ show: true, feature: "studyGuide" });
+            setStudyGuideModal(null);
+            return;
+          }
+          if (!res.ok) {
+            setStudyGuideError(json?.error ?? "Could not generate study guide");
+            return;
+          }
+          if (json?.study_guide?.trim()) {
+            setStudyGuideText(json.study_guide);
+            consumeStreakJson(json);
+          } else {
+            setStudyGuideError("Empty response");
+          }
+        } catch {
+          setStudyGuideError("Something went wrong. Try again.");
+        } finally {
+          setStudyGuideLoading(false);
+        }
+      })();
+    },
+    [plan, consumeStreakJson]
+  );
+
+  const saveStudyGuideToNote = React.useCallback(async () => {
+    if (!studyGuideModal || !studyGuideText?.trim()) return;
+    setSaveStudyGuideLoading(true);
+    try {
+      const title = `Study guide — ${studyGuideModal.categoryName}`;
+      const html = ensureEditorHtml(studyGuideMarkdownToHtml(studyGuideText));
+      const note = await actions.create(studyGuideModal.categoryId, title);
+      if (note) {
+        await actions.update(note.id, { content: html });
+        setSelectedCategoryId(studyGuideModal.categoryId);
+        setSelectedNoteId(note.id);
+        closeStudyGuideModal();
+        setMobileSidebarOpen(false);
+      }
+    } finally {
+      setSaveStudyGuideLoading(false);
+    }
+  }, [studyGuideModal, studyGuideText, actions, closeStudyGuideModal]);
+
+  const downloadStudyGuidePdf = React.useCallback(async () => {
+    if (!studyGuideModal || !studyGuideText?.trim()) return;
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(`Study guide — ${studyGuideModal.categoryName}`, 20, 20);
+    doc.setFontSize(10);
+    const lines = doc.splitTextToSize(studyGuideText, 170);
+    let y = 32;
+    const lineHeight = 5;
+    const pageBreak = 285;
+    for (const line of lines) {
+      if (y > pageBreak) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(line, 20, y);
+      y += lineHeight;
+    }
+    const safe = studyGuideModal.categoryName.replace(/[^\w\-]+/g, "-").slice(0, 48);
+    doc.save(`study-guide-${safe || "category"}.pdf`);
+  }, [studyGuideModal, studyGuideText]);
 
   const loadUserStats = React.useCallback(async () => {
     try {
@@ -213,8 +361,11 @@ export function NoteApp({
   const [suggestTagsChips, setSuggestTagsChips] = React.useState<string[] | null>(null);
   const [toolbarError, setToolbarError] = React.useState<string | null>(null);
   const [improveToast, setImproveToast] = React.useState(false);
+  const [shareNoteModalNoteId, setShareNoteModalNoteId] = React.useState<string | null>(null);
+  const [linkCopiedToast, setLinkCopiedToast] = React.useState(false);
   const [createCategoryModalOpen, setCreateCategoryModalOpen] = React.useState(false);
   const [createCategoryLoading, setCreateCategoryLoading] = React.useState(false);
+  const [newNoteTemplateModalOpen, setNewNoteTemplateModalOpen] = React.useState(false);
   const [deleteCategoryModal, setDeleteCategoryModal] = React.useState<{ id: string; name: string } | null>(null);
   const [deleteNoteModal, setDeleteNoteModal] = React.useState<{
     id: string;
@@ -223,9 +374,18 @@ export function NoteApp({
   } | null>(null);
   const [deleteNoteLoading, setDeleteNoteLoading] = React.useState(false);
   const [importDocLoading, setImportDocLoading] = React.useState(false);
+  /** Shown only after a Google Doc is chosen, while the server builds the note (not during OAuth/picker). */
+  const [importGoogleDocSaving, setImportGoogleDocSaving] = React.useState(false);
   const [importDocError, setImportDocError] = React.useState<string | null>(null);
+  const [slidesAnalyzeLoading, setSlidesAnalyzeLoading] = React.useState(false);
+  const [slidesAnalyzeError, setSlidesAnalyzeError] = React.useState<string | null>(null);
+  const [voiceNotesError, setVoiceNotesError] = React.useState<string | null>(null);
+  const [importDropdownOpen, setImportDropdownOpen] = React.useState(false);
+  const importDropdownRef = React.useRef<HTMLDivElement>(null);
+  const [googleDocsImportEnabled, setGoogleDocsImportEnabled] = React.useState<boolean | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
   const importDocumentInputRef = React.useRef<HTMLInputElement>(null);
+  const analyzeSlidesInputRef = React.useRef<HTMLInputElement>(null);
   const sidebarSearchInputRef = React.useRef<HTMLInputElement>(null);
   const processedOpenStudyRef = React.useRef<string | null>(null);
   const processedReviewDueRef = React.useRef<string | null>(null);
@@ -262,6 +422,12 @@ export function NoteApp({
       document.body.style.overflow = prev;
     };
   }, [mobileSidebarOpen]);
+
+  React.useEffect(() => {
+    if (!linkCopiedToast) return;
+    const t = window.setTimeout(() => setLinkCopiedToast(false), 2500);
+    return () => window.clearTimeout(t);
+  }, [linkCopiedToast]);
 
   const refreshStudySets = React.useCallback(async () => {
     try {
@@ -375,7 +541,23 @@ export function NoteApp({
     setEditContent(ensureEditorHtml(selectedNote.content));
   }, [selectedNoteId, selectedNote, draftNote]);
 
-  const [showOnboarding, setShowOnboarding] = React.useState<boolean | null>(null);
+  const [onboardingGate, setOnboardingGate] = React.useState<"unknown" | "needs" | "done">("unknown");
+  const [guidedOnboarding, setGuidedOnboarding] = React.useState<{
+    step: number;
+    persona: OnboardingPersona | null;
+    sampleNoteId: string | null;
+  } | null>(null);
+  const guidedOnboardingRef = React.useRef(guidedOnboarding);
+  React.useEffect(() => {
+    guidedOnboardingRef.current = guidedOnboarding;
+  }, [guidedOnboarding]);
+
+  const [guidedWelcomeLoading, setGuidedWelcomeLoading] = React.useState(false);
+  const [guidedFinishLoading, setGuidedFinishLoading] = React.useState(false);
+  const guidedImproveInFlightRef = React.useRef(false);
+  const guidedFlashcardsStartedRef = React.useRef(false);
+  const guidedStep4ExitRef = React.useRef(false);
+  const improveButtonRef = React.useRef<HTMLSpanElement>(null);
 
   React.useEffect(() => {
     if (!userId || loading) return;
@@ -384,13 +566,32 @@ export function NoteApp({
       try {
         const res = await fetch("/api/me/onboarding", { cache: "no-store", credentials: "include" });
         if (!res.ok) {
-          if (!cancelled) setShowOnboarding(false);
+          if (!cancelled) setOnboardingGate("done");
           return;
         }
-        const j = (await res.json()) as { needsOnboarding?: boolean };
-        if (!cancelled) setShowOnboarding(!!j.needsOnboarding);
+        const j = (await res.json()) as {
+          needsOnboarding?: boolean;
+          resume?: { persona: string | null; sampleNoteId: string } | null;
+        };
+        if (cancelled) return;
+        if (!j.needsOnboarding) {
+          setOnboardingGate("done");
+          setGuidedOnboarding(null);
+          return;
+        }
+        setOnboardingGate("needs");
+        const r = j.resume;
+        if (r?.sampleNoteId && r.persona && isOnboardingPersona(r.persona)) {
+          setGuidedOnboarding({
+            step: 2,
+            persona: r.persona,
+            sampleNoteId: r.sampleNoteId,
+          });
+        } else {
+          setGuidedOnboarding({ step: 1, persona: null, sampleNoteId: null });
+        }
       } catch {
-        if (!cancelled) setShowOnboarding(false);
+        if (!cancelled) setOnboardingGate("done");
       }
     })();
     return () => {
@@ -398,20 +599,258 @@ export function NoteApp({
     };
   }, [userId, loading]);
 
-  const handleOnboardingFinished = React.useCallback(
-    async ({ welcomeNoteId }: { welcomeNoteId: string | null }) => {
-      setShowOnboarding(false);
-      setMobileSidebarOpen(false);
+  React.useEffect(() => {
+    if (onboardingGate !== "needs" || !guidedOnboarding?.sampleNoteId || guidedOnboarding.step !== 2) return;
+    if (selectedNoteId !== guidedOnboarding.sampleNoteId) {
+      setSelectedCategoryId("all");
+      setDraftNote(null);
+      setSelectedNoteId(guidedOnboarding.sampleNoteId);
+    }
+  }, [onboardingGate, guidedOnboarding, selectedNoteId]);
+
+  const skipOrCompleteGuidedOnboarding = React.useCallback(async () => {
+    try {
+      await fetch("/api/me/onboarding/complete", { method: "POST", credentials: "include" });
+    } catch {
+      /* ignore */
+    }
+    setOnboardingGate("done");
+    setGuidedOnboarding(null);
+    guidedFlashcardsStartedRef.current = false;
+    guidedStep4ExitRef.current = false;
+    guidedImproveInFlightRef.current = false;
+    setStudyModal(null);
+    setStudyMode("menu");
+    setFlashcards([]);
+    setCardIndex(0);
+    setCardFlipped(false);
+    setStudyLoading(null);
+    setStudyError(null);
+    setMobileSidebarOpen(false);
+    await actions.refresh();
+    void loadUserStats();
+  }, [actions, loadUserStats]);
+
+  const finishGuidedOnboardingDashboard = React.useCallback(async () => {
+    setGuidedFinishLoading(true);
+    try {
+      await fetch("/api/me/onboarding/complete", { method: "POST", credentials: "include" });
+    } catch {
+      /* ignore */
+    }
+    setOnboardingGate("done");
+    setGuidedOnboarding(null);
+    guidedFlashcardsStartedRef.current = false;
+    guidedStep4ExitRef.current = false;
+    guidedImproveInFlightRef.current = false;
+    setMobileSidebarOpen(false);
+    lastLoadedEditorNoteIdRef.current = null;
+    await actions.refresh();
+    void loadUserStats();
+    setGuidedFinishLoading(false);
+  }, [actions, loadUserStats]);
+
+  const handleGuidedWelcomeContinue = React.useCallback(async () => {
+    const persona = guidedOnboarding?.persona;
+    if (!persona) return;
+    setGuidedWelcomeLoading(true);
+    try {
+      const res = await fetch("/api/me/onboarding/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ persona }),
+      });
+      const j = (await res.json()) as {
+        ok?: boolean;
+        skipped?: boolean;
+        reason?: string;
+        noteId?: string;
+        persona?: OnboardingPersona;
+      };
+      if (j.skipped && j.reason === "note_limit") {
+        await skipOrCompleteGuidedOnboarding();
+        return;
+      }
+      if (!j.noteId) {
+        setToolbarError("Could not create your sample note. Try again or skip.");
+        return;
+      }
       await actions.refresh();
       lastLoadedEditorNoteIdRef.current = null;
-      if (welcomeNoteId) {
-        setSelectedCategoryId("all");
-        setDraftNote(null);
-        setSelectedNoteId(welcomeNoteId);
+      setGuidedOnboarding({
+        step: 2,
+        persona: j.persona ?? persona,
+        sampleNoteId: j.noteId,
+      });
+      setSelectedCategoryId("all");
+      setDraftNote(null);
+      setSelectedNoteId(j.noteId);
+    } catch {
+      setToolbarError("Something went wrong starting onboarding.");
+    } finally {
+      setGuidedWelcomeLoading(false);
+    }
+  }, [guidedOnboarding?.persona, actions, skipOrCompleteGuidedOnboarding]);
+
+  const runGuidedAutoImprove = React.useCallback(async () => {
+    if (guidedImproveInFlightRef.current) return;
+    const g = guidedOnboardingRef.current;
+    if (!g || g.step !== 2 || !g.sampleNoteId || !g.persona) return;
+    guidedImproveInFlightRef.current = true;
+    setToolbarError(null);
+    setImproveLoading(true);
+    try {
+      const res = await fetch("/api/ai/anthropic/improve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: editContentRef.current,
+          onboardingSampleNoteId: g.sampleNoteId,
+        }),
+      });
+      const json = (await res.json()) as { improved?: string; error?: string; code?: string };
+      let improvedHtml: string | null = null;
+      if (json.improved) {
+        consumeStreakJson(json);
+        improvedHtml = normalizeImprovedNoteHtml(json.improved);
+      } else {
+        improvedHtml = getOnboardingImprovedFallbackHtml(g.persona);
       }
-    },
-    [actions]
-  );
+      if (improvedHtml) {
+        setEditContent(improvedHtml);
+        setEditorContentRevision((r) => r + 1);
+        void actions.update(g.sampleNoteId, { content: improvedHtml, record_improvement: true });
+        setImproveToast(true);
+        setTimeout(() => setImproveToast(false), 3000);
+      }
+      setGuidedOnboarding((prev) => (prev && prev.step === 2 ? { ...prev, step: 3 } : prev));
+    } catch {
+      const g2 = guidedOnboardingRef.current;
+      if (g2?.persona && g2.sampleNoteId) {
+        const fb = getOnboardingImprovedFallbackHtml(g2.persona);
+        setEditContent(fb);
+        setEditorContentRevision((r) => r + 1);
+        void actions.update(g2.sampleNoteId, { content: fb });
+        setGuidedOnboarding((prev) => (prev && prev.step === 2 ? { ...prev, step: 3 } : prev));
+      }
+    } finally {
+      setImproveLoading(false);
+      guidedImproveInFlightRef.current = false;
+    }
+  }, [actions, consumeStreakJson]);
+
+  React.useEffect(() => {
+    if (!guidedOnboarding || guidedOnboarding.step !== 2) return;
+    const t = window.setTimeout(() => {
+      if (guidedOnboardingRef.current?.step !== 2) return;
+      void runGuidedAutoImprove();
+    }, 10_000);
+    return () => clearTimeout(t);
+  }, [guidedOnboarding?.step, guidedOnboarding?.sampleNoteId, runGuidedAutoImprove]);
+
+  React.useEffect(() => {
+    if (guidedOnboarding?.step !== 3) return;
+    const t = window.setTimeout(() => {
+      setGuidedOnboarding((prev) => (prev?.step === 3 ? { ...prev, step: 4 } : prev));
+    }, 4500);
+    return () => clearTimeout(t);
+  }, [guidedOnboarding?.step]);
+
+  React.useEffect(() => {
+    if (!guidedOnboarding) {
+      guidedFlashcardsStartedRef.current = false;
+      guidedStep4ExitRef.current = false;
+    }
+  }, [guidedOnboarding]);
+
+  React.useEffect(() => {
+    if (guidedOnboarding?.step !== 4 || !guidedOnboarding.sampleNoteId) return;
+    if (guidedFlashcardsStartedRef.current) return;
+    guidedFlashcardsStartedRef.current = true;
+    guidedStep4ExitRef.current = false;
+    const nid = guidedOnboarding.sampleNoteId;
+    const persona = guidedOnboarding.persona;
+    void (async () => {
+      setStudyModal({ kind: "single", noteId: nid });
+      setStudyMode("menu");
+      setStudyError(null);
+      setStudyLoading("flashcards");
+      try {
+        const res = await fetch(`/api/study/${nid}`);
+        const json = (await res.json()) as {
+          flashcards?: { cards?: { front: string; back: string }[] } | null;
+          code?: string;
+        };
+        let cards: { front: string; back: string }[] | null = null;
+        const payload = json?.flashcards;
+        if (payload && typeof payload === "object" && "cards" in payload) {
+          cards = payload.cards ?? null;
+        }
+        if (!cards?.length) {
+          const post = await fetch(`/api/study/${nid}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind: "flashcards" }),
+          });
+          const j = (await post.json()) as { cards?: { front: string; back: string }[] };
+          consumeStreakJson(j);
+          cards = j.cards ?? null;
+        }
+        if (!cards?.length && persona) {
+          cards = getOnboardingDemoFlashcards(persona);
+        }
+        primeFlashcardSession(cards ?? []);
+        setStudyMode("flashcards");
+        void refreshStudySets();
+      } catch {
+        const p = guidedOnboardingRef.current?.persona;
+        if (p) primeFlashcardSession(getOnboardingDemoFlashcards(p));
+        setStudyMode("flashcards");
+      } finally {
+        setStudyLoading(null);
+      }
+    })();
+  }, [guidedOnboarding?.step, guidedOnboarding?.sampleNoteId, guidedOnboarding?.persona, primeFlashcardSession, refreshStudySets, consumeStreakJson]);
+
+  React.useEffect(() => {
+    if (guidedOnboarding?.step !== 4) return;
+    const t = window.setTimeout(() => {
+      if (guidedOnboardingRef.current?.step !== 4 || guidedStep4ExitRef.current) return;
+      guidedStep4ExitRef.current = true;
+      setStudyModal(null);
+      setStudyMode("menu");
+      setFlashcards([]);
+      setFlashcardOriginalIndices([]);
+      setFlashcardReviewDueTotal(null);
+      setCardIndex(0);
+      setCardFlipped(false);
+      setStudyLoading(null);
+      setStudyError(null);
+      setGuidedOnboarding((prev) => (prev?.step === 4 ? { ...prev, step: 5 } : prev));
+    }, 14_000);
+    return () => clearTimeout(t);
+  }, [guidedOnboarding?.step]);
+
+  React.useEffect(() => {
+    if (guidedOnboarding?.step !== 4 || studyMode !== "flashcards") return;
+    if (!cardFlipped) return;
+    const t = window.setTimeout(() => {
+      if (guidedOnboardingRef.current?.step !== 4 || guidedStep4ExitRef.current) return;
+      guidedStep4ExitRef.current = true;
+      setStudyModal(null);
+      setStudyMode("menu");
+      setFlashcards([]);
+      setFlashcardOriginalIndices([]);
+      setFlashcardReviewDueTotal(null);
+      setCardIndex(0);
+      setCardFlipped(false);
+      setStudyLoading(null);
+      setStudyError(null);
+      setGuidedOnboarding((prev) => (prev?.step === 4 ? { ...prev, step: 5 } : prev));
+    }, 1400);
+    return () => clearTimeout(t);
+  }, [guidedOnboarding?.step, studyMode, cardFlipped]);
 
   const studySourceLabel = React.useMemo(() => {
     if (!studyModal) return "Untitled";
@@ -582,12 +1021,75 @@ export function NoteApp({
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [exportMenu]);
 
+  const openNewNotePicker = React.useCallback(() => {
+    if (onboardingGate === "needs" && guidedOnboarding && guidedOnboarding.step >= 2 && guidedOnboarding.step <= 4) {
+      return;
+    }
+    if (plan !== "pro" && notes.length >= FREE_NOTE_LIMIT) {
+      setUpgradeModal({ show: true, message: "You've reached the free limit — upgrade to Pro for unlimited notes" });
+      return;
+    }
+    setNewNoteTemplateModalOpen(true);
+  }, [plan, notes.length, FREE_NOTE_LIMIT, setUpgradeModal, onboardingGate, guidedOnboarding]);
+
+  const createNewNoteWithInitial = React.useCallback(
+    ({ title, content }: { title: string; content: string }) => {
+      setNewNoteTemplateModalOpen(false);
+      if (plan !== "pro" && notes.length >= FREE_NOTE_LIMIT) {
+        setUpgradeModal({ show: true, message: "You've reached the free limit — upgrade to Pro for unlimited notes" });
+        return;
+      }
+      const sid = selectedCategoryIdRef.current;
+      /** Sidebar category filter: specific id, or "all" / null → uncategorized */
+      const targetCategoryId: string | null = sid && sid !== "all" ? sid : null;
+      const bodyHtml = ensureEditorHtml(content);
+
+      const draftId = `draft-${Date.now()}`;
+      const draft: Note = {
+        id: draftId,
+        user_id: userId,
+        category_id: targetCategoryId,
+        title,
+        content: bodyHtml,
+        pinned: false,
+        tags: [],
+      };
+      setDraftNote(draft);
+      setSelectedNoteId(draftId);
+      setEditTitle(title);
+      setEditContent(bodyHtml);
+      setNewNoteIds((prev) => new Set(prev).add(draftId));
+      setMobileSidebarOpen(false);
+
+      (async () => {
+        const note = await actions.create(targetCategoryId, title);
+        if (note) {
+          setNewNoteIds((prev) => {
+            const next = new Set(prev);
+            next.delete(draftId);
+            next.add(note.id);
+            return next;
+          });
+          skipSyncRef.current = true;
+          actions.update(note.id, {
+            title: editTitleRef.current,
+            content: editContentRef.current,
+          });
+          setSelectedNoteId(note.id);
+          setSelectedCategoryId(note.category_id ?? "all");
+          setDraftNote(null);
+        }
+      })();
+    },
+    [userId, actions, plan, notes.length, FREE_NOTE_LIMIT, setUpgradeModal]
+  );
+
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (shouldIgnoreAppShortcut(e)) return;
       if (e.key === "n" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        handleNewNote();
+        openNewNotePicker();
       }
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -596,55 +1098,7 @@ export function NoteApp({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [defaultCategoryId, categories, notes, plan]);
-
-  function handleNewNote() {
-    if (plan !== "pro" && notes.length >= FREE_NOTE_LIMIT) {
-      setUpgradeModal({ show: true, message: "You've reached the free limit — upgrade to Pro for unlimited notes" });
-      return;
-    }
-    const sid = selectedCategoryIdRef.current;
-    /** Sidebar category filter: specific id, or "all" / null → uncategorized */
-    const targetCategoryId: string | null = sid && sid !== "all" ? sid : null;
-
-    const draftId = `draft-${Date.now()}`;
-    const draft: Note = {
-      id: draftId,
-      user_id: userId,
-      category_id: targetCategoryId,
-      title: "Untitled",
-      content: "",
-      pinned: false,
-      tags: [],
-    };
-    setDraftNote(draft);
-    setSelectedNoteId(draftId);
-    setEditTitle("Untitled");
-    setEditContent("");
-    setNewNoteIds((prev) => new Set(prev).add(draftId));
-    setMobileSidebarOpen(false);
-
-    // Persist in background — don't block the editor
-    (async () => {
-      const note = await actions.create(targetCategoryId, "Untitled");
-      if (note) {
-        setNewNoteIds((prev) => {
-          const next = new Set(prev);
-          next.delete(draftId);
-          next.add(note.id);
-          return next;
-        });
-        skipSyncRef.current = true;
-        actions.update(note.id, {
-          title: editTitleRef.current,
-          content: editContentRef.current,
-        });
-        setSelectedNoteId(note.id);
-        setSelectedCategoryId(note.category_id ?? "all");
-        setDraftNote(null);
-      }
-    })();
-  }
+  }, [openNewNotePicker]);
 
   async function handleImportDocumentChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -681,6 +1135,181 @@ export function NoteApp({
       );
     }
   }
+
+  async function handleAnalyzeSlidesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (plan !== "pro") {
+      setUpgradeModal({ show: true, feature: "slidesAnalysis" });
+      return;
+    }
+    setSlidesAnalyzeError(null);
+    setSlidesAnalyzeLoading(true);
+    try {
+      const sid = selectedCategoryIdRef.current;
+      const category_id = sid && sid !== "all" ? sid : null;
+      const fd = new FormData();
+      fd.append("file", file);
+      if (category_id) fd.append("category_id", category_id);
+      const res = await fetch("/api/notes/analyze-slides", {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      const json = (await res.json()) as {
+        id?: string;
+        title?: string;
+        content?: string;
+        category_id?: string | null;
+        error?: string;
+        code?: string;
+      };
+      if (json.code === "PRO_FEATURE_SLIDES_ANALYSIS" && res.status === 402) {
+        setUpgradeModal({ show: true, feature: "slidesAnalysis" });
+        return;
+      }
+      if (!res.ok || !json.id) {
+        setSlidesAnalyzeError(json.error ?? "Couldn’t analyze those slides.");
+        return;
+      }
+      consumeStreakJson(json);
+      await actions.refresh();
+      lastLoadedEditorNoteIdRef.current = null;
+      setSelectedNoteId(json.id);
+      setEditTitle(json.title ?? "Untitled");
+      setEditContent(ensureEditorHtml(json.content ?? ""));
+      setDraftNote(null);
+      setSelectedCategoryId(json.category_id ?? "all");
+      setStudyModal(null);
+      exitGridSelection();
+      setNewNoteIds((prev) => new Set(prev).add(json.id));
+      setMobileSidebarOpen(false);
+    } catch {
+      setSlidesAnalyzeError("Something went wrong. Please try again.");
+    } finally {
+      setSlidesAnalyzeLoading(false);
+    }
+  }
+
+  async function handleImportFromGoogleDocs() {
+    setImportDropdownOpen(false);
+    setImportDocError(null);
+    if (plan !== "pro" && notes.length >= FREE_NOTE_LIMIT) {
+      setUpgradeModal({
+        show: true,
+        message: "You've reached the free limit — upgrade to Pro for unlimited notes",
+      });
+      return;
+    }
+    const cfg = await fetchGoogleDocsClientConfig();
+    setGoogleDocsImportEnabled(cfg.enabled);
+    if (!cfg.enabled) {
+      setImportDocError(
+        "Google Docs import isn’t set up yet. Add GOOGLE_PICKER_API_KEY (browser key) and GOOGLE_CLIENT_ID to your environment, and enable the Picker & Docs APIs in Google Cloud."
+      );
+      return;
+    }
+    let picked: Awaited<ReturnType<typeof pickGoogleDocWithAccessToken>>;
+    try {
+      picked = await pickGoogleDocWithAccessToken(cfg.clientId, cfg.apiKey);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not connect to Google";
+      setImportDocError(msg);
+      return;
+    }
+    if ("cancelled" in picked) return;
+
+    setImportGoogleDocSaving(true);
+    try {
+      const sid = selectedCategoryIdRef.current;
+      const category_id = sid && sid !== "all" ? sid : null;
+      const res = await fetch("/api/notes/import-google-doc", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${picked.accessToken}`,
+        },
+        body: JSON.stringify({ documentId: picked.documentId, category_id }),
+      });
+      const json = (await res.json()) as {
+        id?: string;
+        title?: string;
+        content?: string;
+        category_id?: string | null;
+        error?: string;
+        code?: string;
+      };
+      if (json.code === "FREE_LIMIT_NOTES" && res.status === 402) {
+        setUpgradeModal({
+          show: true,
+          message: json.error ?? "You've reached the free limit — upgrade to Pro for unlimited notes",
+        });
+        return;
+      }
+      if (!res.ok || !json.id) {
+        setImportDocError(json.error ?? "Couldn’t import that document.");
+        return;
+      }
+      consumeStreakJson(json);
+      await actions.refresh();
+      lastLoadedEditorNoteIdRef.current = null;
+      setSelectedNoteId(json.id);
+      setEditTitle(json.title ?? "Untitled");
+      setEditContent(ensureEditorHtml(json.content ?? ""));
+      setDraftNote(null);
+      setSelectedCategoryId(json.category_id ?? "all");
+      setStudyModal(null);
+      exitGridSelection();
+      setNewNoteIds((prev) => new Set(prev).add(json.id));
+      setMobileSidebarOpen(false);
+    } catch {
+      setImportDocError("Something went wrong while importing. Try again.");
+    } finally {
+      setImportGoogleDocSaving(false);
+    }
+  }
+
+  const handleVoiceTranscriptionSuccess = React.useCallback(
+    async (json: {
+      id: string;
+      title: string;
+      content: string;
+      category_id: string | null;
+    } & Record<string, unknown>) => {
+      consumeStreakJson(json);
+      await actions.refresh();
+      lastLoadedEditorNoteIdRef.current = null;
+      setSelectedNoteId(json.id);
+      setEditTitle(json.title ?? "Untitled");
+      setEditContent(ensureEditorHtml(json.content ?? ""));
+      setDraftNote(null);
+      setSelectedCategoryId(json.category_id ?? "all");
+      setStudyModal(null);
+      setGridSelectMode(false);
+      setGridSelectedIds(new Set());
+      setMultiStudyError(null);
+      setNewNoteIds((prev) => new Set(prev).add(json.id));
+      setMobileSidebarOpen(false);
+      setVoiceNotesError(null);
+      setToolbarError(null);
+      void loadUserStats();
+    },
+    [actions, consumeStreakJson, loadUserStats]
+  );
+
+  React.useEffect(() => {
+    if (!importDropdownOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      const root = importDropdownRef.current;
+      const t = e.target;
+      if (root && t instanceof Node && root.contains(t)) return;
+      setImportDropdownOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [importDropdownOpen]);
 
   /** Sidebar category pick: leave note editor and show the grid for that category. */
   function selectSidebarCategory(categoryId: string | "all") {
@@ -966,13 +1595,15 @@ export function NoteApp({
 
   React.useEffect(() => {
     if (!initialOpenStudySetId || loading) return;
-    if (showOnboarding !== false) return;
+    if (onboardingGate !== "done") return;
     if (processedOpenStudyRef.current === initialOpenStudySetId) return;
     processedOpenStudyRef.current = initialOpenStudySetId;
     void loadAndOpenStudySet(initialOpenStudySetId).finally(() => {
-      router.replace("/notes", { scroll: false });
+      if (!studyReturnPath) {
+        router.replace("/notes", { scroll: false });
+      }
     });
-  }, [initialOpenStudySetId, loading, showOnboarding, router]);
+  }, [initialOpenStudySetId, loading, onboardingGate, router, studyReturnPath]);
 
   React.useEffect(() => {
     if (!initialOpenStudySetId) processedOpenStudyRef.current = null;
@@ -980,13 +1611,15 @@ export function NoteApp({
 
   React.useEffect(() => {
     if (!initialReviewDueSetId || loading) return;
-    if (showOnboarding !== false) return;
+    if (onboardingGate !== "done") return;
     if (processedReviewDueRef.current === initialReviewDueSetId) return;
     processedReviewDueRef.current = initialReviewDueSetId;
     void loadDueReviewSet(initialReviewDueSetId).finally(() => {
-      router.replace("/notes", { scroll: false });
+      if (!studyReturnPath) {
+        router.replace("/notes", { scroll: false });
+      }
     });
-  }, [initialReviewDueSetId, loading, showOnboarding, router, loadDueReviewSet]);
+  }, [initialReviewDueSetId, loading, onboardingGate, router, loadDueReviewSet, studyReturnPath]);
 
   React.useEffect(() => {
     if (!initialReviewDueSetId) processedReviewDueRef.current = null;
@@ -1000,21 +1633,166 @@ export function NoteApp({
     );
   }
 
+  const holdStudyEmbedUI =
+    minimalChromeUntilStudyOpen &&
+    (initialOpenStudySetId || initialReviewDueSetId) &&
+    !studyModal &&
+    !studySetLoadError &&
+    onboardingGate !== "needs" &&
+    !studyEmbedDismissed;
+
+  if (holdStudyEmbedUI) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0f]">
+        <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+      </div>
+    );
+  }
+
+  if (
+    minimalChromeUntilStudyOpen &&
+    studyReturnPath &&
+    studySetLoadError &&
+    !studyModal &&
+    !studyEmbedDismissed
+  ) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-5 bg-[#0a0a0f] px-6 text-center">
+        <p className="max-w-sm text-sm text-red-100/95">{studySetLoadError}</p>
+        <Button
+          type="button"
+          className="border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white"
+          onClick={() => {
+            setStudySetLoadError(null);
+            setStudyEmbedDismissed(true);
+            router.push(studyReturnPath);
+          }}
+        >
+          Back to Study Sets
+        </Button>
+      </div>
+    );
+  }
+
+  const studyLeaveButtonLabel =
+    studyReturnPath === "/study-sets" ? "Back to study sets" : "Back to notes";
+
+  const importDocumentMenu = (layout: "toolbar" | "hero") => {
+    const isHero = layout === "hero";
+    return (
+      <div ref={importDropdownRef} className={cn("relative", isHero && "w-full max-w-xs")}>
+        <Button
+          type="button"
+          size={isHero ? "md" : "sm"}
+          variant="ghost"
+          disabled={importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading}
+          className={cn(
+            "gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/15",
+            isHero && "min-h-11 w-full justify-center"
+          )}
+          aria-expanded={importDropdownOpen}
+          aria-haspopup="menu"
+          onClick={() => {
+            setImportDropdownOpen((o) => !o);
+            if (googleDocsImportEnabled === null) {
+              void fetchGoogleDocsClientConfig().then((c) => setGoogleDocsImportEnabled(c.enabled));
+            }
+          }}
+        >
+          <Upload className={isHero ? "h-4 w-4" : "h-3.5 w-3.5"} />
+          Import
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+        </Button>
+        {importDropdownOpen && (
+          <div
+            role="menu"
+            className={cn(
+              "absolute z-[80] min-w-[15rem] rounded-xl border border-white/10 bg-[#14141c] py-1 shadow-xl shadow-black/50",
+              isHero ? "left-0 right-0 mt-2" : "right-0 top-[calc(100%+6px)]"
+            )}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-white/90 hover:bg-white/10"
+              onClick={() => {
+                setImportDropdownOpen(false);
+                setImportDocError(null);
+                importDocumentInputRef.current?.click();
+              }}
+            >
+              <Upload className="h-4 w-4 shrink-0 text-white/55" />
+              PDF or Word from device
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-white/90 hover:bg-white/10"
+              onClick={() => {
+                setImportDropdownOpen(false);
+                setSlidesAnalyzeError(null);
+                if (plan !== "pro") {
+                  setUpgradeModal({ show: true, feature: "slidesAnalysis" });
+                  return;
+                }
+                analyzeSlidesInputRef.current?.click();
+              }}
+            >
+              <Presentation className="h-4 w-4 shrink-0 text-white/55" />
+              Analyze Slides
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={googleDocsImportEnabled === false}
+              title={
+                googleDocsImportEnabled === false
+                  ? "Add GOOGLE_PICKER_API_KEY and GOOGLE_CLIENT_ID to enable Google Docs import"
+                  : undefined
+              }
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-white/90 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => void handleImportFromGoogleDocs()}
+            >
+              <Cloud className="h-4 w-4 shrink-0 text-white/55" />
+              Import from Google Docs
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="relative flex h-dvh max-w-[100vw] overflow-x-hidden bg-[#0a0a0f]">
-      {importDocLoading && (
+      {(importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading) && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm"
           role="alertdialog"
           aria-busy="true"
           aria-live="polite"
-          aria-label="Importing document"
+          aria-label={
+            slidesAnalyzeLoading
+              ? "Analyzing slides"
+              : importGoogleDocSaving
+                ? "Importing from Google Docs"
+                : "Importing document"
+          }
         >
           <div className="max-w-sm rounded-2xl border border-white/10 bg-[#12121a]/95 px-8 py-6 text-center shadow-xl shadow-purple-950/40">
             <Loader2 className="mx-auto h-9 w-9 animate-spin text-purple-400" aria-hidden />
-            <p className="mt-4 text-sm font-medium text-white">Importing document…</p>
+            <p className="mt-4 text-sm font-medium text-white">
+              {slidesAnalyzeLoading
+                ? "Analyzing your slides…"
+                : importGoogleDocSaving
+                  ? "Importing from Google Docs…"
+                  : "Importing document…"}
+            </p>
             <p className="mt-1.5 text-xs text-white/50">
-              Extracting text — large PDFs may take a little longer.
+              {slidesAnalyzeLoading
+                ? "Extracting slide text and generating study notes with AI. This can take a minute for large decks."
+                : importGoogleDocSaving
+                  ? "Converting your Google Doc into a note — almost there."
+                  : "Extracting text — large PDFs may take a little longer."}
             </p>
           </div>
         </div>
@@ -1055,7 +1833,7 @@ export function NoteApp({
         <div className="shrink-0 px-4 pb-4 pt-4">
           <button
             type="button"
-            onClick={handleNewNote}
+            onClick={openNewNotePicker}
             className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
@@ -1082,6 +1860,32 @@ export function NoteApp({
               <button
                 type="button"
                 onClick={() => setImportDocError(null)}
+                className="shrink-0 text-red-300 transition hover:text-white"
+                aria-label="Dismiss"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          {slidesAnalyzeError && (
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
+              <span>{slidesAnalyzeError}</span>
+              <button
+                type="button"
+                onClick={() => setSlidesAnalyzeError(null)}
+                className="shrink-0 text-red-300 transition hover:text-white"
+                aria-label="Dismiss"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          {voiceNotesError && (
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
+              <span>{voiceNotesError}</span>
+              <button
+                type="button"
+                onClick={() => setVoiceNotesError(null)}
                 className="shrink-0 text-red-300 transition hover:text-white"
                 aria-label="Dismiss"
               >
@@ -1121,6 +1925,7 @@ export function NoteApp({
                   count={noteCounts.byCategory.get(c.id) ?? 0}
                   selected={selectedCategoryId === c.id}
                   onClick={() => selectSidebarCategory(c.id)}
+                  onStudyGuide={() => requestStudyGuide(c.id, c.name)}
                   onRename={() => {
                     const name = prompt("Rename category:", c.name);
                     if (name?.trim()) actions.updateCategory(c.id, name.trim());
@@ -1162,6 +1967,14 @@ export function NoteApp({
               >
                 <FilePenLine className="h-4 w-4 shrink-0 text-white/50" />
                 Essay Feedback
+              </Link>
+              <Link
+                href="/citations"
+                onClick={() => setMobileSidebarOpen(false)}
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-white/75 transition duration-200 hover:bg-white/[0.05] hover:text-white touch-manipulation"
+              >
+                <Quote className="h-4 w-4 shrink-0 text-white/50" strokeWidth={2} />
+                Citations
               </Link>
             </div>
           </div>
@@ -1257,6 +2070,14 @@ export function NoteApp({
           aria-hidden
           onChange={handleImportDocumentChange}
         />
+        <input
+          ref={analyzeSlidesInputRef}
+          type="file"
+          accept={SLIDES_ANALYZE_FILE_ACCEPT}
+          className="hidden"
+          aria-hidden
+          onChange={(e) => void handleAnalyzeSlidesChange(e)}
+        />
         {plan === "pro" && proHeavyUsage ? (
           <div
             role="status"
@@ -1344,21 +2165,35 @@ export function NoteApp({
             onSuggestDismiss={() => setSuggestBanner(null)}
             onImprove={async () => {
               setToolbarError(null);
+              const guided = guidedOnboardingRef.current;
+              const onboardingImproveId =
+                guided?.step === 2 && guided.sampleNoteId && selectedNote?.id === guided.sampleNoteId
+                  ? guided.sampleNoteId
+                  : undefined;
+              if (onboardingImproveId) guidedImproveInFlightRef.current = true;
               setImproveLoading(true);
               try {
                 const res = await fetch("/api/ai/anthropic/improve", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ content: editContent }),
+                  body: JSON.stringify({
+                    content: editContent,
+                    ...(onboardingImproveId ? { onboardingSampleNoteId: onboardingImproveId } : {}),
+                  }),
                 });
                 const json = (await res.json()) as { improved?: string; error?: string; code?: string };
                 if (json.code && res.status === 402) {
                   setUpgradeModal({ show: true, message: json.error ?? "You've used all 5 free improvements this month — upgrade to Pro for unlimited access." });
                   return;
                 }
+                let improvedHtml: string | null = null;
                 if (json.improved) {
                   consumeStreakJson(json);
-                  const improvedHtml = normalizeImprovedNoteHtml(json.improved);
+                  improvedHtml = normalizeImprovedNoteHtml(json.improved);
+                } else if (onboardingImproveId && guidedOnboardingRef.current?.persona) {
+                  improvedHtml = getOnboardingImprovedFallbackHtml(guidedOnboardingRef.current.persona);
+                }
+                if (improvedHtml) {
                   setEditContent(improvedHtml);
                   setEditorContentRevision((r) => r + 1);
                   if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
@@ -1374,13 +2209,29 @@ export function NoteApp({
                   }
                   setImproveToast(true);
                   setTimeout(() => setImproveToast(false), 3000);
+                  if (onboardingImproveId) {
+                    setGuidedOnboarding((prev) =>
+                      prev?.step === 2 && prev.sampleNoteId === onboardingImproveId ? { ...prev, step: 3 } : prev
+                    );
+                  }
                 } else {
                   setToolbarError(json.error ?? "Failed to improve note");
                 }
               } catch {
-                setToolbarError("Something went wrong. Please try again.");
+                if (onboardingImproveId && guidedOnboardingRef.current?.persona && selectedNote) {
+                  const fb = getOnboardingImprovedFallbackHtml(guidedOnboardingRef.current.persona);
+                  setEditContent(fb);
+                  setEditorContentRevision((r) => r + 1);
+                  void actions.update(selectedNote.id, { content: fb });
+                  setGuidedOnboarding((prev) =>
+                    prev?.step === 2 && prev.sampleNoteId === onboardingImproveId ? { ...prev, step: 3 } : prev
+                  );
+                } else {
+                  setToolbarError("Something went wrong. Please try again.");
+                }
               } finally {
                 setImproveLoading(false);
+                if (onboardingImproveId) guidedImproveInFlightRef.current = false;
               }
             }}
             onGenerateTitle={async () => {
@@ -1438,7 +2289,16 @@ export function NoteApp({
                 setTagsLoading(false);
               }
             }}
+            improveButtonRef={improveButtonRef}
             onStudy={() => {
+              if (
+                onboardingGate === "needs" &&
+                guidedOnboarding &&
+                guidedOnboarding.step >= 2 &&
+                guidedOnboarding.step <= 4
+              ) {
+                return;
+              }
               if (plan !== "pro") {
                 setUpgradeModal({ show: true, feature: "study" });
                 return;
@@ -1562,6 +2422,33 @@ export function NoteApp({
             }}
             onSuggestTagDismiss={() => setSuggestTagsChips(null)}
             onToolbarErrorDismiss={() => setToolbarError(null)}
+            shareToolbarSlot={
+              selectedNote && !selectedNote.id.startsWith("draft-") ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="shrink-0 gap-1.5 border border-white/10 text-white/90 hover:bg-white/10"
+                  title="Share note"
+                  aria-label="Share note"
+                  onClick={() => setShareNoteModalNoteId(selectedNote.id)}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Share
+                </Button>
+              ) : null
+            }
+            voiceToNotesToolbar={
+              <VoiceToNotesControl
+                layout="editor"
+                plan={plan}
+                categoryId={selectedNote!.category_id ?? null}
+                disabled={improveLoading || summarizeLoading}
+                onRequirePro={() => setUpgradeModal({ show: true, feature: "voiceTranscription" })}
+                onError={(m) => setToolbarError(m)}
+                onSuccess={handleVoiceTranscriptionSuccess}
+              />
+            }
             studyProgressCompletion={computeStudyProgressCompletion(selectedNote!, {
               hasSummaryInSession: !!summaryBelow,
               hasSavedStudySet: noteHasSavedStudySet(selectedNote!.id, savedStudySets),
@@ -1608,19 +2495,19 @@ export function NoteApp({
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={importDocLoading}
-                    onClick={() => {
-                      setImportDocError(null);
-                      importDocumentInputRef.current?.click();
+                  {importDocumentMenu("toolbar")}
+                  <VoiceToNotesControl
+                    layout="toolbar"
+                    plan={plan}
+                    categoryId={selectedCategoryId === "all" ? null : selectedCategoryId}
+                    disabled={importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading}
+                    onRequirePro={() => setUpgradeModal({ show: true, feature: "voiceTranscription" })}
+                    onError={(m) => {
+                      setVoiceNotesError(m);
+                      setToolbarError(m);
                     }}
-                    className="gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/15"
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    Import Document
-                  </Button>
+                    onSuccess={handleVoiceTranscriptionSuccess}
+                  />
                   <Button
                     size="sm"
                     onClick={startGridSelection}
@@ -1696,23 +2583,24 @@ export function NoteApp({
                 <p className="mt-1 text-sm text-white/40">
                   Click New Note to create your first note, or import a PDF or Word file.
                 </p>
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                  <Button onClick={handleNewNote}>
+                <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
+                  <Button onClick={openNewNotePicker}>
                     <Plus className="mr-2 h-4 w-4" />
                     New Note
                   </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={importDocLoading}
-                    onClick={() => {
-                      setImportDocError(null);
-                      importDocumentInputRef.current?.click();
+                  {importDocumentMenu("hero")}
+                  <VoiceToNotesControl
+                    layout="hero"
+                    plan={plan}
+                    categoryId={selectedCategoryId === "all" ? null : selectedCategoryId}
+                    disabled={importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading}
+                    onRequirePro={() => setUpgradeModal({ show: true, feature: "voiceTranscription" })}
+                    onError={(m) => {
+                      setVoiceNotesError(m);
+                      setToolbarError(m);
                     }}
-                    className="border border-white/15 bg-white/10 text-white hover:bg-white/15"
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Import Document
-                  </Button>
+                    onSuccess={handleVoiceTranscriptionSuccess}
+                  />
                 </div>
               </div>
             ) : (
@@ -1832,6 +2720,9 @@ export function NoteApp({
           error={studyError}
           onClose={() => {
             flashcardEphemeralStreakRef.current = false;
+            if (studyReturnPath) {
+              setStudyEmbedDismissed(true);
+            }
             setStudyModal(null);
             setStudyMode("menu");
             setFlashcards([]);
@@ -1850,7 +2741,11 @@ export function NoteApp({
             setStudySaveLoading(null);
             setStudyError(null);
             void loadUserStats();
+            if (studyReturnPath) {
+              router.push(studyReturnPath);
+            }
           }}
+          studyLeaveButtonLabel={studyLeaveButtonLabel}
           savedStudySetId={studyModal.kind === "saved" ? studyModal.setId : null}
           onQuizSessionComplete={(id) => void reportQuizSessionComplete(id)}
           canPersistStudy={studyModal.kind !== "saved"}
@@ -1994,6 +2889,78 @@ export function NoteApp({
         />
       )}
 
+      {studyGuideModal ? (
+        <div
+          className="fixed inset-0 z-[55] flex flex-col bg-[#0a0a0f]"
+          role="dialog"
+          aria-modal
+          aria-labelledby="study-guide-title"
+        >
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/40 px-4 py-3 backdrop-blur-xl sm:px-6">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300/80">Study guide</p>
+              <h2 id="study-guide-title" className="truncate text-lg font-semibold text-white sm:text-xl">
+                {studyGuideModal.categoryName}
+              </h2>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={!studyGuideText || studyGuideLoading}
+                className="gap-1.5 border border-white/15 text-white hover:bg-white/10"
+                onClick={() => void downloadStudyGuidePdf()}
+              >
+                <Download className="h-4 w-4" />
+                PDF
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!studyGuideText || studyGuideLoading || saveStudyGuideLoading}
+                className="gap-1.5 border-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-white"
+                onClick={() => void saveStudyGuideToNote()}
+              >
+                {saveStudyGuideLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                Save to Notes
+              </Button>
+              <button
+                type="button"
+                onClick={closeStudyGuideModal}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/50 transition hover:bg-white/10 hover:text-white"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
+            {studyGuideLoading ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-24">
+                <Loader2 className="h-10 w-10 animate-spin text-violet-400" />
+                <p className="text-sm text-white/60">Generating your study guide…</p>
+              </div>
+            ) : studyGuideError ? (
+              <div className="mx-auto max-w-md rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-center">
+                <p className="text-sm text-red-100">{studyGuideError}</p>
+                <Button type="button" className="mt-4" variant="ghost" onClick={closeStudyGuideModal}>
+                  Close
+                </Button>
+              </div>
+            ) : studyGuideText ? (
+              <div className="mx-auto max-w-3xl rounded-2xl border border-white/[0.08] bg-black/25 p-5 sm:p-8">
+                <TutorMarkdown content={studyGuideText} className="text-[0.95rem] leading-relaxed" />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {streakMilestone ? (
         <StreakMilestoneModal milestone={streakMilestone} onClose={() => setStreakMilestone(null)} />
       ) : null}
@@ -2031,6 +2998,21 @@ export function NoteApp({
           Notes improved
         </div>
       )}
+      {linkCopiedToast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-4 py-2.5 text-sm text-white shadow-lg backdrop-blur">
+          Link copied!
+        </div>
+      )}
+      {shareNoteModalNoteId ? (
+        <ShareResourceModal
+          open
+          onClose={() => setShareNoteModalNoteId(null)}
+          resourceType="note"
+          resourceId={shareNoteModalNoteId}
+          title="Share note"
+          onCopied={() => setLinkCopiedToast(true)}
+        />
+      ) : null}
 
       {saveErrorMessage ? (
         <div
@@ -2070,6 +3052,18 @@ export function NoteApp({
       />
 
       {/* Create category modal */}
+      <NoteTemplatePickerModal
+        open={newNoteTemplateModalOpen}
+        onClose={() => setNewNoteTemplateModalOpen(false)}
+        onBlankNote={() => createNewNoteWithInitial({ title: "Untitled", content: "" })}
+        onPickTemplate={(id: NoteTemplateId) =>
+          createNewNoteWithInitial({
+            title: noteTemplateDefaultTitle(id),
+            content: noteTemplateHtml(id),
+          })
+        }
+      />
+
       <CreateCategoryModal
         open={createCategoryModalOpen}
         onClose={() => setCreateCategoryModalOpen(false)}
@@ -2086,8 +3080,31 @@ export function NoteApp({
         }}
       />
 
-      {showOnboarding === true ? (
-        <OnboardingModal open onFinished={handleOnboardingFinished} />
+      {onboardingGate === "needs" && guidedOnboarding ? (
+        <GuidedOnboarding
+          step={guidedOnboarding.step}
+          persona={guidedOnboarding.persona}
+          onPersonaChange={(p) =>
+            setGuidedOnboarding((g) => (g && g.step === 1 ? { ...g, persona: p } : g))
+          }
+          onWelcomeContinue={() => void handleGuidedWelcomeContinue()}
+          welcomeLoading={guidedWelcomeLoading}
+          onSkip={() => void skipOrCompleteGuidedOnboarding()}
+          skipDisabled={guidedWelcomeLoading || guidedFinishLoading}
+          onFinishDashboard={() => void finishGuidedOnboardingDashboard()}
+          onTutorContinue={() =>
+            setGuidedOnboarding((g) => (g && g.step === 5 ? { ...g, step: 6 } : g))
+          }
+          finishLoading={guidedFinishLoading}
+          improveButtonRef={improveButtonRef}
+          showImproveCoach={guidedOnboarding.step === 2}
+          showMagicCoach={guidedOnboarding.step === 3}
+          showFlashcardCoach={
+            guidedOnboarding.step === 4 && studyMode === "flashcards" && flashcards.length > 0
+          }
+          showTutorCoach={guidedOnboarding.step === 5}
+          currentStreak={userStats?.current_streak ?? 1}
+        />
       ) : null}
     </div>
   );
@@ -2116,6 +3133,7 @@ function EditorPanel({
   onSuggestApply,
   onSuggestDismiss,
   onImprove,
+  improveButtonRef,
   onGenerateTitle,
   onSuggestTags,
   onStudy,
@@ -2126,6 +3144,8 @@ function EditorPanel({
   onSuggestTagAccept,
   onSuggestTagDismiss,
   onToolbarErrorDismiss,
+  shareToolbarSlot,
+  voiceToNotesToolbar,
   studyProgressCompletion,
   onDeleteRequest,
 }: {
@@ -2151,6 +3171,7 @@ function EditorPanel({
   onSuggestApply: () => void;
   onSuggestDismiss: () => void;
   onImprove: () => void;
+  improveButtonRef?: React.RefObject<HTMLElement | null>;
   onGenerateTitle: () => void;
   onSuggestTags: () => void;
   onStudy: () => void;
@@ -2161,6 +3182,8 @@ function EditorPanel({
   onSuggestTagAccept: (tag: string) => void;
   onSuggestTagDismiss: () => void;
   onToolbarErrorDismiss: () => void;
+  shareToolbarSlot?: React.ReactNode;
+  voiceToNotesToolbar?: React.ReactNode;
   studyProgressCompletion: StudyProgressCompletion;
   onDeleteRequest: () => void;
 }) {
@@ -2227,6 +3250,8 @@ function EditorPanel({
               </option>
             ))}
           </select>
+          {shareToolbarSlot}
+          {voiceToNotesToolbar}
           <Button size="sm" variant="ghost" onClick={() => void onClaudeSummarize()} disabled={summaryLoading}>
             {summaryLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
             Summarize
@@ -2326,10 +3351,12 @@ function EditorPanel({
           </div>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="ghost" onClick={() => void onImprove()} disabled={improveLoading}>
-            {improveLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-            Improve
-          </Button>
+          <span ref={improveButtonRef as React.RefObject<HTMLSpanElement>} className="inline-flex">
+            <Button size="sm" variant="ghost" onClick={() => void onImprove()} disabled={improveLoading}>
+              {improveLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+              Improve
+            </Button>
+          </span>
           <Button size="sm" variant="ghost" onClick={() => void onGenerateTitle()} disabled={titleLoading}>
             {titleLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
             Generate Title
@@ -2634,6 +3661,7 @@ function CategoryTab({
   count,
   selected,
   onClick,
+  onStudyGuide,
   onRename,
   onDelete,
 }: {
@@ -2644,18 +3672,19 @@ function CategoryTab({
   count?: number;
   selected: boolean;
   onClick: () => void;
+  onStudyGuide?: () => void;
   onRename?: () => void;
   onDelete?: () => void;
 }) {
   const [menu, setMenu] = React.useState(false);
   const isAll = id === "all";
   return (
-    <div className="group relative">
+    <div className="group relative flex w-full min-w-0 items-center gap-0.5">
       <button
         type="button"
         onClick={onClick}
         className={cn(
-          "flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition duration-200",
+          "flex min-h-11 min-w-0 flex-1 touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition duration-200",
           selected
             ? "bg-gradient-to-r from-purple-500/18 to-blue-500/10 text-white shadow-[inset_0_0_0_1px_rgba(168,85,247,0.25)]"
             : "text-white/70 hover:bg-white/[0.05] hover:text-white/92"
@@ -2683,16 +3712,34 @@ function CategoryTab({
             {count}
           </span>
         ) : null}
-        {!isAll && (onRename || onDelete) ? (
-          <ChevronRight
-            className="h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenu((m) => !m);
-            }}
-          />
-        ) : null}
       </button>
+      {onStudyGuide && !isAll ? (
+        <button
+          type="button"
+          className="flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg text-violet-300/90 opacity-90 transition hover:bg-violet-500/15 hover:text-violet-200 md:opacity-0 md:group-hover:opacity-100"
+          aria-label={`Generate study guide for ${name}`}
+          title="Generate study guide (Pro)"
+          onClick={(e) => {
+            e.stopPropagation();
+            onStudyGuide();
+          }}
+        >
+          <Sparkles className="h-4 w-4" strokeWidth={2} />
+        </button>
+      ) : null}
+      {!isAll && (onRename || onDelete) ? (
+        <button
+          type="button"
+          className="flex h-9 w-6 shrink-0 touch-manipulation items-center justify-center rounded-lg text-white/40 opacity-90 transition hover:bg-white/10 hover:text-white/70 md:opacity-0 md:group-hover:opacity-100"
+          aria-label={`Category actions for ${name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenu((m) => !m);
+          }}
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
       {menu && !isAll && (
         <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[8rem] rounded-xl border border-white/[0.08] bg-black/95 py-1 shadow-xl">
           {onRename && (
@@ -2828,12 +3875,14 @@ function StudyModal({
   onSaveQuiz,
   savedStudySetId = null,
   onQuizSessionComplete,
+  studyLeaveButtonLabel = "Back to notes",
 }: {
   studyScope?: "single" | "multi" | "saved";
   savedSetTitle?: string;
   reviewDueOnly?: boolean;
   savedStudySetId?: string | null;
   onQuizSessionComplete?: (savedSetId: string | null) => void;
+  studyLeaveButtonLabel?: string;
   mode: string;
   flashcards: { front: string; back: string }[];
   quizQuestions: { question: string; options: string[]; correctIndex: number; explanation?: string }[];
@@ -3215,7 +4264,7 @@ function StudyModal({
                   onClick={onClose}
                   className="w-full border border-white/15 bg-white/[0.06] text-white hover:bg-white/10 sm:w-auto sm:min-w-[140px]"
                 >
-                  Back to notes
+                  {studyLeaveButtonLabel}
                 </Button>
               </div>
             </div>

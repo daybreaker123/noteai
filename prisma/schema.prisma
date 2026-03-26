@@ -45,6 +45,10 @@ model User {
   createdAt          DateTime             @default(now())
   /** Set when the user finishes or skips the first-time onboarding flow. */
   onboardingCompletedAt DateTime?
+  /** First-time guided onboarding: high_school | university | graduate | lifelong */
+  onboardingPersona      String?
+  /** Supabase note id for the interactive onboarding sample note. */
+  onboardingSampleNoteId String?
   accounts           Account[]
   sessions           Session[]
   passwordResetTokens PasswordResetToken[]

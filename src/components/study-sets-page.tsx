@@ -4,11 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Bookmark, Loader2, Trash2, BookOpen, X } from "lucide-react";
+import { ArrowLeft, Bookmark, Loader2, Trash2, BookOpen, X, Link2 } from "lucide-react";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { Button, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Note, StudySetSummary } from "@/lib/api-types";
+import { ShareResourceModal } from "@/components/share-resource-modal";
 import type { FlashcardDueSummaryItem } from "@/lib/flashcard-progress-types";
 
 export function StudySetsPage() {
@@ -20,6 +21,8 @@ export function StudySetsPage() {
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [dueItems, setDueItems] = React.useState<FlashcardDueSummaryItem[]>([]);
+  const [shareStudySetId, setShareStudySetId] = React.useState<string | null>(null);
+  const [linkCopiedToast, setLinkCopiedToast] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -55,6 +58,12 @@ export function StudySetsPage() {
   React.useEffect(() => {
     if (status === "authenticated") void load();
   }, [status, load]);
+
+  React.useEffect(() => {
+    if (!linkCopiedToast) return;
+    const t = window.setTimeout(() => setLinkCopiedToast(false), 2500);
+    return () => window.clearTimeout(t);
+  }, [linkCopiedToast]);
 
   function sourceLabel(s: StudySetSummary): string {
     if (!s.note_id) return "Multiple or unsourced";
@@ -172,9 +181,7 @@ export function StudySetsPage() {
                         type="button"
                         size="sm"
                         className="w-full shrink-0 border-0 bg-gradient-to-r from-amber-600/90 to-orange-600/90 text-white hover:from-amber-500 hover:to-orange-500 sm:w-auto"
-                        onClick={() =>
-                          router.push(`/notes?reviewDueSet=${encodeURIComponent(d.id)}`)
-                        }
+                        onClick={() => router.push(`/study-sets/review/${encodeURIComponent(d.id)}`)}
                       >
                         Review due cards
                       </Button>
@@ -237,10 +244,24 @@ export function StudySetsPage() {
                     type="button"
                     size="sm"
                     className="min-h-12 flex-1 gap-1.5 bg-gradient-to-r from-violet-600/90 to-indigo-600/90 text-base font-medium text-white shadow-md shadow-violet-900/20 transition hover:from-violet-500 hover:to-indigo-500 sm:min-h-10 sm:text-sm"
-                    onClick={() => router.push(`/notes?openStudySet=${encodeURIComponent(s.id)}`)}
+                    onClick={() => router.push(`/study-sets/set/${encodeURIComponent(s.id)}`)}
                   >
                     <BookOpen className="h-3.5 w-3.5" />
                     Open
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-12 min-w-12 shrink-0 border border-white/10 px-0 text-white/80 hover:border-purple-500/35 hover:bg-purple-500/10 hover:text-white sm:min-h-10 sm:min-w-12 sm:px-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShareStudySetId(s.id);
+                    }}
+                    aria-label="Share study set"
+                    title="Share"
+                  >
+                    <Link2 className="h-4 w-4" />
                   </Button>
                   <Button
                     type="button"
@@ -265,6 +286,21 @@ export function StudySetsPage() {
           </>
         )}
       </main>
+      {linkCopiedToast ? (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-4 py-2.5 text-sm text-white shadow-lg backdrop-blur">
+          Link copied!
+        </div>
+      ) : null}
+      {shareStudySetId ? (
+        <ShareResourceModal
+          open
+          onClose={() => setShareStudySetId(null)}
+          resourceType="study_set"
+          resourceId={shareStudySetId}
+          title="Share study set"
+          onCopied={() => setLinkCopiedToast(true)}
+        />
+      ) : null}
     </div>
   );
 }
