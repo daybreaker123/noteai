@@ -92,25 +92,54 @@ export function VoiceToNotesControl({
       const fd = new FormData();
       fd.append("audio", file, filename);
       if (categoryId) fd.append("category_id", categoryId);
+      const meta = {
+        filename,
+        size: file instanceof Blob ? file.size : undefined,
+        categoryIdProp: categoryId,
+      };
+      console.log("[voice-to-notes] POST /api/notes/voice-transcription (FormData)", meta);
+
       const res = await fetch("/api/notes/voice-transcription", {
         method: "POST",
         credentials: "include",
         body: fd,
       });
-      const json = (await res.json()) as VoiceTranscriptionSuccessPayload & {
+
+      const rawBody = await res.text();
+      console.log("[voice-to-notes] voice-transcription response", {
+        status: res.status,
+        ok: res.ok,
+        body: rawBody.slice(0, 8000),
+      });
+
+      let json: VoiceTranscriptionSuccessPayload & {
         error?: string;
         code?: string;
+        details?: string;
+        hint?: string;
       };
+      try {
+        json = JSON.parse(rawBody) as typeof json;
+      } catch {
+        onError(`Invalid server response (${res.status}).`);
+        return;
+      }
+
       if (json.code === "PRO_FEATURE_VOICE_TRANSCRIPTION" && res.status === 402) {
         onRequirePro();
         return;
       }
       if (!res.ok || !json.id) {
-        onError(json.error ?? "Voice transcription failed.");
+        const parts = [json.error, json.details, json.hint].filter(
+          (x): x is string => typeof x === "string" && x.trim() !== ""
+        );
+        onError(parts.length > 0 ? parts.join(" — ") : "Voice transcription failed.");
         return;
       }
+      console.log("[voice-to-notes] success note id:", json.id, "title:", json.title, "content length:", json.content?.length);
       await onSuccess(json);
-    } catch {
+    } catch (e) {
+      console.error("[voice-to-notes] postAudio error", e);
       onError("Something went wrong. Please try again.");
     } finally {
       setProcessing(false);

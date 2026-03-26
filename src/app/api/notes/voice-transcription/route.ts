@@ -7,6 +7,7 @@ import { anthropicImproveNoteContent } from "@/lib/anthropic-improve-note";
 import { hasOpenAIKey, transcribeAudioWithWhisper } from "@/lib/openai-whisper";
 import { migratePlainTextToHtml, normalizeImprovedNoteHtml } from "@/lib/note-content-html";
 import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
+import { normalizeOptionalCategoryId } from "@/lib/category-id";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -140,8 +141,10 @@ export async function POST(req: Request) {
   }
 
   const categoryRaw = form.get("category_id");
-  const categoryId =
-    typeof categoryRaw === "string" && categoryRaw.trim() !== "" ? categoryRaw.trim() : null;
+  const categoryId = normalizeOptionalCategoryId(categoryRaw);
+  if (typeof categoryRaw === "string" && categoryRaw.trim() !== "" && categoryId === null) {
+    console.warn("[voice-transcription] dropped invalid category_id (not a UUID):", categoryRaw.slice(0, 80));
+  }
 
   const buf = Buffer.from(await file.arrayBuffer());
   const mime = defaultMimeForFile(file);
@@ -157,6 +160,11 @@ export async function POST(req: Request) {
       { status: 502 }
     );
   }
+
+  console.log("[voice-transcription] whisper raw transcript:", {
+    length: transcript.length,
+    text: transcript,
+  });
 
   if (!transcript.trim()) {
     return NextResponse.json(
@@ -183,28 +191,61 @@ export async function POST(req: Request) {
     finalContent = rawHtml;
   }
 
+  const insertPayload = {
+    user_id: session.user.id,
+    category_id: categoryId,
+    title,
+    content: finalContent,
+    pinned: false,
+    tags: [] as string[],
+    ...(improvedOk ? { improved_at: new Date().toISOString() } : {}),
+  };
+  console.log("[voice-transcription] inserting note:", {
+    user_id: session.user.id,
+    category_id: categoryId,
+    titleLen: title.length,
+    contentLen: finalContent.length,
+    improve_applied: improvedOk,
+  });
+
   const { data: inserted, error: insertErr } = await supabaseAdmin
     .from("notes")
-    .insert({
-      user_id: session.user.id,
-      category_id: categoryId,
-      title,
-      content: finalContent,
-      pinned: false,
-      tags: [],
-      ...(improvedOk ? { improved_at: new Date().toISOString() } : {}),
-    })
+    .insert(insertPayload)
     .select()
     .single();
 
   if (insertErr || !inserted) {
-    console.error("[voice-transcription] insert", insertErr);
-    return NextResponse.json({ error: "Couldn't save your note. Please try again." }, { status: 500 });
+    console.error("[voice-transcription] insert failed:", {
+      message: insertErr?.message,
+      code: insertErr?.code,
+      details: insertErr?.details,
+      hint: insertErr?.hint,
+    });
+    return NextResponse.json(
+      {
+        error: insertErr?.message ?? "Couldn't save your note. Please try again.",
+        code: insertErr?.code,
+        details: insertErr?.details,
+        hint: insertErr?.hint,
+      },
+      { status: 500 }
+    );
   }
 
-  await incrementVoiceTranscription(session.user.id);
+  try {
+    await incrementVoiceTranscription(session.user.id);
+  } catch (e) {
+    console.warn("[voice-transcription] incrementVoiceTranscription:", e);
+  }
 
-  const streak = await recordStudyActivity(session.user.id);
+  let streak;
+  try {
+    streak = await recordStudyActivity(session.user.id);
+  } catch (e) {
+    console.warn("[voice-transcription] recordStudyActivity:", e);
+    streak = { current_streak: 0, milestone: null };
+  }
+
   return NextResponse.json({
     ...inserted,
     improve_applied: improvedOk,

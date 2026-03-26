@@ -1361,8 +1361,13 @@ export function NoteApp({
       content: string;
       category_id: string | null;
     } & Record<string, unknown>) => {
+      console.log("[note-app] voice transcription success payload", {
+        id: json.id,
+        title: json.title,
+        category_id: json.category_id,
+        contentLength: typeof json.content === "string" ? json.content.length : 0,
+      });
       consumeStreakJson(json);
-      await actions.refresh();
       lastLoadedEditorNoteIdRef.current = null;
       setSelectedNoteId(json.id);
       setEditTitle(json.title ?? "Untitled");
@@ -1377,6 +1382,11 @@ export function NoteApp({
       setMobileSidebarOpen(false);
       setVoiceNotesError(null);
       setToolbarError(null);
+      try {
+        await actions.refresh();
+      } catch (e) {
+        console.error("[note-app] refresh after voice note failed (editor already updated)", e);
+      }
       void loadUserStats();
     },
     [actions, consumeStreakJson, loadUserStats]
@@ -2532,7 +2542,10 @@ export function NoteApp({
                 categoryId={selectedNote!.category_id ?? null}
                 disabled={improveLoading || summarizeLoading}
                 onRequirePro={() => setUpgradeModal({ show: true, feature: "voiceTranscription" })}
-                onError={(m) => setToolbarError(m)}
+                onError={(m) => {
+                  setToolbarError(m);
+                  setVoiceNotesError(m);
+                }}
                 onSuccess={handleVoiceTranscriptionSuccess}
               />
             }

@@ -30,5 +30,7 @@ export async function transcribeAudioWithWhisper(
     throw new Error(t || "Whisper transcription failed");
   }
   const json = (await res.json()) as { text?: string };
-  return (json.text ?? "").trim();
+  const text = (json.text ?? "").trim();
+  console.log("[openai-whisper] raw transcript from Whisper API:", text);
+  return text;
 }
