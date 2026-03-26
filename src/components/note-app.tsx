@@ -19,6 +19,9 @@ import {
   normalizeImprovedNoteHtml,
   noteContentPreview,
 } from "@/lib/note-content-html";
+import type { ConceptMapData } from "@/lib/concept-map-types";
+import { conceptMapToNotePlainText } from "@/lib/concept-map-types";
+import { ConceptMapModal } from "@/components/concept-map-modal";
 import { studyGuideMarkdownToHtml } from "@/lib/study-guide-markdown";
 import { TutorMarkdown } from "@/components/tutor-markdown";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
@@ -80,6 +83,7 @@ import {
   Quote,
   Link2,
   Presentation,
+  Network,
 } from "lucide-react";
 
 type StudaraUserStats = {
@@ -104,6 +108,8 @@ const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
     "Voice to Notes records or uploads lecture audio, transcribes it with AI, and turns it into structured study notes.",
   slidesAnalysis:
     "Analyze Slides turns PowerPoint or PDF lecture decks into detailed, structured study notes with Claude.",
+  conceptMap:
+    "Concept Map uses AI to pull out key ideas from your notes and shows how they connect in an interactive diagram you can rearrange, export, or save.",
 };
 
 /** Skip global ⌘N / ⌘K when typing in the editor or any form field. */
@@ -258,7 +264,7 @@ export function NoteApp({
 
   const downloadStudyGuidePdf = React.useCallback(async () => {
     if (!studyGuideModal || !studyGuideText?.trim()) return;
-    const { default: jsPDF } = await import("jspdf");
+    const { jsPDF } = await import("jspdf");
     const doc = new jsPDF();
     doc.setFontSize(16);
     doc.text(`Study guide — ${studyGuideModal.categoryName}`, 20, 20);
@@ -356,6 +362,10 @@ export function NoteApp({
   const [studySaveLoading, setStudySaveLoading] = React.useState<"flashcards" | "quiz" | null>(null);
   const [studyError, setStudyError] = React.useState<string | null>(null);
   const [improveLoading, setImproveLoading] = React.useState(false);
+  const [conceptMapModalOpen, setConceptMapModalOpen] = React.useState(false);
+  const [conceptMapGraph, setConceptMapGraph] = React.useState<ConceptMapData | null>(null);
+  const [conceptMapLoading, setConceptMapLoading] = React.useState(false);
+  const [conceptMapSaveNoteLoading, setConceptMapSaveNoteLoading] = React.useState(false);
   const [titleLoading, setTitleLoading] = React.useState(false);
   const [tagsLoading, setTagsLoading] = React.useState(false);
   const [suggestTagsChips, setSuggestTagsChips] = React.useState<string[] | null>(null);
@@ -508,6 +518,78 @@ export function NoteApp({
   const [editContent, setEditContent] = React.useState("");
   /** Bumps when AI replaces full body so Tiptap remounts with new HTML. */
   const [editorContentRevision, setEditorContentRevision] = React.useState(0);
+
+  const requestConceptMap = React.useCallback(async () => {
+    if (plan !== "pro") {
+      setUpgradeModal({ show: true, feature: "conceptMap" });
+      return;
+    }
+    const plain = htmlToPlainText(editContent).trim();
+    if (!plain) {
+      setToolbarError("Add some note content first.");
+      return;
+    }
+    setToolbarError(null);
+    setConceptMapLoading(true);
+    try {
+      const res = await fetch("/api/ai/anthropic/concept-map", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editContent }),
+      });
+      const json = (await res.json().catch(() => null)) as {
+        graph?: ConceptMapData;
+        error?: string;
+        code?: string;
+      };
+      if (json?.code === "PRO_FEATURE_CONCEPT_MAP" && res.status === 402) {
+        setUpgradeModal({ show: true, feature: "conceptMap" });
+        return;
+      }
+      if (!res.ok || !json?.graph) {
+        setToolbarError(json?.error ?? "Could not generate concept map.");
+        return;
+      }
+      consumeStreakJson(json);
+      setConceptMapGraph(json.graph);
+      setConceptMapModalOpen(true);
+    } catch {
+      setToolbarError("Something went wrong. Try again.");
+    } finally {
+      setConceptMapLoading(false);
+    }
+  }, [plan, editContent, consumeStreakJson, setUpgradeModal]);
+
+  const saveConceptMapAsNote = React.useCallback(
+    async (data: ConceptMapData) => {
+      if (!selectedNote) return;
+      setConceptMapSaveNoteLoading(true);
+      setToolbarError(null);
+      try {
+        const sourceTitle = (editTitle || "Untitled").trim();
+        const plain = conceptMapToNotePlainText(sourceTitle, data);
+        const html = ensureEditorHtml(plain);
+        const titleBase = sourceTitle.slice(0, 80);
+        const title = `Concept map — ${titleBase || "Note"}`;
+        const note = await actions.create(selectedNote.category_id ?? null, title);
+        if (note) {
+          await actions.update(note.id, { content: html });
+          if (note.category_id) setSelectedCategoryId(note.category_id);
+          setSelectedNoteId(note.id);
+          setEditTitle(note.title);
+          setEditContent(html);
+          setEditorContentRevision((r) => r + 1);
+          setConceptMapModalOpen(false);
+          setConceptMapGraph(null);
+        }
+      } catch {
+        setToolbarError("Could not save concept map as a note.");
+      } finally {
+        setConceptMapSaveNoteLoading(false);
+      }
+    },
+    [selectedNote, editTitle, actions, setSelectedCategoryId, setSelectedNoteId]
+  );
   const editTitleRef = React.useRef(editTitle);
   const editContentRef = React.useRef(editContent);
   const skipSyncRef = React.useRef(false);
@@ -2341,7 +2423,7 @@ export function NoteApp({
                 setUpgradeModal({ show: true, feature: "export" });
                 return;
               }
-              const { default: jsPDF } = await import("jspdf");
+              const { jsPDF } = await import("jspdf");
               const title = (editTitle || "Untitled").trim() || "note";
               const doc = new jsPDF();
               doc.setFontSize(16);
@@ -2404,6 +2486,9 @@ export function NoteApp({
             }}
             autoCategorizeLoading={autoCategorizeLoading}
             improveLoading={improveLoading}
+            onConceptMap={() => void requestConceptMap()}
+            conceptMapLoading={conceptMapLoading}
+            conceptMapDisabled={!htmlToPlainText(editContent).trim()}
             titleLoading={titleLoading}
             tagsLoading={tagsLoading}
             suggestTagsChips={suggestTagsChips}
@@ -2658,7 +2743,7 @@ export function NoteApp({
                         setUpgradeModal({ show: true, feature: "export" });
                         return;
                       }
-                      const { default: jsPDF } = await import("jspdf");
+                      const { jsPDF } = await import("jspdf");
                       const doc = new jsPDF();
                       doc.setFontSize(16);
                       doc.text(note.title, 20, 20);
@@ -3014,6 +3099,18 @@ export function NoteApp({
         />
       ) : null}
 
+      <ConceptMapModal
+        open={conceptMapModalOpen}
+        onClose={() => {
+          setConceptMapModalOpen(false);
+          setConceptMapGraph(null);
+        }}
+        graph={conceptMapGraph}
+        sourceTitle={editTitle || "Untitled"}
+        onSaveAsNote={saveConceptMapAsNote}
+        saveNoteLoading={conceptMapSaveNoteLoading}
+      />
+
       {saveErrorMessage ? (
         <div
           role="alert"
@@ -3124,6 +3221,9 @@ function EditorPanel({
   summaryLoading,
   autoCategorizeLoading,
   improveLoading,
+  onConceptMap,
+  conceptMapLoading,
+  conceptMapDisabled,
   titleLoading,
   tagsLoading,
   suggestTagsChips,
@@ -3162,6 +3262,9 @@ function EditorPanel({
   summaryLoading: boolean;
   autoCategorizeLoading: boolean;
   improveLoading: boolean;
+  onConceptMap: () => void;
+  conceptMapLoading: boolean;
+  conceptMapDisabled: boolean;
   titleLoading: boolean;
   tagsLoading: boolean;
   suggestTagsChips: string[] | null;
@@ -3357,6 +3460,20 @@ function EditorPanel({
               Improve
             </Button>
           </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onConceptMap}
+            disabled={conceptMapLoading || conceptMapDisabled}
+            title={conceptMapDisabled ? "Add note content to generate a concept map" : undefined}
+          >
+            {conceptMapLoading ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Network className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Concept Map
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => void onGenerateTitle()} disabled={titleLoading}>
             {titleLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
             Generate Title
