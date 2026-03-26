@@ -5,9 +5,14 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hasAnthropicKey } from "@/lib/anthropic";
 import { anthropicImproveVoiceTranscription } from "@/lib/anthropic-improve-note";
 import { hasOpenAIKey, transcribeAudioWithWhisper } from "@/lib/openai-whisper";
-import { normalizeImprovedNoteHtml } from "@/lib/note-content-html";
+import { htmlToPlainText, normalizeImprovedNoteHtml } from "@/lib/note-content-html";
 import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 import { normalizeOptionalCategoryId } from "@/lib/category-id";
+
+/** Same UUID shape as category ids; used for `append_note_id`. */
+function parseOptionalNoteUuid(raw: unknown): string | null {
+  return normalizeOptionalCategoryId(raw);
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -197,6 +202,102 @@ export async function POST(req: Request) {
   }
 
   const improvedAt = new Date().toISOString();
+
+  const skipPersist = form.get("skip_persist") === "true";
+  const appendRaw = form.get("append_note_id");
+  let appendNoteId: string | null = null;
+  if (typeof appendRaw === "string" && appendRaw.trim() !== "") {
+    appendNoteId = parseOptionalNoteUuid(appendRaw);
+    if (appendNoteId === null) {
+      return NextResponse.json({ error: "Invalid note id for append." }, { status: 400 });
+    }
+  }
+
+  if (skipPersist && appendNoteId) {
+    return NextResponse.json(
+      { error: "Cannot combine append_note_id and skip_persist." },
+      { status: 400 }
+    );
+  }
+
+  async function finishWithUsageJson(extra: Record<string, unknown>) {
+    try {
+      await incrementVoiceTranscription(session.user.id);
+    } catch (e) {
+      console.warn("[voice-transcription] incrementVoiceTranscription:", e);
+    }
+    let streak;
+    try {
+      streak = await recordStudyActivity(session.user.id);
+    } catch (e) {
+      console.warn("[voice-transcription] recordStudyActivity:", e);
+      streak = { current_streak: 0, milestone: null };
+    }
+    return NextResponse.json({
+      improve_applied: true,
+      ...extra,
+      ...streakJson(streak),
+    });
+  }
+
+  if (skipPersist) {
+    console.log("[voice-transcription] skip_persist (draft append), contentLen:", finalContent.length);
+    return finishWithUsageJson({
+      draft_append: true,
+      content: finalContent,
+    });
+  }
+
+  if (appendNoteId) {
+    const { data: existingRow, error: fetchErr } = await supabaseAdmin
+      .from("notes")
+      .select("id, content")
+      .eq("id", appendNoteId)
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+
+    if (fetchErr || !existingRow) {
+      console.error("[voice-transcription] append fetch note:", fetchErr?.message);
+      return NextResponse.json({ error: "Note not found." }, { status: 404 });
+    }
+
+    const existingContent = typeof existingRow.content === "string" ? existingRow.content : "";
+    const hasBody = htmlToPlainText(existingContent).trim().length > 0;
+    const mergedContent = hasBody ? `${existingContent}<hr />${finalContent}` : finalContent;
+
+    const { data: updated, error: updateErr } = await supabaseAdmin
+      .from("notes")
+      .update({ content: mergedContent, improved_at: improvedAt })
+      .eq("id", appendNoteId)
+      .eq("user_id", session.user.id)
+      .select()
+      .single();
+
+    if (updateErr || !updated) {
+      console.error("[voice-transcription] append update failed:", {
+        message: updateErr?.message,
+        code: updateErr?.code,
+        details: updateErr?.details,
+        hint: updateErr?.hint,
+      });
+      return NextResponse.json(
+        {
+          error: updateErr?.message ?? "Couldn't update your note. Please try again.",
+          code: updateErr?.code,
+          details: updateErr?.details,
+          hint: updateErr?.hint,
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log("[voice-transcription] appended to note:", appendNoteId, "mergedLen:", mergedContent.length);
+    return finishWithUsageJson({
+      ...updated,
+      appended: true,
+    });
+  }
+
   const insertPayload = {
     user_id: session.user.id,
     category_id: categoryId,
@@ -238,23 +339,5 @@ export async function POST(req: Request) {
     );
   }
 
-  try {
-    await incrementVoiceTranscription(session.user.id);
-  } catch (e) {
-    console.warn("[voice-transcription] incrementVoiceTranscription:", e);
-  }
-
-  let streak;
-  try {
-    streak = await recordStudyActivity(session.user.id);
-  } catch (e) {
-    console.warn("[voice-transcription] recordStudyActivity:", e);
-    streak = { current_streak: 0, milestone: null };
-  }
-
-  return NextResponse.json({
-    ...inserted,
-    improve_applied: true,
-    ...streakJson(streak),
-  });
+  return finishWithUsageJson(inserted);
 }

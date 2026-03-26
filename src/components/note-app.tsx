@@ -34,7 +34,10 @@ import {
   type OnboardingPersona,
 } from "@/lib/onboarding-persona";
 import { NoteTemplatePickerModal } from "@/components/note-template-picker-modal";
-import { VoiceToNotesControl } from "@/components/voice-to-notes-control";
+import {
+  VoiceToNotesControl,
+  type VoiceTranscriptionSuccessPayload,
+} from "@/components/voice-to-notes-control";
 import { ShareResourceModal } from "@/components/share-resource-modal";
 import { noteTemplateDefaultTitle, noteTemplateHtml, type NoteTemplateId } from "@/lib/note-templates";
 import {
@@ -1354,19 +1357,62 @@ export function NoteApp({
   }
 
   const handleVoiceTranscriptionSuccess = React.useCallback(
-    async (json: {
-      id: string;
-      title: string;
-      content: string;
-      category_id: string | null;
-    } & Record<string, unknown>) => {
+    async (json: VoiceTranscriptionSuccessPayload) => {
       console.log("[note-app] voice transcription success payload", {
+        draft_append: json.draft_append,
+        appended: json.appended,
         id: json.id,
         title: json.title,
         category_id: json.category_id,
         contentLength: typeof json.content === "string" ? json.content.length : 0,
       });
       consumeStreakJson(json);
+      setVoiceNotesError(null);
+      setToolbarError(null);
+
+      if (json.draft_append === true) {
+        const chunk = ensureEditorHtml(json.content ?? "");
+        const mergeWithDivider = (baseRaw: string) => {
+          const base = ensureEditorHtml(baseRaw);
+          const hasBody = htmlToPlainText(base).trim().length > 0;
+          return hasBody ? `${base}<hr />${chunk}` : chunk;
+        };
+        setEditContent((prev) => mergeWithDivider(prev));
+        setDraftNote((d) => (d ? { ...d, content: mergeWithDivider(d.content ?? "") } : null));
+        setEditorContentRevision((r) => r + 1);
+        setMobileSidebarOpen(false);
+        try {
+          await actions.refresh();
+        } catch (e) {
+          console.error("[note-app] refresh after voice draft append failed", e);
+        }
+        void loadUserStats();
+        return;
+      }
+
+      if (json.appended === true && typeof json.id === "string") {
+        lastLoadedEditorNoteIdRef.current = json.id;
+        setSelectedNoteId(json.id);
+        setEditTitle(json.title ?? "Untitled");
+        setEditContent(ensureEditorHtml(json.content ?? ""));
+        setEditorContentRevision((r) => r + 1);
+        setDraftNote(null);
+        setStudyModal(null);
+        setGridSelectMode(false);
+        setGridSelectedIds(new Set());
+        setMultiStudyError(null);
+        setMobileSidebarOpen(false);
+        try {
+          await actions.refresh();
+        } catch (e) {
+          console.error("[note-app] refresh after voice append failed (editor already updated)", e);
+        }
+        void loadUserStats();
+        return;
+      }
+
+      if (typeof json.id !== "string") return;
+
       lastLoadedEditorNoteIdRef.current = null;
       setSelectedNoteId(json.id);
       setEditTitle(json.title ?? "Untitled");
@@ -1379,8 +1425,6 @@ export function NoteApp({
       setMultiStudyError(null);
       setNewNoteIds((prev) => new Set(prev).add(json.id));
       setMobileSidebarOpen(false);
-      setVoiceNotesError(null);
-      setToolbarError(null);
       try {
         await actions.refresh();
       } catch (e) {
@@ -2538,6 +2582,10 @@ export function NoteApp({
                 layout="editor"
                 plan={plan}
                 categoryId={selectedNote!.category_id ?? null}
+                appendNoteId={
+                  selectedNote!.id.startsWith("draft-") ? null : selectedNote!.id
+                }
+                draftVoiceAppend={selectedNote!.id.startsWith("draft-")}
                 disabled={improveLoading || summarizeLoading}
                 onRequirePro={() => setUpgradeModal({ show: true, feature: "voiceTranscription" })}
                 onError={(m) => {

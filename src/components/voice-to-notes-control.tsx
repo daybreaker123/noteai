@@ -10,11 +10,15 @@ const ACCEPT_AUDIO =
   "audio/mpeg,audio/mp4,audio/x-m4a,audio/m4a,audio/wav,audio/webm,video/mp4,.mp3,.m4a,.wav,.mp4";
 
 export type VoiceTranscriptionSuccessPayload = {
-  id: string;
-  title: string;
+  id?: string;
+  title?: string;
   content: string;
-  category_id: string | null;
+  category_id?: string | null;
   improve_applied?: boolean;
+  /** Server merged voice output into an existing persisted note. */
+  appended?: boolean;
+  /** Improved HTML only; client merges into a draft (no new DB row). */
+  draft_append?: boolean;
 } & Record<string, unknown>;
 
 function formatTimer(totalSeconds: number): string {
@@ -35,6 +39,10 @@ function pickRecorderMime(): string | null {
 type VoiceToNotesControlProps = {
   plan: "free" | "pro";
   categoryId: string | null;
+  /** Persisted note id: append improved transcription after `<hr />` instead of creating a note. */
+  appendNoteId?: string | null;
+  /** Draft editor: return improved HTML only; parent merges into the open draft. */
+  draftVoiceAppend?: boolean;
   disabled?: boolean;
   onRequirePro: () => void;
   onError: (message: string) => void;
@@ -45,6 +53,8 @@ type VoiceToNotesControlProps = {
 export function VoiceToNotesControl({
   plan,
   categoryId,
+  appendNoteId = null,
+  draftVoiceAppend = false,
   disabled = false,
   onRequirePro,
   onError,
@@ -92,10 +102,14 @@ export function VoiceToNotesControl({
       const fd = new FormData();
       fd.append("audio", file, filename);
       if (categoryId) fd.append("category_id", categoryId);
+      if (appendNoteId) fd.append("append_note_id", appendNoteId);
+      if (draftVoiceAppend) fd.append("skip_persist", "true");
       const meta = {
         filename,
         size: file instanceof Blob ? file.size : undefined,
         categoryIdProp: categoryId,
+        appendNoteId: appendNoteId ?? undefined,
+        draftVoiceAppend,
       };
       console.log("[voice-to-notes] POST /api/notes/voice-transcription (FormData)", meta);
 
@@ -129,14 +143,24 @@ export function VoiceToNotesControl({
         onRequirePro();
         return;
       }
-      if (!res.ok || !json.id) {
+      const okPayload =
+        typeof json.content === "string" &&
+        (json.draft_append === true || (typeof json.id === "string" && json.id.length > 0));
+      if (!res.ok || !okPayload) {
         const parts = [json.error, json.details, json.hint].filter(
           (x): x is string => typeof x === "string" && x.trim() !== ""
         );
         onError(parts.length > 0 ? parts.join(" — ") : "Voice transcription failed.");
         return;
       }
-      console.log("[voice-to-notes] success note id:", json.id, "title:", json.title, "content length:", json.content?.length);
+      console.log(
+        "[voice-to-notes] success",
+        json.draft_append ? "draft_append" : json.appended ? "appended" : "new note",
+        "id:",
+        json.id,
+        "content length:",
+        json.content?.length
+      );
       await onSuccess(json);
     } catch (e) {
       console.error("[voice-to-notes] postAudio error", e);
