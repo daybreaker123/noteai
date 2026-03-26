@@ -3671,7 +3671,7 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "group max-w-full overflow-x-hidden rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] p-5 transition hover:border-purple-500/30 hover:bg-[var(--btn-default-bg)]",
+        "note-dashboard-card group max-w-full overflow-x-hidden rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] p-5 transition hover:border-purple-500/30 hover:bg-[var(--btn-default-bg)]",
         selectMode ? "cursor-default" : "cursor-pointer",
         selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30",
         categoryColor && "border-l-4"

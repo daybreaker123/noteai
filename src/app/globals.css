@@ -469,3 +469,14 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
   color: var(--tiptap-placeholder);
   pointer-events: none;
 }
+
+/* Dashboard note cards — hide scrollbars; line-clamp / ellipsis unchanged */
+.note-dashboard-card,
+.note-dashboard-card * {
+  scrollbar-width: none;
+}
+
+.note-dashboard-card::-webkit-scrollbar,
+.note-dashboard-card *::-webkit-scrollbar {
+  display: none;
+}
