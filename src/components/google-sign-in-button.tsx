@@ -47,8 +47,8 @@ export function GoogleSignInButton({ callbackUrl }: { callbackUrl: string }) {
 
   if (!ready) {
     return (
-      <div className="mt-4 border-t border-white/10 pt-4">
-        <div className="h-10 w-full animate-pulse rounded-xl bg-white/5" aria-hidden />
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <div className="h-10 w-full animate-pulse rounded-xl bg-[var(--input-bg)]" aria-hidden />
       </div>
     );
   }
@@ -56,10 +56,10 @@ export function GoogleSignInButton({ callbackUrl }: { callbackUrl: string }) {
   if (!show) return null;
 
   return (
-    <div className="mt-4 border-t border-white/10 pt-4">
+    <div className="mt-4 border-t border-[var(--border)] pt-4">
       <Button
         type="button"
-        className="w-full border border-white/15 bg-white/[0.06] text-white hover:bg-white/10 hover:border-white/25"
+        className="w-full border border-[var(--border)] bg-[var(--badge-free-bg)] text-[var(--text)] hover:bg-[var(--btn-default-bg)] hover:border-[var(--border)]"
         onClick={handleGoogle}
       >
         Continue with Google

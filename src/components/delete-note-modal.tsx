@@ -38,7 +38,7 @@ export function DeleteNoteModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-sm"
             onClick={loading ? undefined : onClose}
           />
           <motion.div
@@ -48,20 +48,20 @@ export function DeleteNoteModal({
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="relative w-full max-w-sm"
           >
-            <Card className="overflow-hidden border-white/10 bg-black/40 p-6 shadow-2xl backdrop-blur-xl">
+            <Card className="overflow-hidden border-[var(--border)] bg-[var(--chrome-40)] p-6 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Delete note</h3>
+                <h3 className="text-lg font-semibold text-[var(--text)]">Delete note</h3>
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={loading}
-                  className="rounded-lg p-1.5 text-white/50 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                  className="rounded-lg p-1.5 text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] disabled:opacity-50"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <p className="mt-4 text-sm text-white/70">
+              <p className="mt-4 text-sm text-[var(--muted)]">
                 Are you sure you want to delete this note? This cannot be undone.
               </p>
               <div className="mt-6 flex gap-3">

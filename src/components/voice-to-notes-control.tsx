@@ -212,9 +212,9 @@ export function VoiceToNotesControl({
       variant="ghost"
       disabled={disabled || recording || processing}
       className={cn(
-        "gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/15",
+        "gap-1.5 border border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--text)] hover:bg-[var(--btn-default-hover)]",
         isHero && "min-h-11 w-full max-w-xs justify-center",
-        isEditor && "shrink-0 border-white/10"
+        isEditor && "shrink-0 border-[var(--border)]"
       )}
       aria-expanded={menuOpen}
       aria-haspopup="menu"
@@ -231,26 +231,26 @@ export function VoiceToNotesControl({
     <div
       role="menu"
       className={cn(
-        "absolute z-[80] min-w-[15rem] rounded-xl border border-white/10 bg-[#14141c] py-1 shadow-xl shadow-black/50",
+        "absolute z-[80] min-w-[15rem] rounded-xl border border-[var(--border)] bg-[var(--surface-mid)] py-1 shadow-xl shadow-black/50",
         isHero ? "left-0 right-0 mt-2" : "right-0 top-[calc(100%+6px)]"
       )}
     >
       <button
         type="button"
         role="menuitem"
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-white/90 hover:bg-white/10"
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
         onClick={() => void startQuickRecord()}
       >
-        <Mic className="h-4 w-4 shrink-0 text-white/55" />
+        <Mic className="h-4 w-4 shrink-0 text-[var(--muted)]" />
         Quick Record
       </button>
       <button
         type="button"
         role="menuitem"
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-white/90 hover:bg-white/10"
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
         onClick={onUploadPick}
       >
-        <Upload className="h-4 w-4 shrink-0 text-white/55" />
+        <Upload className="h-4 w-4 shrink-0 text-[var(--muted)]" />
         Upload Audio
       </button>
     </div>
@@ -262,36 +262,36 @@ export function VoiceToNotesControl({
       <>
         {recording && (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay-scrim)] p-6 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-labelledby="voice-recording-title"
             aria-live="polite"
           >
-            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#12121a]/95 px-8 py-6 text-center shadow-xl shadow-purple-950/40">
+            <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-xl shadow-purple-950/40">
               <div className="flex items-center justify-center gap-2">
                 <span className="relative flex h-3 w-3">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-60" />
                   <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
                 </span>
-                <p id="voice-recording-title" className="text-sm font-semibold text-white">
+                <p id="voice-recording-title" className="text-sm font-semibold text-[var(--text)]">
                   Recording
                 </p>
               </div>
-              <p className="mt-4 font-mono text-3xl tabular-nums text-white">{formatTimer(seconds)}</p>
-              <p className="mt-2 text-xs text-white/50">Speak clearly; tap Stop when you’re done.</p>
+              <p className="mt-4 font-mono text-3xl tabular-nums text-[var(--text)]">{formatTimer(seconds)}</p>
+              <p className="mt-2 text-xs text-[var(--muted)]">Speak clearly; tap Stop when you’re done.</p>
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <Button
                   type="button"
                   variant="ghost"
-                  className="border border-white/15 text-white/80 hover:bg-white/10"
+                  className="border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
                   onClick={cancelRecording}
                 >
                   Cancel
                 </Button>
                 <Button
                   type="button"
-                  className="gap-2 border-0 bg-red-600 text-white hover:bg-red-500"
+                  className="gap-2 border-0 bg-red-600 text-[var(--text)] hover:bg-red-500"
                   onClick={stopRecording}
                 >
                   <Square className="h-3.5 w-3.5 fill-current" aria-hidden />
@@ -303,19 +303,19 @@ export function VoiceToNotesControl({
         )}
         {processing && (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay-scrim)] p-6 backdrop-blur-sm"
             role="alertdialog"
             aria-busy="true"
             aria-live="polite"
             aria-label="Transcribing audio"
           >
-            <div className="max-w-sm rounded-2xl border border-white/10 bg-[#12121a]/95 px-8 py-6 text-center shadow-xl shadow-purple-950/40">
+            <div className="max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-xl shadow-purple-950/40">
               <div
                 className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-purple-400 border-t-transparent"
                 aria-hidden
               />
-              <p className="mt-4 text-sm font-medium text-white">Transcribing &amp; improving notes…</p>
-              <p className="mt-1.5 text-xs text-white/50">This can take a minute for long recordings.</p>
+              <p className="mt-4 text-sm font-medium text-[var(--text)]">Transcribing &amp; improving notes…</p>
+              <p className="mt-1.5 text-xs text-[var(--muted)]">This can take a minute for long recordings.</p>
             </div>
           </div>
         )}

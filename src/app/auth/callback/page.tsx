@@ -50,8 +50,8 @@ function AuthCallbackContent() {
   }, [next]);
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0f]">
-      <div className="text-white/60">Redirecting…</div>
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)]">
+      <div className="text-[var(--muted)]">Redirecting…</div>
     </main>
   );
 }
@@ -66,8 +66,8 @@ function AuthCallbackContent() {
 export default function AuthCallbackPage() {
   return (
     <Suspense fallback={
-      <main className="flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0f]">
-        <div className="text-white/60">Redirecting…</div>
+      <main className="flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)]">
+        <div className="text-[var(--muted)]">Redirecting…</div>
       </main>
     }>
       <AuthCallbackContent />

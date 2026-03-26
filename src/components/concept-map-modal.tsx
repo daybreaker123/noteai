@@ -22,6 +22,7 @@ import type { NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { X, ZoomIn, ZoomOut, Maximize2, ImageDown, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui";
+import { useStudaraTheme } from "@/components/theme-provider";
 import type { ConceptMapData } from "@/lib/concept-map-types";
 
 type ConceptNodeData = { label: string; description: string };
@@ -31,11 +32,11 @@ function ConceptMapNode({ data }: NodeProps) {
   const label = d.label;
   const description = d.description;
   return (
-    <div className="w-[min(200px,42vw)] rounded-xl border-2 border-purple-500/45 bg-[#14141c] px-3 py-3 text-center shadow-lg shadow-black/40">
+    <div className="w-[min(200px,42vw)] rounded-xl border-2 border-purple-500/45 bg-[var(--surface-mid)] px-3 py-3 text-center shadow-lg shadow-black/40">
       <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-purple-400/90" />
       <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-0 !bg-purple-400/90" />
-      <p className="text-sm font-semibold leading-snug text-white">{label}</p>
-      {description ? <p className="mt-1.5 text-center text-xs leading-snug text-white/55">{description}</p> : null}
+      <p className="text-sm font-semibold leading-snug text-[var(--text)]">{label}</p>
+      {description ? <p className="mt-1.5 text-center text-xs leading-snug text-[var(--muted)]">{description}</p> : null}
       <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-0 !bg-purple-400/90" />
       <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-purple-400/90" />
     </div>
@@ -44,7 +45,7 @@ function ConceptMapNode({ data }: NodeProps) {
 
 const nodeTypes: NodeTypes = { concept: ConceptMapNode };
 
-function buildFlowElements(data: ConceptMapData): { nodes: Node[]; edges: Edge[] } {
+function buildFlowElements(data: ConceptMapData, edgeLabelBg: string): { nodes: Node[]; edges: Edge[] } {
   const n = data.nodes.length;
   const cx = 480;
   const cy = 340;
@@ -69,7 +70,7 @@ function buildFlowElements(data: ConceptMapData): { nodes: Node[]; edges: Edge[]
     type: "smoothstep",
     style: { stroke: "rgba(148, 163, 184, 0.45)", strokeWidth: 1.25 },
     labelStyle: { fill: "#94a3b8", fontSize: 11, fontWeight: 500 },
-    labelBgStyle: { fill: "#12121a", fillOpacity: 0.95 },
+    labelBgStyle: { fill: edgeLabelBg, fillOpacity: 0.95 },
     labelBgPadding: [6, 4] as [number, number],
     markerEnd: {
       type: MarkerType.ArrowClosed,
@@ -96,7 +97,9 @@ function ConceptMapCanvas({
   onSaveAsNote: () => void | Promise<void>;
   saveNoteLoading: boolean;
 }) {
-  const initial = React.useMemo(() => buildFlowElements(graph), [graph]);
+  const { theme } = useStudaraTheme();
+  const edgeLabelBg = theme === "light" ? "#ffffff" : "#12121a";
+  const initial = React.useMemo(() => buildFlowElements(graph, edgeLabelBg), [graph, edgeLabelBg]);
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
   const { fitView, zoomIn, zoomOut } = useReactFlow();
@@ -119,8 +122,12 @@ function ConceptMapCanvas({
     if (!el) return;
     setExporting(true);
     try {
+      const rootBg =
+        typeof document !== "undefined"
+          ? getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#0a0a0f"
+          : "#0a0a0f";
       const dataUrl = await toPng(el, {
-        backgroundColor: "#0a0a0f",
+        backgroundColor: rootBg,
         pixelRatio: 2,
         cacheBust: true,
       });
@@ -137,17 +144,17 @@ function ConceptMapCanvas({
 
   return (
     <>
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#0c0c12] px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--modal-surface)] px-4 py-3">
         <div className="min-w-0">
-          <h2 className="truncate text-lg font-semibold text-white">Concept map</h2>
-          <p className="truncate text-xs text-white/45">From: {sourceTitle || "Untitled"}</p>
+          <h2 className="truncate text-lg font-semibold text-[var(--text)]">Concept map</h2>
+          <p className="truncate text-xs text-[var(--muted)]">From: {sourceTitle || "Untitled"}</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            className="gap-1.5 border border-white/10 text-white/90 hover:bg-white/10"
+            className="gap-1.5 border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
             disabled={exporting}
             onClick={() => void handleSavePng()}
           >
@@ -158,7 +165,7 @@ function ConceptMapCanvas({
             type="button"
             size="sm"
             variant="ghost"
-            className="gap-1.5 border border-white/10 text-white/90 hover:bg-white/10"
+            className="gap-1.5 border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
             disabled={saveNoteLoading}
             onClick={() => void onSaveAsNote()}
           >
@@ -168,14 +175,14 @@ function ConceptMapCanvas({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)]"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
       </div>
-      <div ref={flowWrapRef} className="min-h-0 flex-1 bg-[#0a0a0f]" data-concept-map-canvas>
+      <div ref={flowWrapRef} className="min-h-0 flex-1 bg-[var(--bg)]" data-concept-map-canvas>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -186,11 +193,11 @@ function ConceptMapCanvas({
           minZoom={0.15}
           maxZoom={1.8}
           proOptions={{ hideAttribution: true }}
-          className="!bg-[#0a0a0f]"
+          className="!bg-[var(--bg)]"
         >
           <Background color="rgba(139, 92, 246, 0.12)" gap={22} size={1} />
           <Controls
-            className="!m-3 !overflow-hidden !rounded-xl !border !border-white/10 !bg-[#14141c] !shadow-lg [&_button]:!h-8 [&_button]:!w-8 [&_button]:!border-white/10 [&_button]:!bg-transparent [&_button]:!fill-white/80 [&_button:hover]:!bg-white/10"
+            className="!m-3 !overflow-hidden !rounded-xl !border !border-[var(--border)] !bg-[var(--surface-mid)] !shadow-lg [&_button]:!h-8 [&_button]:!w-8 [&_button]:!border-[var(--border)] [&_button]:!bg-transparent [&_button]:!fill-[var(--muted)] [&_button:hover]:!bg-[var(--btn-default-bg)]"
             showInteractive={false}
           />
           <Panel position="top-left" className="!m-3 mt-14 flex gap-2">
@@ -198,7 +205,7 @@ function ConceptMapCanvas({
               type="button"
               size="sm"
               variant="ghost"
-              className="border border-white/10 bg-[#14141c]/95 text-white/90 hover:bg-white/10"
+              className="border border-[var(--border)] bg-[var(--surface-mid)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
               onClick={() => zoomIn({ duration: 200 })}
             >
               <ZoomIn className="h-4 w-4" />
@@ -207,7 +214,7 @@ function ConceptMapCanvas({
               type="button"
               size="sm"
               variant="ghost"
-              className="border border-white/10 bg-[#14141c]/95 text-white/90 hover:bg-white/10"
+              className="border border-[var(--border)] bg-[var(--surface-mid)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
               onClick={() => zoomOut({ duration: 200 })}
             >
               <ZoomOut className="h-4 w-4" />
@@ -216,7 +223,7 @@ function ConceptMapCanvas({
               type="button"
               size="sm"
               variant="ghost"
-              className="border border-white/10 bg-[#14141c]/95 text-white/90 hover:bg-white/10"
+              className="border border-[var(--border)] bg-[var(--surface-mid)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
               onClick={() => fitView({ padding: 0.2, duration: 250 })}
             >
               <Maximize2 className="h-4 w-4" />
@@ -250,7 +257,7 @@ export function ConceptMapModal({
 
   return (
     <div
-      className="fixed inset-0 z-[140] flex flex-col bg-[#050508]"
+      className="fixed inset-0 z-[140] flex flex-col bg-[var(--bg)]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="concept-map-title"

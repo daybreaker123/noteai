@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui";
 import { StudaraWordmark, StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { cn } from "@/lib/cn";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { TutorImageLightbox } from "@/components/tutor-image-lightbox";
 import { TutorMarkdown } from "@/components/tutor-markdown";
 import {
@@ -673,12 +674,12 @@ export function TutorPage() {
   }, []);
 
   return (
-    <div className="relative flex h-dvh max-w-[100vw] flex-col overflow-x-hidden overflow-y-hidden bg-[#0a0a0f] text-white">
+    <div className="relative flex h-dvh max-w-[100vw] flex-col overflow-x-hidden overflow-y-hidden bg-[var(--bg)] text-[var(--text)]">
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -top-32 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/12 via-blue-500/8 to-fuchsia-500/8 blur-3xl" />
       </div>
 
-      <header className="relative z-10 shrink-0 border-b border-white/[0.08] bg-[#08080c]/92 backdrop-blur-xl backdrop-saturate-150">
+      <header className="relative z-10 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--header-bar)] backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex h-14 max-w-[2000px] items-center justify-between gap-3 px-3 sm:h-[3.25rem] sm:px-5">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <button
@@ -686,7 +687,7 @@ export function TutorPage() {
               aria-label="Open conversations"
               aria-expanded={mobileTutorSidebarOpen}
               onClick={() => setMobileTutorSidebarOpen(true)}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10 md:hidden touch-manipulation"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] transition hover:bg-[var(--btn-default-bg)] md:hidden touch-manipulation"
             >
               <Menu className="h-6 w-6" strokeWidth={2} aria-hidden />
             </button>
@@ -694,31 +695,34 @@ export function TutorPage() {
               href="/notes"
               linkClassName="shrink-0 touch-manipulation opacity-95 transition hover:opacity-100"
             />
-            <span className="hidden h-5 w-px shrink-0 bg-white/[0.1] sm:block" aria-hidden />
+            <span className="hidden h-5 w-px shrink-0 bg-[var(--divider-fade)] sm:block" aria-hidden />
             <div className="flex min-w-0 items-center gap-2">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-gradient-to-br from-purple-500/35 to-blue-500/25 shadow-sm shadow-purple-900/20">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-gradient-to-br from-purple-500/35 to-blue-500/25 shadow-sm shadow-purple-900/20">
                 <GraduationCap className="h-3.5 w-3.5 text-purple-100/95" strokeWidth={2} />
               </div>
-              <h1 className="truncate text-[0.9375rem] font-semibold tracking-tight text-white/95 sm:text-base">
+              <h1 className="truncate text-[0.9375rem] font-semibold tracking-tight text-[var(--text)] sm:text-base">
                 AI Tutor
               </h1>
             </div>
           </div>
-          <p className="hidden shrink-0 items-center gap-1.5 text-right text-[11px] leading-tight text-white/38 sm:flex">
-            <kbd className="rounded-md border border-white/[0.12] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/55">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <ThemeToggle variant="icon" />
+          <p className="hidden shrink-0 items-center gap-1.5 text-right text-[11px] leading-tight text-[var(--faint)] sm:flex">
+            <kbd className="rounded-md border border-[var(--border)] bg-[var(--hover-bg-subtle)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--muted)]">
               Enter
             </kbd>
             <span>to send</span>
-            <span className="text-white/25">·</span>
-            <kbd className="rounded-md border border-white/[0.12] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/55">
+            <span className="text-[var(--faint)]">·</span>
+            <kbd className="rounded-md border border-[var(--border)] bg-[var(--hover-bg-subtle)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--muted)]">
               Shift
             </kbd>
-            <span className="text-white/38">+</span>
-            <kbd className="rounded-md border border-white/[0.12] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] font-medium text-white/55">
+            <span className="text-[var(--faint)]">+</span>
+            <kbd className="rounded-md border border-[var(--border)] bg-[var(--hover-bg-subtle)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--muted)]">
               Enter
             </kbd>
             <span>new line</span>
           </p>
+          </div>
         </div>
       </header>
 
@@ -727,14 +731,14 @@ export function TutorPage() {
           role="presentation"
           aria-hidden={!mobileTutorSidebarOpen}
           className={cn(
-            "fixed inset-0 z-[35] bg-black/55 backdrop-blur-sm transition-opacity duration-300 md:hidden",
+            "fixed inset-0 z-[35] bg-[var(--overlay-scrim)] backdrop-blur-sm transition-opacity duration-300 md:hidden",
             mobileTutorSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
           )}
           onClick={() => setMobileTutorSidebarOpen(false)}
         />
         <aside
           className={cn(
-            "flex w-[min(17rem,92vw)] shrink-0 flex-col border-r border-white/[0.06] bg-black/20 backdrop-blur-xl md:w-72",
+            "flex w-[min(17rem,92vw)] shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] backdrop-blur-xl md:w-72",
             "fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:relative md:z-10 md:translate-x-0",
             mobileTutorSidebarOpen ? "translate-x-0 shadow-2xl shadow-black/40" : "-translate-x-full md:translate-x-0"
           )}
@@ -743,20 +747,20 @@ export function TutorPage() {
             <button
               type="button"
               onClick={newChat}
-              className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
+              className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
             >
               <Plus className="h-4 w-4" strokeWidth={2.5} />
               New chat
             </button>
           </div>
-          <div className="mx-4 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+          <div className="mx-4 h-px bg-gradient-to-r from-transparent via-[var(--divider-fade)] to-transparent" />
           <div className="tutor-sidebar-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-4">
             {loadingList ? (
-              <div className="flex justify-center py-4 text-white/40">
+              <div className="flex justify-center py-4 text-[var(--faint)]">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
             ) : conversations.length === 0 ? (
-              <p className="px-2 text-xs text-white/40">No chats yet — start below.</p>
+              <p className="px-2 text-xs text-[var(--faint)]">No chats yet — start below.</p>
             ) : (
               <ul className="space-y-1.5">
                 {conversations.map((c) => (
@@ -767,8 +771,8 @@ export function TutorPage() {
                       className={cn(
                         "min-h-11 min-w-0 flex-1 touch-manipulation truncate rounded-xl border border-transparent px-3 py-2.5 text-left text-sm transition duration-200",
                         c.id === activeConversationId
-                          ? "border-purple-500/35 bg-gradient-to-r from-purple-500/15 to-blue-500/10 text-white shadow-sm shadow-purple-900/10"
-                          : "text-white/65 hover:border-white/[0.06] hover:bg-white/[0.05] hover:text-white/92"
+                          ? "border-purple-500/35 bg-gradient-to-r from-purple-500/15 to-blue-500/10 text-[var(--text)] shadow-sm shadow-purple-900/10"
+                          : "text-[var(--muted)] hover:border-[var(--sidebar-border)] hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
                       )}
                     >
                       {c.title || "Chat"}
@@ -782,8 +786,8 @@ export function TutorPage() {
                         setConversationToDelete({ id: c.id, title: c.title || "Chat" });
                       }}
                       className={cn(
-                        "flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-white/30 transition hover:bg-red-500/12 hover:text-red-300/95",
-                        c.id === activeConversationId && "text-white/45"
+                        "flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-[var(--placeholder)] transition hover:bg-red-500/12 hover:text-red-300/95",
+                        c.id === activeConversationId && "text-[var(--muted)]"
                       )}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -793,13 +797,14 @@ export function TutorPage() {
               </ul>
             )}
           </div>
-          <div className="shrink-0 border-t border-white/[0.06] bg-black/15 p-4 backdrop-blur-sm">
+          <div className="shrink-0 border-t border-[var(--sidebar-border)] bg-[var(--sidebar-footer-bg)] p-4 backdrop-blur-sm">
+            <ThemeToggle className="mb-3" />
             <Link
               href="/notes"
               onClick={() => setMobileTutorSidebarOpen(false)}
-              className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-white/60 transition duration-200 hover:bg-white/[0.05] hover:text-white/90"
+              className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
             >
-              <ArrowLeft className="h-4 w-4 shrink-0 text-white/45" />
+              <ArrowLeft className="h-4 w-4 shrink-0 text-[var(--muted)]" />
               Back to notes
             </Link>
           </div>
@@ -834,8 +839,8 @@ export function TutorPage() {
           }}
         >
           {isDraggingFile ? (
-            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-purple-400/70 bg-[#0a0a0f]/85 backdrop-blur-sm">
-              <p className="rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm font-medium text-white">
+            <div className="studara-overlay-85 pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-purple-400/70 backdrop-blur-sm">
+              <p className="rounded-xl border border-[var(--border)] bg-[var(--chrome-50)] px-4 py-3 text-sm font-medium text-[var(--text)]">
                 Drop image, PDF, or Word file to attach
               </p>
             </div>
@@ -845,21 +850,21 @@ export function TutorPage() {
             className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 sm:px-8 md:pb-8 max-md:pb-[calc(13rem+env(safe-area-inset-bottom))]"
           >
             {loadingMessages && messages.length === 0 && !sending ? (
-              <div className="flex h-full items-center justify-center text-white/40">
+              <div className="flex h-full items-center justify-center text-[var(--faint)]">
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
             ) : messages.length === 0 && !sending && !awaitingTutorReply ? (
               <div className="flex min-h-[min(60vh,520px)] flex-col items-center justify-center px-4 text-center">
                 <div className="mb-6 flex flex-col items-center gap-3">
                   <StudaraWordmark className="text-3xl sm:text-4xl" />
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/20 to-blue-500/15 shadow-lg shadow-purple-900/20">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-gradient-to-br from-purple-500/20 to-blue-500/15 shadow-lg shadow-purple-900/20">
                     <GraduationCap className="h-8 w-8 text-purple-200/90" />
                   </div>
                 </div>
-                <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                <h2 className="text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
                   What are you working on today?
                 </h2>
-                <p className="mt-2 max-w-md text-sm text-white/45">
+                <p className="mt-2 max-w-md text-sm text-[var(--muted)]">
                   Paste or drop images, PDFs, or Word files — or start from a suggestion below.
                 </p>
                 <div className="mt-8 flex max-w-lg flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:justify-center">
@@ -874,7 +879,7 @@ export function TutorPage() {
                       key={label}
                       type="button"
                       onClick={() => applySuggestion(`${label} — `)}
-                      className="rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-white/80 backdrop-blur-sm transition hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white"
+                      className="rounded-full border border-[var(--border-subtle)] bg-[var(--input-bg)] px-4 py-2.5 text-sm text-[var(--text)] backdrop-blur-sm transition hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-[var(--text)]"
                     >
                       {label}
                     </button>
@@ -889,12 +894,12 @@ export function TutorPage() {
                     className={cn("flex gap-3", m.role === "user" ? "flex-row-reverse" : "flex-row")}
                   >
                     {m.role === "assistant" ? (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-emerald-500/30 to-blue-600/30">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-emerald-500/30 to-blue-600/30">
                         <GraduationCap className="h-4 w-4 text-emerald-200" />
                       </div>
                     ) : (
                       <div
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-purple-500/45 to-blue-500/35 text-[0.65rem] font-semibold uppercase leading-none tracking-tight text-white shadow-sm"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-purple-500/45 to-blue-500/35 text-[0.65rem] font-semibold uppercase leading-none tracking-tight text-[var(--text)] shadow-sm"
                         aria-label="You"
                       >
                         {userChatInitials}
@@ -904,8 +909,8 @@ export function TutorPage() {
                       className={cn(
                         "max-w-[88%] rounded-[1.35rem] px-5 py-4 text-[0.9375rem] leading-relaxed shadow-sm",
                         m.role === "user"
-                          ? "border border-white/10 bg-gradient-to-br from-purple-500/35 via-purple-500/22 to-blue-500/28 text-white shadow-purple-900/10"
-                          : "border border-white/[0.08] bg-[#14141c]/95 text-white/[0.94] shadow-black/20"
+                          ? "border border-[var(--border)] bg-gradient-to-br from-purple-500/35 via-purple-500/22 to-blue-500/28 text-[var(--text)] shadow-purple-900/10"
+                          : "border border-[var(--border-subtle)] bg-[var(--surface-mid)] text-[var(--text)]/[0.94] shadow-black/20"
                       )}
                     >
                       {m.role === "user" ? (
@@ -917,7 +922,7 @@ export function TutorPage() {
                                 key={i}
                                 src={`data:${a.media_type};base64,${a.data}`}
                                 alt=""
-                                className="max-h-56 max-w-full cursor-zoom-in rounded-lg border border-white/10 object-contain transition-opacity hover:opacity-95"
+                                className="max-h-56 max-w-full cursor-zoom-in rounded-lg border border-[var(--border)] object-contain transition-opacity hover:opacity-95"
                                 role="button"
                                 tabIndex={0}
                                 onClick={() =>
@@ -933,12 +938,12 @@ export function TutorPage() {
                             ) : a.type === "document_context" ? (
                               <div
                                 key={i}
-                                className="flex max-w-full items-center gap-2 rounded-lg border border-white/15 bg-black/20 px-3 py-2"
+                                className="flex max-w-full items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--chrome-20)] px-3 py-2"
                               >
-                                <FileText className="h-4 w-4 shrink-0 text-white/60" aria-hidden />
+                                <FileText className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-white">{a.file_name}</p>
-                                  <p className="text-xs text-white/45">{a.display_type ?? "Document"}</p>
+                                  <p className="truncate text-sm font-medium text-[var(--text)]">{a.file_name}</p>
+                                  <p className="text-xs text-[var(--muted)]">{a.display_type ?? "Document"}</p>
                                 </div>
                               </div>
                             ) : null
@@ -956,10 +961,10 @@ export function TutorPage() {
 
                 {showTyping ? (
                   <div className="flex gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-emerald-500/30 to-blue-600/30">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-emerald-500/30 to-blue-600/30">
                       <GraduationCap className="h-4 w-4 text-emerald-200" />
                     </div>
-                    <div className="flex items-center gap-2 rounded-[1.35rem] border border-white/[0.08] bg-[#14141c]/95 px-5 py-4 text-sm text-white/45 shadow-sm">
+                    <div className="flex items-center gap-2 rounded-[1.35rem] border border-[var(--border-subtle)] bg-[var(--surface-mid)] px-5 py-4 text-sm text-[var(--muted)] shadow-sm">
                       <span className="flex gap-1">
                         <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-white/50 [animation-delay:-0.3s]" />
                         <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-white/50 [animation-delay:-0.15s]" />
@@ -978,7 +983,7 @@ export function TutorPage() {
               e.preventDefault();
               void sendMessage();
             }}
-            className="shrink-0 border-t border-white/[0.06] bg-[#08080c]/95 px-4 py-3 shadow-[0_-12px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl backdrop-saturate-150 sm:px-6 sm:py-5 md:static max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            className="shrink-0 border-t border-[var(--sidebar-border)] bg-[var(--footer-bar)] px-4 py-3 shadow-[0_-12px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl backdrop-saturate-150 sm:px-6 sm:py-5 md:static max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
             <div className="mx-auto max-w-3xl space-y-3">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -990,8 +995,8 @@ export function TutorPage() {
                   className={cn(
                     "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition sm:text-[13px]",
                     useMyNotes
-                      ? "border-purple-500/45 bg-gradient-to-r from-purple-500/30 to-blue-500/25 text-white shadow-[0_0_20px_rgba(139,92,246,0.22)] ring-1 ring-purple-400/20"
-                      : "border-white/[0.12] bg-white/[0.04] text-white/70 hover:border-white/20 hover:bg-white/[0.07] hover:text-white/90"
+                      ? "border-purple-500/45 bg-gradient-to-r from-purple-500/30 to-blue-500/25 text-[var(--text)] shadow-[0_0_20px_rgba(139,92,246,0.22)] ring-1 ring-purple-400/20"
+                      : "border-[var(--border)] bg-[var(--input-bg)] text-[var(--muted)] hover:border-[var(--border)] hover:bg-white/[0.07] hover:text-[var(--text)]"
                   )}
                 >
                   <FileStack className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
@@ -1002,13 +1007,13 @@ export function TutorPage() {
                     Your notes are included with each message you send.
                   </span>
                 ) : (
-                  <span className="text-[11px] leading-snug text-white/38 sm:text-xs">
+                  <span className="text-[11px] leading-snug text-[var(--faint)] sm:text-xs">
                     Turn on to let the tutor use your saved notes as context.
                   </span>
                 )}
               </div>
               {extractingDocument ? (
-                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/70">
+                <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--muted)]">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                   Extracting text from document…
                 </div>
@@ -1019,7 +1024,7 @@ export function TutorPage() {
                   <img
                     src={pendingAttachment.preview}
                     alt="Attachment preview"
-                    className="max-h-24 max-w-[min(100%,280px)] cursor-zoom-in rounded-lg border border-white/15 object-contain transition-opacity hover:opacity-95"
+                    className="max-h-24 max-w-[min(100%,280px)] cursor-zoom-in rounded-lg border border-[var(--border)] object-contain transition-opacity hover:opacity-95"
                     role="button"
                     tabIndex={0}
                     onClick={() => openImageLightbox(pendingAttachment.preview)}
@@ -1033,7 +1038,7 @@ export function TutorPage() {
                   <button
                     type="button"
                     onClick={clearPendingAttachment}
-                    className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-[#1a1a24] text-white shadow hover:bg-white/10"
+                    className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-chip)] text-[var(--text)] shadow hover:bg-[var(--btn-default-bg)]"
                     aria-label="Remove attachment"
                   >
                     <X className="h-4 w-4" />
@@ -1041,23 +1046,23 @@ export function TutorPage() {
                 </div>
               ) : null}
               {pendingAttachment?.kind === "document" ? (
-                <div className="flex max-w-full items-center gap-3 rounded-xl border border-white/15 bg-white/5 py-2 pl-3 pr-2">
+                <div className="flex max-w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] py-2 pl-3 pr-2">
                   <FileText className="h-9 w-9 shrink-0 text-purple-300/90" aria-hidden />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-white">{pendingAttachment.fileName}</p>
-                    <p className="text-xs text-white/50">{pendingAttachment.displayType} · text ready to send</p>
+                    <p className="truncate text-sm font-medium text-[var(--text)]">{pendingAttachment.fileName}</p>
+                    <p className="text-xs text-[var(--muted)]">{pendingAttachment.displayType} · text ready to send</p>
                   </div>
                   <button
                     type="button"
                     onClick={clearPendingAttachment}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)]"
                     aria-label="Remove attachment"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
               ) : null}
-              <div className="flex items-end gap-0 rounded-full border border-white/[0.1] bg-black/40 py-1.5 pl-2 pr-1.5 shadow-inner shadow-black/25 transition focus-within:border-purple-500/40 focus-within:ring-2 focus-within:ring-purple-500/20">
+              <div className="flex items-end gap-0 rounded-full border border-[var(--border)] bg-[var(--chrome-40)] py-1.5 pl-2 pr-1.5 shadow-inner shadow-black/25 transition focus-within:border-purple-500/40 focus-within:ring-2 focus-within:ring-purple-500/20">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1075,7 +1080,7 @@ export function TutorPage() {
                       tutorImagesUsed >= tutorImagesLimit)
                   }
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-white/40 transition duration-200 hover:bg-white/[0.06] hover:text-white/70 disabled:opacity-35 sm:h-10 sm:w-10"
+                  className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-[var(--faint)] transition duration-200 hover:bg-[var(--badge-free-bg)] hover:text-[var(--muted)] disabled:opacity-35 sm:h-10 sm:w-10"
                   aria-label="Attach file"
                   title={
                     showFreeUsage &&
@@ -1101,24 +1106,24 @@ export function TutorPage() {
                   placeholder="Ask anything…"
                   rows={1}
                   disabled={sending || extractingDocument}
-                  className="min-h-[44px] flex-1 resize-none border-0 bg-transparent py-2.5 pr-2 text-sm leading-relaxed text-white placeholder:text-white/35 outline-none ring-0 disabled:opacity-45"
+                  className="min-h-[44px] flex-1 resize-none border-0 bg-transparent py-2.5 pr-2 text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--placeholder)] outline-none ring-0 disabled:opacity-45"
                 />
                 <button
                   type="submit"
                   disabled={sending || extractingDocument || (!input.trim() && !pendingAttachment)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 text-white shadow-lg shadow-purple-900/35 transition duration-200 hover:brightness-110 disabled:pointer-events-none disabled:opacity-35"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 text-[var(--inverse-text)] shadow-lg shadow-purple-900/35 transition duration-200 hover:brightness-110 disabled:pointer-events-none disabled:opacity-35"
                   aria-label="Send message"
                 >
                   {sending ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-white" />
+                    <Loader2 className="h-5 w-5 animate-spin text-[var(--text)]" />
                   ) : (
-                    <Send className="h-5 w-5 translate-x-px text-white" strokeWidth={2} />
+                    <Send className="h-5 w-5 translate-x-px text-[var(--text)]" strokeWidth={2} />
                   )}
                 </button>
               </div>
             </div>
             {showFreeUsage && tutorLimit != null && (
-              <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-white/40">
+              <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-[var(--faint)]">
                 Free plan: {Math.max(0, tutorLimit - tutorUsed)} tutor messages left
                 {tutorImagesLimit != null
                   ? ` · ${Math.max(0, tutorImagesLimit - tutorImagesUsed)} image uploads left`
@@ -1135,10 +1140,10 @@ export function TutorPage() {
       </div>
 
       {conversationToDelete ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#12121a] p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-white">Delete this conversation?</h3>
-            <p className="mt-2 line-clamp-2 text-sm text-white/60">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--scrim-heavy)] p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--text)]">Delete this conversation?</h3>
+            <p className="mt-2 line-clamp-2 text-sm text-[var(--muted)]">
               &ldquo;{conversationToDelete.title}&rdquo; and all messages will be removed. This cannot be undone.
             </p>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
@@ -1171,12 +1176,12 @@ export function TutorPage() {
       ) : null}
 
       {upgradeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-w-md rounded-2xl border border-white/10 bg-[#12121a] p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim-heavy)] p-4">
+          <div className="max-w-md rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--text)]">
               {upgradeModal === "images" ? "Image upload limit reached" : "Monthly tutor limit reached"}
             </h3>
-            <p className="mt-2 text-sm text-white/70">
+            <p className="mt-2 text-sm text-[var(--muted)]">
               {upgradeModal === "images" ? (
                 <>
                   You&apos;ve used all 5 free image uploads this month — upgrade to Pro for unlimited image uploads.
@@ -1192,7 +1197,7 @@ export function TutorPage() {
               <Link
                 href="/billing"
                 onClick={() => setUpgradeModal(null)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 text-sm font-semibold text-white transition hover:from-purple-500 hover:to-blue-500"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 text-sm font-semibold text-[var(--inverse-text)] transition hover:from-purple-500 hover:to-blue-500"
               >
                 <Sparkles className="h-4 w-4" />
                 Upgrade to Pro

@@ -20,7 +20,7 @@ export function LoginPanel({
 }) {
   return (
     <Card className="p-6">
-      <h2 className="text-lg font-semibold text-white">Log in</h2>
+      <h2 className="text-lg font-semibold text-[var(--text)]">Log in</h2>
       <form
         method="post"
         action={useFormPost && csrfToken ? "/api/auth/callback/credentials" : undefined}

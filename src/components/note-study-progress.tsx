@@ -32,7 +32,7 @@ export function NoteStudyProgressBar({
             "h-1 min-w-0 flex-1 rounded-full transition-colors duration-300",
             completion[id]
               ? "bg-gradient-to-r from-purple-500/90 to-violet-500/80 shadow-[0_0_8px_-2px_rgba(168,85,247,0.5)]"
-              : "bg-white/[0.08]"
+              : "bg-[var(--input-bg)]"
           )}
         />
       ))}
@@ -54,7 +54,7 @@ export function NoteStudyProgressTrail({ completion, onStepPress, disabled, clas
     <nav
       aria-label="Study progress"
       className={cn(
-        "flex flex-wrap items-center gap-1 border-b border-white/[0.06] bg-black/20 px-3 py-2.5 md:px-4",
+        "flex flex-wrap items-center gap-1 border-b border-[var(--sidebar-border)] bg-[var(--chrome-20)] px-3 py-2.5 md:px-4",
         className
       )}
     >
@@ -64,7 +64,7 @@ export function NoteStudyProgressTrail({ completion, onStepPress, disabled, clas
         return (
           <React.Fragment key={id}>
             {i > 0 ? (
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/25" aria-hidden />
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--faint)]" aria-hidden />
             ) : null}
             <button
               type="button"
@@ -75,8 +75,8 @@ export function NoteStudyProgressTrail({ completion, onStepPress, disabled, clas
                 done
                   ? "cursor-default text-purple-200/90"
                   : onStepPress
-                    ? "text-white/55 hover:bg-white/[0.06] hover:text-white/90"
-                    : "text-white/40"
+                    ? "text-[var(--muted)] hover:bg-[var(--badge-free-bg)] hover:text-[var(--text)]"
+                    : "text-[var(--faint)]"
               )}
             >
               {done ? (

@@ -14,9 +14,10 @@ import {
   type EssayFeedbackStructured,
 } from "@/lib/essay-feedback-types";
 import { cn } from "@/lib/cn";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const headerSelectClass =
-  "min-h-11 min-w-0 flex-1 rounded-lg border border-white/[0.1] bg-white/[0.05] py-2 pl-2.5 pr-7 text-base font-medium text-white/90 outline-none transition focus:border-purple-500/45 focus:ring-2 focus:ring-purple-500/20 sm:min-h-10 sm:min-w-[8.5rem] sm:flex-none sm:pl-3 sm:text-xs md:min-w-[9.5rem] md:text-sm";
+  "min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--hover-bg-subtle)] py-2 pl-2.5 pr-7 text-base font-medium text-[var(--text)] outline-none transition focus:border-purple-500/45 focus:ring-2 focus:ring-purple-500/20 sm:min-h-10 sm:min-w-[8.5rem] sm:flex-none sm:pl-3 sm:text-xs md:min-w-[9.5rem] md:text-sm";
 
 function wordCount(s: string): number {
   const t = s.trim();
@@ -154,8 +155,8 @@ export function EssayFeedbackPage() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#060608]">
-        <Loader2 className="h-8 w-8 animate-spin text-white/40" />
+      <div className="flex min-h-dvh items-center justify-center bg-[var(--bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--faint)]" />
       </div>
     );
   }
@@ -167,15 +168,15 @@ export function EssayFeedbackPage() {
   const essayCard = (
     <div
       className={cn(
-        "relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#09090d] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+        "relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
         hasResults ? "min-h-[200px] flex-1 lg:min-h-0" : "min-h-[min(420px,calc(100dvh-280px))] flex-1"
       )}
     >
       {hasResults ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-x-3 border-b border-white/[0.06] px-4 py-2.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-white/45">Your essay</span>
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 border-b border-[var(--sidebar-border)] px-4 py-2.5">
+          <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Your essay</span>
           {annotations.length > 0 ? (
-            <span className="text-[10px] text-white/35">
+            <span className="text-[10px] text-[var(--placeholder)]">
               <span className="text-red-300/85">Red</span> ·{" "}
               <span className="text-yellow-200/85">Yellow</span> ·{" "}
               <span className="text-sky-300/85">Blue</span> ·{" "}
@@ -207,7 +208,7 @@ export function EssayFeedbackPage() {
       type="submit"
       disabled={loading || !essay.trim() || (plan === "free" && remaining === 0)}
       className={cn(
-        "flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 py-4 text-base font-semibold text-white shadow-lg shadow-purple-950/40 transition hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 disabled:pointer-events-none disabled:opacity-40"
+        "flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 py-4 text-base font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-950/40 transition hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 disabled:pointer-events-none disabled:opacity-40"
       )}
     >
       {loading ? (
@@ -225,34 +226,34 @@ export function EssayFeedbackPage() {
   );
 
   return (
-    <div className="flex min-h-dvh max-w-[100vw] flex-col overflow-x-hidden bg-[#060608] text-white lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
+    <div className="flex min-h-dvh max-w-[100vw] flex-col overflow-x-hidden bg-[var(--bg)] text-[var(--text)] lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-32 left-1/2 h-[480px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/14 via-indigo-600/10 to-fuchsia-600/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-[320px] w-[480px] rounded-full bg-indigo-600/8 blur-3xl" />
       </div>
 
-      <header className="relative z-20 shrink-0 border-b border-white/[0.06] bg-[#08080c]/90 backdrop-blur-2xl">
+      <header className="relative z-20 shrink-0 border-b border-[var(--sidebar-border)] bg-[var(--header-bar)] backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-4 sm:gap-4 sm:px-8 sm:py-5">
           <Link
             href="/notes"
-            className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 rounded-xl px-3 py-2 text-base text-white/50 transition duration-200 hover:bg-white/[0.05] hover:text-white/85 sm:min-h-0 sm:px-2 sm:text-sm"
+            className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 rounded-xl px-3 py-2 text-base text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] sm:min-h-0 sm:px-2 sm:text-sm"
           >
             <ArrowLeft className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" />
             Notes
           </Link>
-          <div className="hidden h-8 w-px bg-white/[0.08] sm:block" aria-hidden />
+          <div className="hidden h-8 w-px bg-[var(--input-bg)] sm:block" aria-hidden />
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-purple-500/25 to-indigo-500/15 shadow-inner">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-gradient-to-br from-purple-500/25 to-indigo-500/15 shadow-inner">
               <FilePenLine className="h-5 w-5 text-purple-100/95" strokeWidth={1.75} />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Essay feedback</h1>
-              <p className="mt-0.5 text-sm text-white/45">AI-powered draft review</p>
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">Essay feedback</h1>
+              <p className="mt-0.5 text-sm text-[var(--muted)]">AI-powered draft review</p>
             </div>
           </div>
           {plan === "free" && remaining !== null ? (
             <span
-              className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/55"
+              className="rounded-full border border-[var(--border-subtle)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-medium text-[var(--muted)]"
               title="3 free basic feedbacks per month"
             >
               {remaining} free left this month
@@ -262,6 +263,7 @@ export function EssayFeedbackPage() {
               Pro · unlimited
             </span>
           ) : null}
+          <ThemeToggle variant="icon" className="ml-auto shrink-0" />
         </div>
       </header>
 
@@ -284,7 +286,7 @@ export function EssayFeedbackPage() {
                   disabled={loading}
                 >
                   {ESSAY_TYPE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
+                    <option key={o.value} value={o.value} className="bg-[var(--surface-mid)] text-[var(--text)]">
                       {o.label}
                     </option>
                   ))}
@@ -300,7 +302,7 @@ export function EssayFeedbackPage() {
                   disabled={loading}
                 >
                   {GRADE_LEVEL_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
+                    <option key={o.value} value={o.value} className="bg-[var(--surface-mid)] text-[var(--text)]">
                       {o.label}
                     </option>
                   ))}
@@ -309,7 +311,7 @@ export function EssayFeedbackPage() {
               {essayCard}
               {submitButton}
             {highlightsClearedNotice ? (
-              <p className="text-center text-xs leading-relaxed text-white/40">
+              <p className="text-center text-xs leading-relaxed text-[var(--faint)]">
                 Highlights cleared — edit your essay and click Get Feedback again for updated analysis.
               </p>
             ) : null}
@@ -328,18 +330,18 @@ export function EssayFeedbackPage() {
             ) : null}
             </div>
             <aside className="hidden w-full max-w-sm shrink-0 lg:block">
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 backdrop-blur-sm">
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Tips</p>
-                <ul className="mt-4 space-y-3 text-sm leading-relaxed text-white/55">
+              <div className="rounded-2xl border border-[var(--sidebar-border)] bg-white/[0.03] p-6 backdrop-blur-sm">
+                <p className="text-xs font-semibold uppercase tracking-widest text-[var(--faint)]">Tips</p>
+                <ul className="mt-4 space-y-3 text-sm leading-relaxed text-[var(--muted)]">
                   <li>Choose essay type and grade level so feedback matches your assignment.</li>
                   <li>Pro unlocks grade estimates, full rubric sections, and inline highlights.</li>
                   <li>Free includes three basic feedbacks per month on key areas.</li>
                 </ul>
               </div>
             </aside>
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 backdrop-blur-sm lg:hidden">
-              <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Tips</p>
-              <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-white/55">
+            <div className="rounded-2xl border border-[var(--sidebar-border)] bg-white/[0.03] p-5 backdrop-blur-sm lg:hidden">
+              <p className="text-xs font-semibold uppercase tracking-widest text-[var(--faint)]">Tips</p>
+              <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-[var(--muted)]">
                 <li>Choose essay type and grade level so feedback matches your assignment.</li>
                 <li>Pro unlocks grade estimates, full rubric sections, and inline highlights.</li>
                 <li>Free includes three basic feedbacks per month on key areas.</li>
@@ -375,7 +377,7 @@ export function EssayFeedbackPage() {
                     disabled={loading}
                   >
                     {ESSAY_TYPE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
+                      <option key={o.value} value={o.value} className="bg-[var(--surface-mid)] text-[var(--text)]">
                         {o.label}
                       </option>
                     ))}
@@ -391,7 +393,7 @@ export function EssayFeedbackPage() {
                     disabled={loading}
                   >
                     {GRADE_LEVEL_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value} className="bg-[#14141c] text-white">
+                      <option key={o.value} value={o.value} className="bg-[var(--surface-mid)] text-[var(--text)]">
                         {o.label}
                       </option>
                     ))}
@@ -399,7 +401,7 @@ export function EssayFeedbackPage() {
                 </div>
                 {essayCard}
                 {highlightsClearedNotice ? (
-                  <p className="shrink-0 text-xs leading-relaxed text-white/40">
+                  <p className="shrink-0 text-xs leading-relaxed text-[var(--faint)]">
                     Highlights cleared — edit your essay and click Get Feedback again for updated analysis.
                   </p>
                 ) : null}
@@ -407,11 +409,11 @@ export function EssayFeedbackPage() {
               </div>
               <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:basis-0">
                 <div className="flex shrink-0 flex-col gap-1">
-                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40">
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">
                     Feedback
                   </span>
                   {plan === "free" ? (
-                    <p className="text-[11px] text-white/35">
+                    <p className="text-[11px] text-[var(--placeholder)]">
                       Basic feedback — upgrade for grade estimate, highlights, and all sections.
                     </p>
                   ) : null}
@@ -419,11 +421,11 @@ export function EssayFeedbackPage() {
                 {structured ? (
                   <EssayFeedbackStructuredPanel data={structured} />
                 ) : feedback ? (
-                  <div className="essay-feedback-markdown min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c0c10]/95 p-5 text-sm text-white/85 [scrollbar-width:none] [&::-webkit-scrollbar]:[display:none]">
+                  <div className="essay-feedback-markdown min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--modal-surface)] p-5 text-sm text-[var(--text)] [scrollbar-width:none] [&::-webkit-scrollbar]:[display:none]">
                     <TutorMarkdown content={feedback} />
                   </div>
                 ) : (
-                  <p className="text-sm text-white/40">No feedback payload returned. Try again.</p>
+                  <p className="text-sm text-[var(--faint)]">No feedback payload returned. Try again.</p>
                 )}
               </div>
             </div>

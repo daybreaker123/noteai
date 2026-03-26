@@ -8,8 +8,8 @@ export default function TutorRoutePage() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0f]">
-        <div className="text-white/70">Loading…</div>
+      <div className="flex min-h-dvh items-center justify-center bg-[var(--bg)]">
+        <div className="text-[var(--muted)]">Loading…</div>
       </div>
     );
   }

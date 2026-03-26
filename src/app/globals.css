@@ -1,19 +1,200 @@
 @import "tailwindcss";
 
+/* ─── Semantic tokens (dark = default for SSR / first paint) ─── */
 :root {
+  color-scheme: dark;
+  --bg: #0a0a0f;
+  --bg-subtle: #12121a;
+  --surface-elevated: rgba(255, 255, 255, 0.04);
+  --surface-strong: rgba(255, 255, 255, 0.07);
   --border: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.08);
   --panel: rgba(255, 255, 255, 0.05);
-  --text: rgba(255, 255, 255, 0.9);
-  --muted: rgba(255, 255, 255, 0.6);
+  --card: rgba(255, 255, 255, 0.06);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.62);
+  --faint: rgba(255, 255, 255, 0.42);
+  --sidebar-bg: rgba(0, 0, 0, 0.28);
+  --sidebar-footer-bg: rgba(0, 0, 0, 0.2);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --input-border: rgba(255, 255, 255, 0.1);
+  --overlay-scrim: rgba(0, 0, 0, 0.55);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --scrim-heavy: rgba(0, 0, 0, 0.7);
+  --main-header-bg: rgba(0, 0, 0, 0.3);
+  --header-bar: rgba(8, 8, 12, 0.92);
+  --toast-bg: rgba(0, 0, 0, 0.9);
+  --composer-bg: rgba(0, 0, 0, 0.4);
+  --drop-hint-bg: rgba(0, 0, 0, 0.5);
+  /* Translucent blacks → light surfaces in light theme */
+  --chrome-15: rgba(0, 0, 0, 0.15);
+  --chrome-20: rgba(0, 0, 0, 0.2);
+  --chrome-25: rgba(0, 0, 0, 0.25);
+  --chrome-30: rgba(0, 0, 0, 0.3);
+  --chrome-35: rgba(0, 0, 0, 0.35);
+  --chrome-40: rgba(0, 0, 0, 0.4);
+  --chrome-50: rgba(0, 0, 0, 0.5);
+  --chrome-90: rgba(0, 0, 0, 0.9);
+  --modal-surface: #12121a;
+  --surface-mid: #14141c;
+  --surface-chip: #1a1a24;
+  --footer-bar: rgba(8, 8, 12, 0.95);
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --hover-bg-subtle: rgba(255, 255, 255, 0.05);
+  --editor-chrome-bg: rgba(0, 0, 0, 0.3);
+  --editor-surface: rgba(255, 255, 255, 0.05);
+  --toolbar-label: rgba(255, 255, 255, 0.35);
   --accent: #a78bfa;
+  --accent-fg: #e9d5ff;
   --accent2: #34d399;
   --danger: #ef4444;
+  --shadow-sidebar: rgba(0, 0, 0, 0.5);
+  --wordmark-from: #ffffff;
+  --wordmark-via: #d8b4fe;
+  --wordmark-to: #e879f9;
+  --wordmark-shadow: rgba(168, 85, 247, 0.25);
+  --btn-ghost-hover: rgba(255, 255, 255, 0.1);
+  --btn-default-bg: rgba(255, 255, 255, 0.1);
+  --btn-default-hover: rgba(255, 255, 255, 0.15);
+  --placeholder: rgba(255, 255, 255, 0.4);
+  --badge-free-bg: rgba(255, 255, 255, 0.06);
+  --badge-free-border: rgba(255, 255, 255, 0.15);
+  --badge-free-text: rgba(255, 255, 255, 0.55);
+  --divider-fade: rgba(255, 255, 255, 0.08);
+  --landing-card-border: rgba(255, 255, 255, 0.1);
+  --landing-mock-bg: rgba(0, 0, 0, 0.4);
+  --inverse-text: #ffffff;
+  --tiptap-blockquote-border: rgba(167, 139, 250, 0.45);
+  --tiptap-blockquote-text: rgba(255, 255, 255, 0.72);
+  --tiptap-hr: rgba(255, 255, 255, 0.12);
+  --tiptap-code-bg: rgba(255, 255, 255, 0.08);
+  --tiptap-code-text: rgba(252, 211, 77, 0.95);
+  --tiptap-pre-bg: rgba(0, 0, 0, 0.5);
+  --tiptap-pre-border: rgba(255, 255, 255, 0.1);
+  --tiptap-pre-text: rgba(255, 255, 255, 0.88);
+  --tiptap-placeholder: rgba(255, 255, 255, 0.35);
+  --tiptap-hl-comment: rgba(255, 255, 255, 0.45);
+  --tiptap-table-border: rgba(255, 255, 255, 0.15);
+  --tiptap-th-bg: rgba(255, 255, 255, 0.05);
+  --tiptap-body: rgba(255, 255, 255, 0.9);
+  --tiptap-img-border: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --accent-fg: #5b21b6;
+  --bg: #f8f9fa;
+  --bg-subtle: #f1f3f5;
+  --surface-elevated: #ffffff;
+  --surface-strong: #e9ecef;
+  --border: rgba(26, 26, 46, 0.14);
+  --border-subtle: rgba(26, 26, 46, 0.1);
+  --panel: #f1f3f5;
+  --card: #f1f3f5;
+  --text: #1a1a2e;
+  --muted: rgba(26, 26, 46, 0.58);
+  --faint: rgba(26, 26, 46, 0.42);
+  --sidebar-bg: #ffffff;
+  --sidebar-footer-bg: #fafbfc;
+  --sidebar-border: rgba(26, 26, 46, 0.1);
+  --input-bg: rgba(26, 26, 46, 0.04);
+  --input-border: rgba(26, 26, 46, 0.12);
+  --overlay-scrim: rgba(26, 26, 46, 0.4);
+  --scrim: rgba(26, 26, 46, 0.45);
+  --scrim-heavy: rgba(26, 26, 46, 0.55);
+  --main-header-bg: rgba(255, 255, 255, 0.92);
+  --header-bar: rgba(255, 255, 255, 0.94);
+  --toast-bg: rgba(26, 26, 46, 0.94);
+  --composer-bg: rgba(255, 255, 255, 0.92);
+  --drop-hint-bg: rgba(255, 255, 255, 0.95);
+  --chrome-15: #fafbfc;
+  --chrome-20: #f8f9fa;
+  --chrome-25: #f8f9fa;
+  --chrome-30: #f1f3f5;
+  --chrome-35: #eceef1;
+  --chrome-40: #ffffff;
+  --chrome-50: rgba(26, 26, 46, 0.08);
+  --chrome-90: rgba(26, 26, 46, 0.94);
+  --modal-surface: #ffffff;
+  --surface-mid: #f1f3f5;
+  --surface-chip: #eceef1;
+  --footer-bar: rgba(255, 255, 255, 0.96);
+  --hover-bg: rgba(26, 26, 46, 0.08);
+  --hover-bg-subtle: rgba(26, 26, 46, 0.05);
+  --editor-chrome-bg: rgba(255, 255, 255, 0.85);
+  --editor-surface: #ffffff;
+  --toolbar-label: rgba(26, 26, 46, 0.4);
+  --shadow-sidebar: rgba(26, 26, 46, 0.12);
+  --wordmark-from: #5b21b6;
+  --wordmark-via: #a78bfa;
+  --wordmark-to: #c026d3;
+  --wordmark-shadow: rgba(124, 58, 237, 0.2);
+  --btn-ghost-hover: rgba(26, 26, 46, 0.08);
+  --btn-default-bg: rgba(26, 26, 46, 0.08);
+  --btn-default-hover: rgba(26, 26, 46, 0.12);
+  --placeholder: rgba(26, 26, 46, 0.45);
+  --badge-free-bg: rgba(26, 26, 46, 0.06);
+  --badge-free-border: rgba(26, 26, 46, 0.12);
+  --badge-free-text: rgba(26, 26, 46, 0.55);
+  --divider-fade: rgba(26, 26, 46, 0.1);
+  --landing-card-border: rgba(26, 26, 46, 0.12);
+  --landing-mock-bg: rgba(255, 255, 255, 0.95);
+  --inverse-text: #ffffff;
+  --tiptap-blockquote-border: rgba(124, 58, 237, 0.45);
+  --tiptap-blockquote-text: rgba(26, 26, 46, 0.78);
+  --tiptap-hr: rgba(26, 26, 46, 0.12);
+  --tiptap-code-bg: rgba(26, 26, 46, 0.07);
+  --tiptap-code-text: #b45309;
+  --tiptap-pre-bg: #1e1e2e;
+  --tiptap-pre-border: rgba(255, 255, 255, 0.08);
+  --tiptap-pre-text: rgba(255, 255, 255, 0.9);
+  --tiptap-placeholder: rgba(26, 26, 46, 0.38);
+  --tiptap-hl-comment: rgba(255, 255, 255, 0.5);
+  --tiptap-table-border: rgba(26, 26, 46, 0.15);
+  --tiptap-th-bg: rgba(26, 26, 46, 0.06);
+  --tiptap-body: rgba(26, 26, 46, 0.92);
+  --tiptap-img-border: rgba(26, 26, 46, 0.12);
+}
+
+/* Overlays that must blend with theme background */
+.studara-overlay-scan {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--bg) 55%, transparent),
+    color-mix(in oklab, var(--bg) 85%, transparent),
+    color-mix(in oklab, var(--bg) 95%, transparent)
+  );
+}
+
+.studara-overlay-75 {
+  background-color: color-mix(in oklab, var(--bg) 75%, transparent);
+}
+
+.studara-overlay-85 {
+  background-color: color-mix(in oklab, var(--bg) 85%, transparent);
+}
+
+.studara-cookie-panel {
+  background-color: color-mix(in oklab, var(--bg) 95%, transparent);
+}
+
+html {
+  background-color: var(--bg);
 }
 
 body {
-  background: #0a0a0f;
+  background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme-switching] :where(body, body *) {
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+    transition-duration: 0.35s;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }
 
 /* Note editor: hide scrollbar while keeping content scrollable */
@@ -136,7 +317,7 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
   }
 }
 
-/* Tiptap note editor (dark) */
+/* Tiptap note editor */
 .studara-tiptap-root .studara-tiptap {
   min-height: min(42dvh, 240px);
 }
@@ -205,14 +386,14 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
 .studara-tiptap blockquote {
   margin: 0.5em 0;
   padding-left: 1rem;
-  border-left: 3px solid rgba(167, 139, 250, 0.45);
-  color: rgba(255, 255, 255, 0.72);
+  border-left: 3px solid var(--tiptap-blockquote-border);
+  color: var(--tiptap-blockquote-text);
 }
 
 .studara-tiptap hr {
   margin: 1rem 0;
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--tiptap-hr);
 }
 
 .studara-tiptap code {
@@ -220,8 +401,8 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
   font-size: 0.86em;
   padding: 0.12em 0.35em;
   border-radius: 0.25rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(252, 211, 77, 0.95);
+  background: var(--tiptap-code-bg);
+  color: var(--tiptap-code-text);
 }
 
 .studara-tiptap pre,
@@ -230,13 +411,13 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
   margin: 0.65em 0;
   padding: 0.85rem 1rem;
   border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--tiptap-pre-bg);
+  border: 1px solid var(--tiptap-pre-border);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.8125rem;
   line-height: 1.55;
   overflow-x: auto;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--tiptap-pre-text);
 }
 
 .studara-tiptap pre code {
@@ -262,7 +443,7 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
 }
 
 .studara-tiptap .hljs-comment {
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--tiptap-hl-comment);
 }
 
 .studara-tiptap .hljs-function,
@@ -285,6 +466,6 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
   content: attr(data-placeholder);
   float: left;
   height: 0;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--tiptap-placeholder);
   pointer-events: none;
 }

@@ -40,7 +40,7 @@ export function DeleteAccountModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-sm"
             onClick={loading ? undefined : onClose}
             aria-hidden
           />
@@ -54,22 +54,22 @@ export function DeleteAccountModal({
             aria-modal="true"
             aria-labelledby="delete-account-title"
           >
-            <Card className="overflow-hidden border-white/10 bg-black/40 p-6 shadow-2xl backdrop-blur-xl">
+            <Card className="overflow-hidden border-[var(--border)] bg-[var(--chrome-40)] p-6 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between">
-                <h3 id="delete-account-title" className="text-lg font-semibold text-white">
+                <h3 id="delete-account-title" className="text-lg font-semibold text-[var(--text)]">
                   Delete account
                 </h3>
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={loading}
-                  className="rounded-lg p-1.5 text-white/50 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                  className="rounded-lg p-1.5 text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] disabled:opacity-50"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <p className="mt-4 text-sm leading-relaxed text-white/70">
+              <p className="mt-4 text-sm leading-relaxed text-[var(--muted)]">
                 Are you sure you want to delete your account? This will permanently delete all your notes, categories,
                 and data. This cannot be undone.
               </p>

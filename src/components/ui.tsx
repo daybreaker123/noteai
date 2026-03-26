@@ -25,9 +25,9 @@ export function Button({
   const base =
     "inline-flex touch-manipulation items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50 disabled:pointer-events-none";
   const variants: Record<string, string> = {
-    default: "border-[var(--border)] bg-white/10 hover:bg-white/15 text-[var(--text)]",
-    ghost: "border-transparent bg-transparent hover:bg-white/10 text-[var(--text)]",
-    danger: "border-transparent bg-[var(--danger)]/90 hover:bg-[var(--danger)] text-white",
+    default: "border-[var(--border)] bg-[var(--btn-default-bg)] hover:bg-[var(--btn-default-hover)] text-[var(--text)]",
+    ghost: "border-transparent bg-transparent hover:bg-[var(--hover-bg)] text-[var(--text)]",
+    danger: "border-transparent bg-[var(--danger)]/90 hover:bg-[var(--danger)] text-[var(--inverse-text)]",
     success: "border-transparent bg-[var(--accent2)]/90 hover:bg-[var(--accent2)] text-black",
   };
   const sizes: Record<string, string> = {
@@ -41,7 +41,7 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cn(
-        "min-h-11 w-full rounded-xl border border-[var(--border)] bg-white/5 px-3 py-2 text-base text-[var(--text)] outline-none placeholder:text-white/40 focus:ring-2 focus:ring-[var(--accent)]/40 sm:min-h-10 sm:py-2 sm:text-sm",
+        "min-h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--text)] outline-none placeholder:text-[var(--placeholder)] focus:ring-2 focus:ring-[var(--accent)]/40 sm:min-h-10 sm:py-2 sm:text-sm",
         className,
       )}
       {...props}
@@ -53,7 +53,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
   return (
     <textarea
       className={cn(
-        "min-h-40 w-full resize-y rounded-xl border border-[var(--border)] bg-white/5 px-3 py-3 text-base text-[var(--text)] outline-none placeholder:text-white/40 focus:ring-2 focus:ring-[var(--accent)]/40 sm:py-2.5 sm:text-sm",
+        "min-h-40 w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-3 text-base text-[var(--text)] outline-none placeholder:text-[var(--placeholder)] focus:ring-2 focus:ring-[var(--accent)]/40 sm:py-2.5 sm:text-sm",
         className,
       )}
       {...props}
@@ -65,7 +65,7 @@ export function Badge({ className, ...props }: React.HTMLAttributes<HTMLSpanElem
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border border-[var(--border)] bg-white/5 px-2 py-0.5 text-xs text-[var(--muted)]",
+        "inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--input-bg)] px-2 py-0.5 text-xs text-[var(--muted)]",
         className,
       )}
       {...props}

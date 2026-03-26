@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { SignupPanel } from "@/components/signup-panel";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 function SignupContent() {
   const searchParams = useSearchParams();
@@ -60,13 +61,16 @@ function SignupContent() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0f] px-4">
+    <main className="relative flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)] px-4">
+      <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+        <ThemeToggle variant="icon" />
+      </div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex justify-center">
           <StudaraWordmarkLink href="/" />
         </div>
         <SignupPanel onSubmit={handleSubmit} error={error} callbackUrl={callbackUrl} />
-        <p className="mt-4 text-center text-sm text-white/60">
+        <p className="mt-4 text-center text-sm text-[var(--muted)]">
           Already have an account?{" "}
           <Link
             href={`/login?callbackUrl=${encodeURIComponent(targetUrl)}`}
@@ -83,8 +87,8 @@ function SignupContent() {
 export default function SignupPage() {
   return (
     <Suspense fallback={
-      <main className="flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0f]">
-        <div className="text-white/60">Loading…</div>
+      <main className="flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)]">
+        <div className="text-[var(--muted)]">Loading…</div>
       </main>
     }>
       <SignupContent />

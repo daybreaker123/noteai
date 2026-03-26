@@ -64,7 +64,7 @@ export function CreateCategoryModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-sm"
             onClick={onClose}
           />
           {/* Modal */}
@@ -75,12 +75,12 @@ export function CreateCategoryModal({
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="relative w-full max-w-sm"
           >
-            <Card className="overflow-hidden border-white/10 bg-black/40 p-6 shadow-2xl backdrop-blur-xl">
+            <Card className="overflow-hidden border-[var(--border)] bg-[var(--chrome-40)] p-6 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">New Category</h3>
+                <h3 className="text-lg font-semibold text-[var(--text)]">New Category</h3>
                 <button
                   onClick={onClose}
-                  className="rounded-lg p-1.5 text-white/50 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-lg p-1.5 text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)]"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
@@ -88,7 +88,7 @@ export function CreateCategoryModal({
               </div>
               <form onSubmit={handleSubmit} className="mt-5 space-y-4">
                 <div>
-                  <label htmlFor="category-name" className="mb-1.5 block text-sm font-medium text-white/70">
+                  <label htmlFor="category-name" className="mb-1.5 block text-sm font-medium text-[var(--muted)]">
                     Name
                   </label>
                   <Input
@@ -104,7 +104,7 @@ export function CreateCategoryModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-white/70">Color</label>
+                  <label className="mb-2 block text-sm font-medium text-[var(--muted)]">Color</label>
                   <div className="flex flex-wrap gap-2">
                     {PRESET_COLORS.map((color) => (
                       <button
@@ -113,7 +113,7 @@ export function CreateCategoryModal({
                         onClick={() => setSelectedColor(color)}
                         className={`h-9 w-9 rounded-xl border-2 transition-all ${
                           selectedColor === color
-                            ? "scale-110 border-white ring-2 ring-white/30"
+                            ? "scale-110 border-[var(--text)] ring-2 ring-[var(--border)]"
                             : "border-transparent hover:scale-105"
                         }`}
                         style={{ backgroundColor: color }}

@@ -4,6 +4,7 @@ import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/cn";
 import { Button, Card, Input } from "@/components/ui";
 
@@ -56,7 +57,10 @@ function ResetPasswordContent() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0f] px-4">
+    <main className="relative flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)] px-4">
+      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+        <ThemeToggle variant="icon" />
+      </div>
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -top-24 left-1/2 h-[400px] w-[700px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/15 via-blue-500/10 to-fuchsia-500/10 blur-3xl" />
       </div>
@@ -65,14 +69,14 @@ function ResetPasswordContent() {
           <StudaraWordmarkLink href="/" />
         </div>
         <Card className="p-6">
-          <h1 className="text-lg font-semibold text-white">Set new password</h1>
+          <h1 className="text-lg font-semibold text-[var(--text)]">Set new password</h1>
           {done ? (
             <div className="mt-4 space-y-4">
-              <p className="text-sm text-white/70">Your password has been updated. You can log in now.</p>
+              <p className="text-sm text-[var(--muted)]">Your password has been updated. You can log in now.</p>
               <Link
                 href="/login"
                 className={cn(
-                  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-white/10 px-3.5 text-sm font-medium text-[var(--text)] transition hover:bg-white/15"
+                  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--btn-default-bg)] px-3.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--btn-default-hover)]"
                 )}
               >
                 Log in
@@ -107,7 +111,7 @@ function ResetPasswordContent() {
               </Button>
             </form>
           )}
-          <p className="mt-5 text-center text-sm text-white/55">
+          <p className="mt-5 text-center text-sm text-[var(--muted)]">
             <Link href="/forgot-password" className="text-[var(--accent)] hover:underline">
               Request a new link
             </Link>
@@ -126,8 +130,8 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-dvh items-center justify-center bg-[#0a0a0f]">
-          <p className="text-white/60">Loading…</p>
+        <main className="flex min-h-dvh items-center justify-center bg-[var(--bg)]">
+          <p className="text-[var(--muted)]">Loading…</p>
         </main>
       }
     >

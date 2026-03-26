@@ -53,7 +53,7 @@ function CoachMark({
   return createPortal(
     <div
       className={cn(
-        "pointer-events-none fixed z-[220] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-purple-500/45 bg-[#12121a]/98 px-4 py-3 text-sm leading-relaxed text-white/95 shadow-2xl shadow-black/60 ring-1 ring-white/10 backdrop-blur-md",
+        "pointer-events-none fixed z-[220] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-purple-500/45 bg-[var(--modal-surface)] px-4 py-3 text-sm leading-relaxed text-[var(--text)] shadow-2xl shadow-black/60 ring-1 ring-[var(--border)] backdrop-blur-md",
         align === "center" && "-translate-x-1/2"
       )}
       style={{ top: pos.top, left: pos.left }}
@@ -69,7 +69,7 @@ function BottomCoachMark({ children }: { children: React.ReactNode }) {
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
-      className="pointer-events-none fixed bottom-[5.5rem] left-1/2 z-[220] w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-xl border border-purple-500/45 bg-[#12121a]/98 px-4 py-3 text-center text-sm leading-relaxed text-white/95 shadow-2xl shadow-black/60 ring-1 ring-white/10 backdrop-blur-md"
+      className="pointer-events-none fixed bottom-[5.5rem] left-1/2 z-[220] w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-xl border border-purple-500/45 bg-[var(--modal-surface)] px-4 py-3 text-center text-sm leading-relaxed text-[var(--text)] shadow-2xl shadow-black/60 ring-1 ring-[var(--border)] backdrop-blur-md"
       role="status"
     >
       {children}
@@ -106,14 +106,14 @@ function OnboardingChrome({
   skipDisabled?: boolean;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[210] border-t border-white/[0.08] bg-[#06060a]/92 px-4 py-3 backdrop-blur-xl sm:py-4">
+    <div className="fixed inset-x-0 bottom-0 z-[210] border-t border-[var(--border-subtle)] bg-[var(--bg)]/92 px-4 py-3 backdrop-blur-xl sm:py-4">
       <div className="mx-auto flex max-w-3xl flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <ProgressDots step={step} />
         <button
           type="button"
           onClick={onSkip}
           disabled={skipDisabled}
-          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-medium text-white/50 transition hover:bg-white/5 hover:text-white/85 touch-manipulation disabled:opacity-40 sm:min-h-0 sm:justify-end"
+          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--input-bg)] hover:text-[var(--text)] touch-manipulation disabled:opacity-40 sm:min-h-0 sm:justify-end"
         >
           <X className="h-4 w-4" aria-hidden />
           Skip setup
@@ -180,7 +180,7 @@ export function GuidedOnboarding({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex flex-col bg-[#06060a] text-white"
+            className="fixed inset-0 z-[200] flex flex-col bg-[var(--bg)] text-[var(--text)]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="guided-onboarding-title"
@@ -196,7 +196,7 @@ export function GuidedOnboarding({
                 type="button"
                 onClick={onSkip}
                 disabled={skipDisabled}
-                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-4 text-sm font-medium text-white/50 transition hover:bg-white/5 hover:text-white/80 touch-manipulation disabled:opacity-40"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-4 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--input-bg)] hover:text-[var(--text)] touch-manipulation disabled:opacity-40"
               >
                 <X className="h-4 w-4" aria-hidden />
                 Skip
@@ -209,12 +209,12 @@ export function GuidedOnboarding({
                   <div className="mb-6 rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-500/20 to-violet-600/10 p-6 shadow-[0_0_48px_-12px_rgba(139,92,246,0.45)]">
                     <StudaraWordmark className="text-4xl sm:text-5xl" />
                   </div>
-                  <h1 id="guided-onboarding-title" className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                  <h1 id="guided-onboarding-title" className="text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                     Welcome to Studara
                   </h1>
-                  <p className="mt-3 text-base text-white/55 sm:text-lg">Let&apos;s get you set up in 2 minutes</p>
+                  <p className="mt-3 text-base text-[var(--muted)] sm:text-lg">Let&apos;s get you set up in 2 minutes</p>
 
-                  <p className="mt-10 text-sm font-medium text-white/45">What best describes you?</p>
+                  <p className="mt-10 text-sm font-medium text-[var(--muted)]">What best describes you?</p>
                   <div className="mt-4 grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
                     {ONBOARDING_PERSONAS.map((p) => (
                       <button
@@ -224,8 +224,8 @@ export function GuidedOnboarding({
                         className={cn(
                           "min-h-12 rounded-xl border px-4 py-3 text-left text-sm font-medium transition touch-manipulation",
                           persona === p
-                            ? "border-purple-500/60 bg-purple-500/20 text-white ring-2 ring-purple-500/35"
-                            : "border-white/10 bg-white/[0.04] text-white/80 hover:border-white/20 hover:bg-white/[0.07]"
+                            ? "border-purple-500/60 bg-purple-500/20 text-[var(--text)] ring-2 ring-purple-500/35"
+                            : "border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] hover:border-[var(--border)] hover:bg-white/[0.07]"
                         )}
                       >
                         {ONBOARDING_PERSONA_LABELS[p]}
@@ -237,20 +237,20 @@ export function GuidedOnboarding({
 
               {step === 5 && (
                 <div className="flex w-full max-w-lg flex-col items-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/30 to-violet-600/25 ring-1 ring-white/10">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/30 to-violet-600/25 ring-1 ring-[var(--border)]">
                     <MessageCircle className="h-7 w-7 text-cyan-200" strokeWidth={1.75} />
                   </div>
-                  <h2 className="text-center text-xl font-semibold text-white sm:text-2xl">Meet your AI Tutor</h2>
-                  <p className="mt-2 text-center text-sm text-white/50">
+                  <h2 className="text-center text-xl font-semibold text-[var(--text)] sm:text-2xl">Meet your AI Tutor</h2>
+                  <p className="mt-2 text-center text-sm text-[var(--muted)]">
                     Ask questions anytime — here&apos;s a quick example of how a reply might look.
                   </p>
-                  <div className="mt-8 w-full space-y-3 rounded-2xl border border-white/10 bg-black/35 p-4 text-left shadow-inner sm:p-5">
+                  <div className="mt-8 w-full space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--chrome-35)] p-4 text-left shadow-inner sm:p-5">
                     <p className="text-xs font-semibold uppercase tracking-wider text-violet-300/90">You</p>
-                    <p className="text-sm text-white/85">
+                    <p className="text-sm text-[var(--text)]">
                       Can you explain the difference between mitosis and meiosis in simple terms?
                     </p>
                     <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-cyan-300/90">Tutor</p>
-                    <p className="text-sm leading-relaxed text-white/75">
+                    <p className="text-sm leading-relaxed text-[var(--muted)]">
                       Mitosis is one cell dividing into two identical daughter cells — used for growth and repair. Meiosis
                       produces four cells with half the chromosomes, which is how we make eggs and sperm for sexual
                       reproduction. If you tell me your class level, I can give you a memory trick that matches how your
@@ -262,12 +262,12 @@ export function GuidedOnboarding({
 
               {step === 6 && (
                 <div className="flex w-full max-w-md flex-col items-center text-center">
-                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/35 to-violet-600/25 ring-1 ring-white/10">
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/35 to-violet-600/25 ring-1 ring-[var(--border)]">
                     <Sparkles className="h-8 w-8 text-emerald-200" strokeWidth={1.75} />
                   </div>
-                  <h2 className="text-xl font-semibold text-white sm:text-2xl">You&apos;re all set</h2>
-                  <p className="mt-2 text-sm text-white/50">Here&apos;s what you just unlocked:</p>
-                  <ul className="mt-6 w-full space-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 text-left text-sm text-white/80">
+                  <h2 className="text-xl font-semibold text-[var(--text)] sm:text-2xl">You&apos;re all set</h2>
+                  <p className="mt-2 text-sm text-[var(--muted)]">Here&apos;s what you just unlocked:</p>
+                  <ul className="mt-6 w-full space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-5 text-left text-sm text-[var(--text)]">
                     <li className="flex gap-3">
                       <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-purple-300" />
                       <span>Improved a real note with AI — clearer structure and richer explanations.</span>
@@ -284,7 +284,7 @@ export function GuidedOnboarding({
                   <div className="mt-8 flex items-center gap-2 rounded-xl border border-orange-500/25 bg-orange-500/10 px-4 py-3 text-sm text-orange-100">
                     <Flame className="h-5 w-5 shrink-0 text-orange-300" aria-hidden />
                     <span>
-                      Current streak: <strong className="text-white">Day {Math.max(1, currentStreak)}</strong> — keep it
+                      Current streak: <strong className="text-[var(--text)]">Day {Math.max(1, currentStreak)}</strong> — keep it
                       going tomorrow!
                     </span>
                   </div>
@@ -292,14 +292,14 @@ export function GuidedOnboarding({
               )}
             </div>
 
-            <footer className="relative shrink-0 border-t border-white/[0.08] bg-black/40 px-4 py-4 backdrop-blur-xl sm:px-8">
+            <footer className="relative shrink-0 border-t border-[var(--border-subtle)] bg-[var(--chrome-40)] px-4 py-4 backdrop-blur-xl sm:px-8">
               <div className="mx-auto flex max-w-lg flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-end">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={onSkip}
                   disabled={skipDisabled}
-                  className="order-2 min-h-12 border border-white/15 bg-white/[0.04] text-white/80 hover:bg-white/10 sm:order-1"
+                  className="order-2 min-h-12 border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] hover:bg-[var(--btn-default-bg)] sm:order-1"
                 >
                   Skip
                 </Button>
@@ -308,7 +308,7 @@ export function GuidedOnboarding({
                     type="button"
                     disabled={!persona || welcomeLoading || skipDisabled}
                     onClick={onWelcomeContinue}
-                    className="order-1 min-h-12 w-full rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 text-base font-semibold text-white shadow-lg shadow-purple-900/35 transition hover:from-purple-400 hover:to-violet-500 disabled:opacity-50 sm:order-2 sm:w-auto touch-manipulation"
+                    className="order-1 min-h-12 w-full rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 text-base font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-900/35 transition hover:from-purple-400 hover:to-violet-500 disabled:opacity-50 sm:order-2 sm:w-auto touch-manipulation"
                   >
                     {welcomeLoading ? "Creating your note…" : "Get started"}
                   </button>
@@ -317,7 +317,7 @@ export function GuidedOnboarding({
                   <button
                     type="button"
                     onClick={onTutorContinue}
-                    className="order-1 min-h-12 w-full rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 text-base font-semibold text-white shadow-lg shadow-purple-900/35 sm:order-2 sm:w-auto touch-manipulation"
+                    className="order-1 min-h-12 w-full rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 text-base font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-900/35 sm:order-2 sm:w-auto touch-manipulation"
                   >
                     Continue
                   </button>
@@ -327,7 +327,7 @@ export function GuidedOnboarding({
                     type="button"
                     disabled={finishLoading || skipDisabled}
                     onClick={onFinishDashboard}
-                    className="order-1 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 text-base font-semibold text-white shadow-lg shadow-purple-900/35 disabled:opacity-50 sm:order-2 sm:w-auto touch-manipulation"
+                    className="order-1 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 text-base font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-900/35 disabled:opacity-50 sm:order-2 sm:w-auto touch-manipulation"
                   >
                     {finishLoading ? "Saving…" : "Start studying"}
                   </button>

@@ -49,22 +49,22 @@ const BLUR_PLACEHOLDER_LINES = [
 function LockedSectionPreview() {
   const text = BLUR_PLACEHOLDER_LINES.join(" ");
   return (
-    <div className="relative min-h-[112px] overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.03]">
+    <div className="relative min-h-[112px] overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--input-bg)]">
       <div
-        className="pointer-events-none select-none px-4 py-3.5 text-sm leading-relaxed text-white/50"
+        className="pointer-events-none select-none px-4 py-3.5 text-sm leading-relaxed text-[var(--muted)]"
         style={{ filter: "blur(5px)" }}
         aria-hidden
       >
         {text}
       </div>
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-gradient-to-b from-[#0a0a0f]/55 via-[#0a0a0f]/85 to-[#0a0a0f]/95 px-4 backdrop-blur-[2px]">
+      <div className="studara-overlay-scan absolute inset-0 flex flex-col items-center justify-center gap-2.5 px-4 backdrop-blur-[2px]">
         <span className="flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-purple-200/95">
           <Lock className="h-3 w-3" strokeWidth={2.5} />
           Pro
         </span>
         <Link
           href="/billing"
-          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-950/30 transition hover:from-violet-500 hover:to-purple-500"
+          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-xs font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-950/30 transition hover:from-violet-500 hover:to-purple-500"
         >
           Upgrade to Pro
         </Link>
@@ -75,23 +75,23 @@ function LockedSectionPreview() {
 
 function GradeLockedHeader() {
   return (
-    <div className="relative shrink-0 overflow-hidden border-b border-white/[0.06] p-5 sm:p-6">
+    <div className="relative shrink-0 overflow-hidden border-b border-[var(--sidebar-border)] p-5 sm:p-6">
       <div className="pointer-events-none select-none opacity-40" style={{ filter: "blur(8px)" }} aria-hidden>
-        <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+        <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--faint)]">
           Estimated grade
         </p>
-        <p className="mt-2 text-center text-5xl font-bold text-white">B+</p>
-        <p className="mx-auto mt-3 max-w-md text-center text-sm text-white/55">
+        <p className="mt-2 text-center text-5xl font-bold text-[var(--text)]">B+</p>
+        <p className="mx-auto mt-3 max-w-md text-center text-sm text-[var(--muted)]">
           Your essay demonstrates solid understanding with room to refine structure and evidence. A detailed
           rationale appears with Pro.
         </p>
       </div>
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#0a0a0f]/75 backdrop-blur-sm">
+      <div className="studara-overlay-75 absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-sm">
         <Lock className="h-6 w-6 text-purple-300/80" strokeWidth={1.75} />
-        <p className="text-center text-sm font-medium text-white/80">Grade estimate is a Pro feature</p>
+        <p className="text-center text-sm font-medium text-[var(--text)]">Grade estimate is a Pro feature</p>
         <Link
           href="/billing"
-          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-950/35 transition hover:from-violet-500 hover:to-purple-500"
+          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-950/35 transition hover:from-violet-500 hover:to-purple-500"
         >
           Upgrade to Pro
         </Link>
@@ -112,18 +112,18 @@ function FeedbackSection({
   const locked = Boolean(section.locked);
 
   return (
-    <div className="border-b border-white/[0.06] last:border-b-0">
+    <div className="border-b border-[var(--sidebar-border)] last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-3 py-3.5 text-left transition hover:bg-white/[0.03]"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-purple-200/90">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-purple-200/90">
           <Icon className="h-4 w-4" strokeWidth={1.75} />
         </span>
-        <span className="min-w-0 flex-1 text-sm font-medium text-white/90">{section.title}</span>
+        <span className="min-w-0 flex-1 text-sm font-medium text-[var(--text)]">{section.title}</span>
         {locked ? (
-          <span className="flex shrink-0 items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-0.5 text-[11px] font-semibold text-white/55">
+          <span className="flex shrink-0 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--badge-free-bg)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--muted)]">
             <Lock className="h-3 w-3" strokeWidth={2.5} />
             Locked
           </span>
@@ -139,18 +139,18 @@ function FeedbackSection({
         )}
         <ChevronDown
           className={cn(
-            "h-4 w-4 shrink-0 text-white/35 transition-transform duration-200",
+            "h-4 w-4 shrink-0 text-[var(--placeholder)] transition-transform duration-200",
             open ? "rotate-180" : "rotate-0"
           )}
         />
       </button>
       {open ? (
         locked ? (
-          <div className="border-t border-white/[0.04] px-3 py-3 pl-[3.25rem]">
+          <div className="border-t border-[var(--border-subtle)] px-3 py-3 pl-[3.25rem]">
             <LockedSectionPreview />
           </div>
         ) : (
-          <div className="essay-feedback-markdown border-t border-white/[0.04] bg-black/20 px-3 py-4 pl-[3.25rem] text-sm leading-relaxed text-white/80">
+          <div className="essay-feedback-markdown border-t border-[var(--border-subtle)] bg-[var(--chrome-20)] px-3 py-4 pl-[3.25rem] text-sm leading-relaxed text-[var(--text)]">
             <TutorMarkdown content={section.body} />
           </div>
         )
@@ -164,18 +164,18 @@ export function EssayFeedbackStructuredPanel({ data }: { data: EssayFeedbackStru
   const firstUnlockedIdx = data.sections.findIndex((s) => !s.locked);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c10]/95 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--modal-surface)] shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
       {gradeLocked ? (
         <GradeLockedHeader />
       ) : (
-        <div className="shrink-0 border-b border-white/[0.06] bg-gradient-to-br from-purple-500/12 via-[#0f0f14] to-blue-500/10 p-5 sm:p-6">
-          <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+        <div className="shrink-0 border-b border-[var(--sidebar-border)] bg-gradient-to-br from-purple-500/12 via-[var(--bg-subtle)] to-blue-500/10 p-5 sm:p-6">
+          <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--faint)]">
             Estimated grade
           </p>
-          <p className="mt-2 text-center text-4xl font-bold tracking-tight text-white sm:text-5xl">
+          <p className="mt-2 text-center text-4xl font-bold tracking-tight text-[var(--text)] sm:text-5xl">
             {data.gradeBadge}
           </p>
-          <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-white/55">
+          <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-[var(--muted)]">
             {data.gradeBlurb}
           </p>
         </div>

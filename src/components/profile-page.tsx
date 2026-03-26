@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
 import { Button, Card, Badge, Input } from "@/components/ui";
 import { DeleteAccountModal } from "@/components/delete-account-modal";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { PlanLimits } from "@/lib/plan-limits";
 
 type ProfilePayload = {
@@ -67,11 +68,11 @@ function UsageRow({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-white/70">{label}</span>
-        <span className="font-medium tabular-nums text-white/90">{cap}</span>
+        <span className="text-[var(--muted)]">{label}</span>
+        <span className="font-medium tabular-nums text-[var(--text)]">{cap}</span>
       </div>
       {pct != null ? (
-        <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--btn-default-bg)]">
           <div
             className="h-full rounded-full bg-gradient-to-r from-purple-500/80 to-blue-500/80 transition-all"
             style={{ width: `${pct}%` }}
@@ -85,8 +86,8 @@ function UsageRow({
 function StatLine({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-white/70">{label}</span>
-      <span className="font-medium tabular-nums text-white/90">{value}</span>
+      <span className="text-[var(--muted)]">{label}</span>
+      <span className="font-medium tabular-nums text-[var(--text)]">{value}</span>
     </div>
   );
 }
@@ -95,7 +96,7 @@ function StatLine({ label, value }: { label: string; value: string | number }) {
 function AiUnlimitedRow({ label }: { label: string }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-white/70">{label}</span>
+      <span className="text-[var(--muted)]">{label}</span>
       <span className="font-medium text-purple-200/95">Unlimited</span>
     </div>
   );
@@ -213,7 +214,7 @@ export function ProfilePage() {
 
   if (loadError) {
     return (
-      <main className="min-h-dvh bg-[#0a0a0f] px-4 py-12 text-white">
+      <main className="min-h-dvh bg-[var(--bg)] px-4 py-12 text-[var(--text)]">
         <p className="text-center text-red-300">{loadError}</p>
       </main>
     );
@@ -221,8 +222,8 @@ export function ProfilePage() {
 
   if (!data) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-[#0a0a0f]">
-        <Loader2 className="h-8 w-8 animate-spin text-white/40" />
+      <main className="flex min-h-dvh items-center justify-center bg-[var(--bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--faint)]" />
       </main>
     );
   }
@@ -250,7 +251,7 @@ export function ProfilePage() {
         loading={deleteLoading}
         error={deleteErr}
       />
-    <main className="min-h-dvh bg-[#0a0a0f] text-white">
+    <main className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-purple-500/[0.07] blur-[100px]" />
       </div>
@@ -259,21 +260,24 @@ export function ProfilePage() {
         <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/notes"
-            className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm text-white/55 transition duration-200 hover:bg-white/[0.05] hover:text-white/90"
+            className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to notes
           </Link>
-          <StudaraWordmarkLink href="/" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle variant="icon" />
+            <StudaraWordmarkLink href="/" />
+          </div>
         </div>
 
-        <h1 className="text-3xl font-semibold tracking-tight text-white">Profile</h1>
-        <p className="mt-2 text-base text-white/45">Account, plan, and usage in one place</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-[var(--text)]">Profile</h1>
+        <p className="mt-2 text-base text-[var(--muted)]">Account, plan, and usage in one place</p>
 
         <div className="mt-12 space-y-8">
           {/* Profile */}
-          <Card className="border-white/[0.08] bg-black/25 p-8 backdrop-blur-xl">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Profile</h2>
+          <Card className="border-[var(--border-subtle)] bg-[var(--chrome-25)] p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Profile</h2>
             <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start">
               <div className="flex shrink-0 justify-center sm:justify-start">
                 {user.image ? (
@@ -283,21 +287,21 @@ export function ProfilePage() {
                     alt=""
                     width={88}
                     height={88}
-                    className="h-[88px] w-[88px] rounded-2xl border border-white/10 object-cover"
+                    className="h-[88px] w-[88px] rounded-2xl border border-[var(--border)] object-cover"
                   />
                 ) : (
-                  <div className="flex h-[88px] w-[88px] items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/30 to-blue-500/20 text-2xl font-semibold text-white/90">
+                  <div className="flex h-[88px] w-[88px] items-center justify-center rounded-2xl border border-[var(--border)] bg-gradient-to-br from-purple-500/30 to-blue-500/20 text-2xl font-semibold text-[var(--text)]">
                     {initialsFromUser(user.name, user.email)}
                   </div>
                 )}
               </div>
               <div className="min-w-0 flex-1 space-y-3">
                 <div>
-                  <div className="text-xs font-medium text-white/45">Email</div>
-                  <div className="truncate text-sm text-white/90">{user.email ?? "—"}</div>
+                  <div className="text-xs font-medium text-[var(--muted)]">Email</div>
+                  <div className="truncate text-sm text-[var(--text)]">{user.email ?? "—"}</div>
                 </div>
                 <div>
-                  <label htmlFor="display-name" className="text-xs font-medium text-white/45">
+                  <label htmlFor="display-name" className="text-xs font-medium text-[var(--muted)]">
                     Display name
                   </label>
                   <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -320,10 +324,10 @@ export function ProfilePage() {
           </Card>
 
           {/* Plan */}
-          <Card className="border-white/[0.08] bg-black/25 p-8 backdrop-blur-xl">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Plan &amp; billing</h2>
+          <Card className="border-[var(--border-subtle)] bg-[var(--chrome-25)] p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Plan &amp; billing</h2>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <span className="text-lg font-medium text-white/90">Current plan</span>
+              <span className="text-lg font-medium text-[var(--text)]">Current plan</span>
               {plan.tier === "pro" ? (
                 <Badge className="border-purple-500/50 bg-purple-500/25 text-purple-100">Pro</Badge>
               ) : (
@@ -331,15 +335,15 @@ export function ProfilePage() {
               )}
             </div>
             {plan.tier === "pro" ? (
-              <div className="mt-4 space-y-3 text-sm text-white/70">
+              <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
                 {renewal ? (
                   <p>
                     {plan.cancelAtPeriodEnd ? "Access until" : "Renews on"}{" "}
-                    <span className="font-medium text-white/90">{renewal}</span>
+                    <span className="font-medium text-[var(--text)]">{renewal}</span>
                     {plan.cancelAtPeriodEnd ? " (subscription ending)" : ""}
                   </p>
                 ) : (
-                  <p className="text-white/50">Renewal date will appear after your subscription syncs.</p>
+                  <p className="text-[var(--muted)]">Renewal date will appear after your subscription syncs.</p>
                 )}
                 <Button
                   type="button"
@@ -356,7 +360,7 @@ export function ProfilePage() {
                   {plan.cancelAtPeriodEnd ? "Cancellation scheduled" : "Cancel subscription"}
                 </Button>
                 {!plan.stripeSubscriptionId ? (
-                  <p className="text-xs text-white/45">
+                  <p className="text-xs text-[var(--muted)]">
                     If this stays disabled, confirm the Stripe webhook ran and stored your subscription id.
                   </p>
                 ) : null}
@@ -367,7 +371,7 @@ export function ProfilePage() {
               <div className="mt-4">
                 <Link
                   href="/billing"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-lg transition hover:from-purple-500 hover:to-blue-500"
                 >
                   <Sparkles className="h-4 w-4" />
                   Upgrade to Pro
@@ -377,9 +381,9 @@ export function ProfilePage() {
           </Card>
 
           {/* Usage */}
-          <Card className="border-white/[0.08] bg-black/25 p-8 backdrop-blur-xl">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Usage</h2>
-            <p className="mt-1 text-xs text-white/45">
+          <Card className="border-[var(--border-subtle)] bg-[var(--chrome-25)] p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Usage</h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">
               {plan.tier === "pro"
                 ? `Activity this month (${usage.month}) · Pro includes unlimited AI usage`
                 : `This month (${usage.month}) · compared to your plan limits`}
@@ -388,7 +392,7 @@ export function ProfilePage() {
               {plan.tier === "pro" ? (
                 <>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/70">Notes (account total)</span>
+                    <span className="text-[var(--muted)]">Notes (account total)</span>
                     <span className="font-medium text-purple-200/95">Unlimited</span>
                   </div>
                   <StatLine label="Notes created this month" value={usage.notesThisMonth} />
@@ -423,13 +427,13 @@ export function ProfilePage() {
           </Card>
 
           {/* Account */}
-          <Card className="border-white/[0.08] bg-black/25 p-8 backdrop-blur-xl">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Account actions</h2>
-            <p className="mt-3 text-sm text-white/70">
+          <Card className="border-[var(--border-subtle)] bg-[var(--chrome-25)] p-8 backdrop-blur-xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Account actions</h2>
+            <p className="mt-3 text-sm text-[var(--muted)]">
               Member since{" "}
-              <span className="font-medium text-white/90">{memberSince}</span>
+              <span className="font-medium text-[var(--text)]">{memberSince}</span>
             </p>
-            <p className="mt-4 text-sm text-white/60">
+            <p className="mt-4 text-sm text-[var(--muted)]">
               Need help? Contact us at{" "}
               <a
                 href="mailto:studarausersupport@gmail.com"
@@ -441,7 +445,7 @@ export function ProfilePage() {
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Button
                 type="button"
-                className="border-white/20 bg-transparent hover:bg-white/10"
+                className="border-[var(--border)] bg-transparent hover:bg-[var(--btn-default-bg)]"
                 onClick={() => signOut({ callbackUrl: "/" })}
               >
                 Sign out
@@ -449,7 +453,7 @@ export function ProfilePage() {
               <Button
                 type="button"
                 variant="danger"
-                className="border-red-600/80 bg-red-600/90 text-white hover:bg-red-700"
+                className="border-red-600/80 bg-red-600/90 text-[var(--text)] hover:bg-red-700"
                 onClick={() => {
                   setDeleteErr(null);
                   setDeleteOpen(true);

@@ -16,7 +16,7 @@ export function SignupPanel({
 }) {
   return (
     <Card className="p-6">
-      <h2 className="text-lg font-semibold text-white">Sign up</h2>
+      <h2 className="text-lg font-semibold text-[var(--text)]">Sign up</h2>
       <form onSubmit={onSubmit} className="mt-4 space-y-3">
         <Input
           name="name"

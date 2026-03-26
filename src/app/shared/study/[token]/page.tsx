@@ -40,9 +40,9 @@ export default async function SharedStudyPage({ params }: Props) {
   if (result.view === "private") {
     return (
       <SharedPublicShell pageTitle="Private study set">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-12 text-center">
-          <p className="text-lg text-white/85">This study set is private</p>
-          <p className="mt-2 text-sm text-white/45">The owner has turned off public access for this link.</p>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] px-6 py-12 text-center">
+          <p className="text-lg text-[var(--text)]">This study set is private</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">The owner has turned off public access for this link.</p>
         </div>
       </SharedPublicShell>
     );
@@ -50,7 +50,7 @@ export default async function SharedStudyPage({ params }: Props) {
 
   return (
     <SharedPublicShell pageTitle={result.title}>
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-6 sm:px-8 sm:py-8">
+      <div className="rounded-2xl border border-[var(--border)] bg-white/[0.03] px-5 py-6 sm:px-8 sm:py-8">
         <SharedStudyPublic kind={result.kind} cards={result.cards} questions={result.questions} />
       </div>
     </SharedPublicShell>

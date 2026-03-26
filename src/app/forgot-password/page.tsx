@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button, Card, Input } from "@/components/ui";
 
 export default function ForgotPasswordPage() {
@@ -42,7 +43,10 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0f] px-4">
+    <main className="relative flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)] px-4">
+      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+        <ThemeToggle variant="icon" />
+      </div>
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -top-24 left-1/2 h-[400px] w-[700px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/15 via-blue-500/10 to-fuchsia-500/10 blur-3xl" />
       </div>
@@ -51,8 +55,8 @@ export default function ForgotPasswordPage() {
           <StudaraWordmarkLink href="/" />
         </div>
         <Card className="p-6">
-          <h1 className="text-lg font-semibold text-white">Forgot password</h1>
-          <p className="mt-2 text-sm text-white/55">
+          <h1 className="text-lg font-semibold text-[var(--text)]">Forgot password</h1>
+          <p className="mt-2 text-sm text-[var(--muted)]">
             Enter the email you use to sign in with a password. We&apos;ll send a one-time link that expires in 1 hour.
           </p>
           {message ? (
@@ -77,7 +81,7 @@ export default function ForgotPasswordPage() {
               </Button>
             </form>
           )}
-          <p className="mt-5 text-center text-sm text-white/55">
+          <p className="mt-5 text-center text-sm text-[var(--muted)]">
             <Link href="/login" className="text-[var(--accent)] hover:underline">
               Back to log in
             </Link>

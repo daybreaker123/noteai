@@ -128,46 +128,46 @@ export function ShareResourceModal({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--scrim)] p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="share-modal-title"
     >
-      <Card className="relative w-full max-w-md border-white/10 bg-[#12121a]/95 p-6 shadow-xl">
+      <Card className="relative w-full max-w-md border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-xl">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-lg p-1 text-white/50 transition hover:bg-white/10 hover:text-white"
+          className="absolute right-4 top-4 rounded-lg p-1 text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)]"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-2 pr-10">
           <Link2 className="h-5 w-5 text-purple-300" aria-hidden />
-          <h2 id="share-modal-title" className="text-lg font-semibold text-white">
+          <h2 id="share-modal-title" className="text-lg font-semibold text-[var(--text)]">
             {title}
           </h2>
         </div>
-        <p className="mt-2 text-sm text-white/50">
+        <p className="mt-2 text-sm text-[var(--muted)]">
           Anyone with the link can view this {resourceType === "note" ? "note" : "study set"} when it is public.
         </p>
 
         {loading ? (
           <div className="mt-8 flex justify-center py-6">
-            <Loader2 className="h-8 w-8 animate-spin text-white/40" />
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--faint)]" />
           </div>
         ) : error ? (
           <p className="mt-6 text-sm text-red-300">{error}</p>
         ) : (
           <>
-            <div className="mt-5 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5">
-              <p className="break-all text-xs leading-relaxed text-white/80">{fullUrl || "—"}</p>
+            <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--chrome-30)] px-3 py-2.5">
+              <p className="break-all text-xs leading-relaxed text-[var(--text)]">{fullUrl || "—"}</p>
             </div>
 
-            <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-4 py-3">
               <div>
-                <p className="text-sm font-medium text-white">Public link</p>
-                <p className="text-xs text-white/45">
+                <p className="text-sm font-medium text-[var(--text)]">Public link</p>
+                <p className="text-xs text-[var(--muted)]">
                   {isPublic ? "Visible to anyone with the link" : "Only you can view when signed in"}
                 </p>
               </div>
@@ -195,7 +195,7 @@ export function ShareResourceModal({
             <div className="mt-6 flex flex-wrap gap-2">
               <Button
                 type="button"
-                className="flex-1 gap-2 border-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                className="flex-1 gap-2 border-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-[var(--inverse-text)]"
                 disabled={!fullUrl || copyBusy}
                 onClick={() => void handleCopy()}
               >

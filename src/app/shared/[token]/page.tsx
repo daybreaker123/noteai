@@ -43,9 +43,9 @@ export default async function SharedNotePage({ params }: Props) {
   if (result.view === "private") {
     return (
       <SharedPublicShell pageTitle="Private note">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-12 text-center">
-          <p className="text-lg text-white/85">This note is private</p>
-          <p className="mt-2 text-sm text-white/45">The owner has turned off public access for this link.</p>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] px-6 py-12 text-center">
+          <p className="text-lg text-[var(--text)]">This note is private</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">The owner has turned off public access for this link.</p>
         </div>
       </SharedPublicShell>
     );
@@ -55,8 +55,8 @@ export default async function SharedNotePage({ params }: Props) {
 
   return (
     <SharedPublicShell pageTitle={result.title}>
-      <article className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-6 sm:px-8 sm:py-8">
-        <div className="space-y-4 text-[15px] leading-relaxed text-white/88">
+      <article className="rounded-2xl border border-[var(--border)] bg-white/[0.03] px-5 py-6 sm:px-8 sm:py-8">
+        <div className="space-y-4 text-[15px] leading-relaxed text-[var(--text)]/88">
           {paragraphs.length > 0
             ? paragraphs.map((p, i) => (
                 <p key={i} className="whitespace-pre-wrap">
@@ -64,7 +64,7 @@ export default async function SharedNotePage({ params }: Props) {
                 </p>
               ))
             : (
-              <p className="text-white/45">No content.</p>
+              <p className="text-[var(--muted)]">No content.</p>
               )}
         </div>
       </article>

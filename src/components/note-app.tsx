@@ -36,6 +36,7 @@ import {
 import { NoteTemplatePickerModal } from "@/components/note-template-picker-modal";
 import { VoiceToNotesControl } from "@/components/voice-to-notes-control";
 import { ShareResourceModal } from "@/components/share-resource-modal";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { noteTemplateDefaultTitle, noteTemplateHtml, type NoteTemplateId } from "@/lib/note-templates";
 import {
   fetchGoogleDocsClientConfig,
@@ -1709,8 +1710,8 @@ export function NoteApp({
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0f]">
-        <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+      <div className="flex min-h-dvh items-center justify-center bg-[var(--bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--muted)]" />
       </div>
     );
   }
@@ -1725,8 +1726,8 @@ export function NoteApp({
 
   if (holdStudyEmbedUI) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0f]">
-        <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+      <div className="flex min-h-dvh items-center justify-center bg-[var(--bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--muted)]" />
       </div>
     );
   }
@@ -1739,11 +1740,11 @@ export function NoteApp({
     !studyEmbedDismissed
   ) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-5 bg-[#0a0a0f] px-6 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-5 bg-[var(--bg)] px-6 text-center">
         <p className="max-w-sm text-sm text-red-100/95">{studySetLoadError}</p>
         <Button
           type="button"
-          className="border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white"
+          className="border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)]"
           onClick={() => {
             setStudySetLoadError(null);
             setStudyEmbedDismissed(true);
@@ -1769,7 +1770,7 @@ export function NoteApp({
           variant="ghost"
           disabled={importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading}
           className={cn(
-            "gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/15",
+            "gap-1.5 border border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--text)] hover:bg-[var(--btn-default-hover)]",
             isHero && "min-h-11 w-full justify-center"
           )}
           aria-expanded={importDropdownOpen}
@@ -1789,27 +1790,27 @@ export function NoteApp({
           <div
             role="menu"
             className={cn(
-              "absolute z-[80] min-w-[15rem] rounded-xl border border-white/10 bg-[#14141c] py-1 shadow-xl shadow-black/50",
+              "absolute z-[80] min-w-[15rem] rounded-xl border border-[var(--border)] bg-[var(--surface-mid)] py-1 shadow-xl shadow-black/50",
               isHero ? "left-0 right-0 mt-2" : "right-0 top-[calc(100%+6px)]"
             )}
           >
             <button
               type="button"
               role="menuitem"
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-white/90 hover:bg-white/10"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
               onClick={() => {
                 setImportDropdownOpen(false);
                 setImportDocError(null);
                 importDocumentInputRef.current?.click();
               }}
             >
-              <Upload className="h-4 w-4 shrink-0 text-white/55" />
+              <Upload className="h-4 w-4 shrink-0 text-[var(--muted)]" />
               PDF or Word from device
             </button>
             <button
               type="button"
               role="menuitem"
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-white/90 hover:bg-white/10"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
               onClick={() => {
                 setImportDropdownOpen(false);
                 setSlidesAnalyzeError(null);
@@ -1820,7 +1821,7 @@ export function NoteApp({
                 analyzeSlidesInputRef.current?.click();
               }}
             >
-              <Presentation className="h-4 w-4 shrink-0 text-white/55" />
+              <Presentation className="h-4 w-4 shrink-0 text-[var(--muted)]" />
               Analyze Slides
             </button>
             <button
@@ -1832,10 +1833,10 @@ export function NoteApp({
                   ? "Add GOOGLE_PICKER_API_KEY and GOOGLE_CLIENT_ID to enable Google Docs import"
                   : undefined
               }
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-white/90 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)] disabled:cursor-not-allowed disabled:opacity-40"
               onClick={() => void handleImportFromGoogleDocs()}
             >
-              <Cloud className="h-4 w-4 shrink-0 text-white/55" />
+              <Cloud className="h-4 w-4 shrink-0 text-[var(--muted)]" />
               Import from Google Docs
             </button>
           </div>
@@ -1845,10 +1846,10 @@ export function NoteApp({
   };
 
   return (
-    <div className="relative flex h-dvh max-w-[100vw] overflow-x-hidden bg-[#0a0a0f]">
+    <div className="relative flex h-dvh max-w-[100vw] overflow-x-hidden bg-[var(--bg)]">
       {(importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading) && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay-scrim)] p-6 backdrop-blur-sm"
           role="alertdialog"
           aria-busy="true"
           aria-live="polite"
@@ -1860,16 +1861,16 @@ export function NoteApp({
                 : "Importing document"
           }
         >
-          <div className="max-w-sm rounded-2xl border border-white/10 bg-[#12121a]/95 px-8 py-6 text-center shadow-xl shadow-purple-950/40">
+          <div className="max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-xl shadow-purple-950/40">
             <Loader2 className="mx-auto h-9 w-9 animate-spin text-purple-400" aria-hidden />
-            <p className="mt-4 text-sm font-medium text-white">
+            <p className="mt-4 text-sm font-medium text-[var(--text)]">
               {slidesAnalyzeLoading
                 ? "Analyzing your slides…"
                 : importGoogleDocSaving
                   ? "Importing from Google Docs…"
                   : "Importing document…"}
             </p>
-            <p className="mt-1.5 text-xs text-white/50">
+            <p className="mt-1.5 text-xs text-[var(--muted)]">
               {slidesAnalyzeLoading
                 ? "Extracting slide text and generating study notes with AI. This can take a minute for large decks."
                 : importGoogleDocSaving
@@ -1890,7 +1891,7 @@ export function NoteApp({
         role="presentation"
         aria-hidden={!mobileSidebarOpen}
         className={cn(
-          "fixed inset-0 z-[35] bg-black/55 backdrop-blur-sm transition-opacity duration-300 md:hidden",
+          "fixed inset-0 z-[35] bg-[var(--overlay-scrim)] backdrop-blur-sm transition-opacity duration-300 md:hidden",
           mobileSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         onClick={() => setMobileSidebarOpen(false)}
@@ -1899,7 +1900,7 @@ export function NoteApp({
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex h-dvh shrink-0 flex-col border-r border-white/[0.06] bg-black/25 backdrop-blur-xl",
+          "flex h-dvh shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] backdrop-blur-xl",
           "w-[min(18rem,92vw)] sm:w-72",
           "fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:relative md:z-20 md:translate-x-0",
           mobileSidebarOpen ? "translate-x-0 shadow-2xl shadow-black/50" : "-translate-x-full md:translate-x-0"
@@ -1916,7 +1917,7 @@ export function NoteApp({
           <button
             type="button"
             onClick={openNewNotePicker}
-            className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
+            className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             New Note
@@ -1924,14 +1925,14 @@ export function NoteApp({
         </div>
         <div className="shrink-0 px-4 pb-4">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--faint)]" />
             <input
               ref={sidebarSearchInputRef}
               data-search-input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search notes…"
-              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-2.5 pl-10 pr-3 text-sm text-white shadow-inner outline-none transition duration-200 placeholder:text-white/35 focus:border-purple-500/35 focus:ring-2 focus:ring-purple-500/20"
+              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--input-bg)] py-2.5 pl-10 pr-3 text-sm text-[var(--text)] shadow-inner outline-none transition duration-200 placeholder:text-[var(--placeholder)] focus:border-purple-500/35 focus:ring-2 focus:ring-purple-500/20"
             />
           </div>
         </div>
@@ -1942,7 +1943,7 @@ export function NoteApp({
               <button
                 type="button"
                 onClick={() => setImportDocError(null)}
-                className="shrink-0 text-red-300 transition hover:text-white"
+                className="shrink-0 text-red-300 transition hover:text-[var(--text)]"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
@@ -1955,7 +1956,7 @@ export function NoteApp({
               <button
                 type="button"
                 onClick={() => setSlidesAnalyzeError(null)}
-                className="shrink-0 text-red-300 transition hover:text-white"
+                className="shrink-0 text-red-300 transition hover:text-[var(--text)]"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
@@ -1968,7 +1969,7 @@ export function NoteApp({
               <button
                 type="button"
                 onClick={() => setVoiceNotesError(null)}
-                className="shrink-0 text-red-300 transition hover:text-white"
+                className="shrink-0 text-red-300 transition hover:text-[var(--text)]"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
@@ -1981,20 +1982,20 @@ export function NoteApp({
               <button
                 type="button"
                 onClick={clearCategoryError}
-                className="shrink-0 text-red-300 transition hover:text-white"
+                className="shrink-0 text-red-300 transition hover:text-[var(--text)]"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
           <div className="px-1">
-            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Notes</p>
+            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">Notes</p>
             <div className="space-y-1">
               <CategoryTab
                 id="all"
                 name="All Notes"
                 count={noteCounts.total}
-                icon={<LayoutGrid className="h-4 w-4 shrink-0 text-white/45" />}
+                icon={<LayoutGrid className="h-4 w-4 shrink-0 text-[var(--muted)]" />}
                 selected={selectedCategoryId === "all"}
                 onClick={() => selectSidebarCategory("all")}
               />
@@ -2021,67 +2022,68 @@ export function NoteApp({
                   clearCategoryError();
                   setCreateCategoryModalOpen(true);
                 }}
-                className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-white/50 transition duration-200 hover:bg-white/[0.05] hover:text-white/85"
+                className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
               >
-                <FolderPlus className="h-4 w-4 shrink-0 text-white/40" />
+                <FolderPlus className="h-4 w-4 shrink-0 text-[var(--faint)]" />
                 Add category
               </button>
             </div>
           </div>
 
-          <div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+          <div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-[var(--divider-fade)] to-transparent" />
 
           <div className="px-1">
-            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">AI tools</p>
+            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">AI tools</p>
             <div className="space-y-1">
               <Link
                 href="/tutor"
                 onClick={() => setMobileSidebarOpen(false)}
-                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-white/75 transition duration-200 hover:bg-white/[0.05] hover:text-white touch-manipulation"
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] touch-manipulation"
               >
-                <GraduationCap className="h-4 w-4 shrink-0 text-white/50" />
+                <GraduationCap className="h-4 w-4 shrink-0 text-[var(--muted)]" />
                 AI Tutor
               </Link>
               <Link
                 href="/essay-feedback"
                 onClick={() => setMobileSidebarOpen(false)}
-                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-white/75 transition duration-200 hover:bg-white/[0.05] hover:text-white touch-manipulation"
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] touch-manipulation"
               >
-                <FilePenLine className="h-4 w-4 shrink-0 text-white/50" />
+                <FilePenLine className="h-4 w-4 shrink-0 text-[var(--muted)]" />
                 Essay Feedback
               </Link>
               <Link
                 href="/citations"
                 onClick={() => setMobileSidebarOpen(false)}
-                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-white/75 transition duration-200 hover:bg-white/[0.05] hover:text-white touch-manipulation"
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] touch-manipulation"
               >
-                <Quote className="h-4 w-4 shrink-0 text-white/50" strokeWidth={2} />
+                <Quote className="h-4 w-4 shrink-0 text-[var(--muted)]" strokeWidth={2} />
                 Citations
               </Link>
             </div>
           </div>
 
-          <div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+          <div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-[var(--divider-fade)] to-transparent" />
 
           <div className="px-1">
-            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Study</p>
+            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">Study</p>
             <Link
               href="/study-sets"
               onClick={() => setMobileSidebarOpen(false)}
-              className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-white/75 transition duration-200 hover:bg-white/[0.05] hover:text-white touch-manipulation"
+              className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] touch-manipulation"
             >
-              <Bookmark className="h-4 w-4 shrink-0 text-white/50" />
+              <Bookmark className="h-4 w-4 shrink-0 text-[var(--muted)]" />
               <span className="min-w-0 flex-1 truncate">Study sets</span>
-              <span className="shrink-0 tabular-nums text-xs text-white/40">{savedStudySets.length}</span>
+              <span className="shrink-0 tabular-nums text-xs text-[var(--faint)]">{savedStudySets.length}</span>
             </Link>
           </div>
         </nav>
-        <div className="shrink-0 space-y-3 border-t border-white/[0.06] bg-black/20 p-4 backdrop-blur-sm">
+        <div className="shrink-0 space-y-3 border-t border-[var(--sidebar-border)] bg-[var(--sidebar-footer-bg)] p-4 backdrop-blur-sm">
+          <ThemeToggle />
           {plan !== "pro" ? (
             <Link
               href="/billing"
               onClick={() => setMobileSidebarOpen(false)}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition duration-200 hover:from-purple-500 hover:to-blue-500 touch-manipulation"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-md shadow-purple-900/20 transition duration-200 hover:from-purple-500 hover:to-blue-500 touch-manipulation"
             >
               <Sparkles className="h-4 w-4" />
               Upgrade to Pro
@@ -2090,7 +2092,7 @@ export function NoteApp({
           <Link
             href="/profile"
             onClick={() => setMobileSidebarOpen(false)}
-            className="flex min-h-[3.25rem] items-center gap-3 rounded-xl p-2.5 transition duration-200 hover:bg-white/[0.06] touch-manipulation"
+            className="flex min-h-[3.25rem] items-center gap-3 rounded-xl p-2.5 transition duration-200 hover:bg-[var(--badge-free-bg)] touch-manipulation"
           >
             {session?.user?.image ? (
               // eslint-disable-next-line @next/next/no-img-element -- OAuth avatar
@@ -2099,15 +2101,15 @@ export function NoteApp({
                 alt=""
                 width={40}
                 height={40}
-                className="h-10 w-10 shrink-0 rounded-xl border border-white/[0.08] object-cover"
+                className="h-10 w-10 shrink-0 rounded-xl border border-[var(--border-subtle)] object-cover"
               />
             ) : (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-gradient-to-br from-purple-500/35 to-blue-500/25 text-xs font-semibold text-white/90">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-gradient-to-br from-purple-500/35 to-blue-500/25 text-xs font-semibold text-[var(--text)]">
                 {userInitials(session?.user?.name, session?.user?.email)}
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white/90">
+              <p className="truncate text-sm font-medium text-[var(--text)]">
                 {session?.user?.name?.trim() || session?.user?.email?.split("@")[0] || "Account"}
               </p>
               <div className="mt-1">
@@ -2116,13 +2118,13 @@ export function NoteApp({
                     Pro
                   </span>
                 ) : (
-                  <span className="inline-flex rounded-md border border-white/15 bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/55">
+                  <span className="inline-flex rounded-md border border-[var(--border)] bg-[var(--badge-free-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
                     Free
                   </span>
                 )}
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-[var(--placeholder)]" />
           </Link>
         </div>
       </aside>
@@ -2130,13 +2132,13 @@ export function NoteApp({
       {/* Main content: grid of note cards OR editor panel */}
       <main className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
         {!selectedNoteId ? (
-          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-3 py-3 backdrop-blur-xl md:hidden">
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--chrome-30)] px-3 py-3 backdrop-blur-xl md:hidden">
             <button
               type="button"
               aria-label="Open menu"
               aria-expanded={mobileSidebarOpen}
               onClick={() => setMobileSidebarOpen(true)}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10 touch-manipulation"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] transition hover:bg-[var(--btn-default-bg)] touch-manipulation"
             >
               <Menu className="h-6 w-6" strokeWidth={2} aria-hidden />
             </button>
@@ -2178,7 +2180,7 @@ export function NoteApp({
             className="flex shrink-0 flex-col gap-2 border-b border-violet-500/20 bg-violet-500/10 px-4 py-3 text-sm text-violet-100/95 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
             <p className="min-w-0 leading-snug">
-              <span className="font-medium text-white">Keep your streak alive!</span>{" "}
+              <span className="font-medium text-[var(--text)]">Keep your streak alive!</span>{" "}
               You haven&apos;t studied today yet.
             </p>
             <button
@@ -2189,7 +2191,7 @@ export function NoteApp({
                   userStats.recent_study_set_title ?? undefined
                 )
               }
-              className="shrink-0 rounded-lg border border-violet-400/35 bg-violet-500/20 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-500/30"
+              className="shrink-0 rounded-lg border border-violet-400/35 bg-violet-500/20 px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-violet-500/30"
             >
               Open {userStats.recent_study_set_title ? `“${userStats.recent_study_set_title.slice(0, 32)}${userStats.recent_study_set_title.length > 32 ? "…" : ""}”` : "latest set"}
             </button>
@@ -2204,7 +2206,7 @@ export function NoteApp({
             <button
               type="button"
               onClick={() => setStudySetLoadError(null)}
-              className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20 hover:text-white"
+              className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20 hover:text-[var(--text)]"
             >
               Dismiss
             </button>
@@ -2513,7 +2515,7 @@ export function NoteApp({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="shrink-0 gap-1.5 border border-white/10 text-white/90 hover:bg-white/10"
+                  className="shrink-0 gap-1.5 border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
                   title="Share note"
                   aria-label="Share note"
                   onClick={() => setShareNoteModalNoteId(selectedNote.id)}
@@ -2553,7 +2555,7 @@ export function NoteApp({
           /* Grid of note cards */
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-4 pt-2 md:p-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
-              <h1 className="text-lg font-semibold text-white md:text-xl">
+              <h1 className="text-lg font-semibold text-[var(--text)] md:text-xl">
                 {gridSelectMode
                   ? "Select notes"
                   : selectedCategoryId === "all"
@@ -2562,14 +2564,14 @@ export function NoteApp({
               </h1>
               {gridSelectMode ? (
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <span className="text-sm font-medium tabular-nums text-white/90">
+                  <span className="text-sm font-medium tabular-nums text-[var(--text)]">
                     {gridSelectedIds.size} selected
                   </span>
                   <Button
                     size="sm"
                     onClick={openMultiStudyMenu}
                     disabled={gridSelectedIds.size === 0}
-                    className="gap-1.5 border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-md shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
+                    className="gap-1.5 border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-md shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
                   >
                     <GraduationCap className="h-3.5 w-3.5" />
                     Continue to study mode
@@ -2596,58 +2598,58 @@ export function NoteApp({
                   <Button
                     size="sm"
                     onClick={startGridSelection}
-                    className="gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/15"
+                    className="gap-1.5 border border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--text)] hover:bg-[var(--btn-default-hover)]"
                   >
                     <BookOpen className="h-3.5 w-3.5" />
                     Study Multiple
                   </Button>
-                  <span className="hidden text-sm text-white/50 lg:inline">⌘N new · ⌘K search</span>
+                  <span className="hidden text-sm text-[var(--muted)] lg:inline">⌘N new · ⌘K search</span>
                 </div>
               )}
             </div>
             {userStats && !gridSelectMode ? (
               <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-orange-500/15 to-rose-500/10 p-4 ring-1 ring-orange-400/15">
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-br from-orange-500/15 to-rose-500/10 p-4 ring-1 ring-orange-400/15">
                   <div className="flex items-center gap-2 text-orange-200/90">
                     <Flame className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Streak</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Streak</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">{userStats.current_streak}</p>
-                  <p className="mt-0.5 text-xs text-white/45">day{userStats.current_streak === 1 ? "" : "s"} in a row</p>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">{userStats.current_streak}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">day{userStats.current_streak === 1 ? "" : "s"} in a row</p>
                 </div>
-                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-4">
                   <div className="flex items-center gap-2 text-violet-200/85">
                     <FileText className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Notes</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Notes</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">{userStats.total_notes}</p>
-                  <p className="mt-0.5 text-xs text-white/45">total created</p>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">{userStats.total_notes}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">total created</p>
                 </div>
-                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-4">
                   <div className="flex items-center gap-2 text-cyan-200/85">
                     <Layers className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Flashcards</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Flashcards</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">
                     {userStats.flashcard_sets_studied_this_week}
                   </p>
-                  <p className="mt-0.5 text-xs text-white/45">sets studied this week</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">sets studied this week</p>
                 </div>
-                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-4">
                   <div className="flex items-center gap-2 text-emerald-200/85">
                     <HelpCircle className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Quizzes</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Quizzes</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">{userStats.quizzes_this_week}</p>
-                  <p className="mt-0.5 text-xs text-white/45">completed this week</p>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">{userStats.quizzes_this_week}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">completed this week</p>
                 </div>
-                <div className="col-span-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 sm:col-span-1">
+                <div className="col-span-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-4 sm:col-span-1">
                   <div className="flex items-center gap-2 text-amber-200/85">
                     <Sparkles className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Summaries</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Summaries</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-white">{userStats.summarizations_this_month}</p>
-                  <p className="mt-0.5 text-xs text-white/45">AI summarizations this month</p>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">{userStats.summarizations_this_month}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">AI summarizations this month</p>
                 </div>
               </div>
             ) : null}
@@ -2662,10 +2664,10 @@ export function NoteApp({
                 </Button>
               </div>
             ) : filteredNotes.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-12">
-                <FileText className="h-12 w-12 text-white/30" />
-                <p className="mt-4 text-white/60">No notes yet</p>
-                <p className="mt-1 text-sm text-white/40">
+              <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] p-12">
+                <FileText className="h-12 w-12 text-[var(--placeholder)]" />
+                <p className="mt-4 text-[var(--muted)]">No notes yet</p>
+                <p className="mt-1 text-sm text-[var(--faint)]">
                   Click New Note to create your first note, or import a PDF or Word file.
                 </p>
                 <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
@@ -2976,15 +2978,15 @@ export function NoteApp({
 
       {studyGuideModal ? (
         <div
-          className="fixed inset-0 z-[55] flex flex-col bg-[#0a0a0f]"
+          className="fixed inset-0 z-[55] flex flex-col bg-[var(--bg)]"
           role="dialog"
           aria-modal
           aria-labelledby="study-guide-title"
         >
-          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/40 px-4 py-3 backdrop-blur-xl sm:px-6">
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--chrome-40)] px-4 py-3 backdrop-blur-xl sm:px-6">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300/80">Study guide</p>
-              <h2 id="study-guide-title" className="truncate text-lg font-semibold text-white sm:text-xl">
+              <h2 id="study-guide-title" className="truncate text-lg font-semibold text-[var(--text)] sm:text-xl">
                 {studyGuideModal.categoryName}
               </h2>
             </div>
@@ -2994,7 +2996,7 @@ export function NoteApp({
                 size="sm"
                 variant="ghost"
                 disabled={!studyGuideText || studyGuideLoading}
-                className="gap-1.5 border border-white/15 text-white hover:bg-white/10"
+                className="gap-1.5 border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
                 onClick={() => void downloadStudyGuidePdf()}
               >
                 <Download className="h-4 w-4" />
@@ -3004,7 +3006,7 @@ export function NoteApp({
                 type="button"
                 size="sm"
                 disabled={!studyGuideText || studyGuideLoading || saveStudyGuideLoading}
-                className="gap-1.5 border-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-white"
+                className="gap-1.5 border-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-[var(--inverse-text)]"
                 onClick={() => void saveStudyGuideToNote()}
               >
                 {saveStudyGuideLoading ? (
@@ -3017,7 +3019,7 @@ export function NoteApp({
               <button
                 type="button"
                 onClick={closeStudyGuideModal}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/50 transition hover:bg-white/10 hover:text-white"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)]"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -3028,7 +3030,7 @@ export function NoteApp({
             {studyGuideLoading ? (
               <div className="flex flex-col items-center justify-center gap-4 py-24">
                 <Loader2 className="h-10 w-10 animate-spin text-violet-400" />
-                <p className="text-sm text-white/60">Generating your study guide…</p>
+                <p className="text-sm text-[var(--muted)]">Generating your study guide…</p>
               </div>
             ) : studyGuideError ? (
               <div className="mx-auto max-w-md rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-center">
@@ -3038,7 +3040,7 @@ export function NoteApp({
                 </Button>
               </div>
             ) : studyGuideText ? (
-              <div className="mx-auto max-w-3xl rounded-2xl border border-white/[0.08] bg-black/25 p-5 sm:p-8">
+              <div className="mx-auto max-w-3xl rounded-2xl border border-[var(--border-subtle)] bg-[var(--chrome-25)] p-5 sm:p-8">
                 <TutorMarkdown content={studyGuideText} className="text-[0.95rem] leading-relaxed" />
               </div>
             ) : null}
@@ -3052,10 +3054,10 @@ export function NoteApp({
 
       {/* Upgrade modal */}
       {upgradeModal.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim)] backdrop-blur-sm">
           <Card className="mx-4 max-w-sm p-6">
-            <h3 className="text-lg font-semibold text-white">Upgrade to Pro</h3>
-            <p className="mt-2 text-sm text-white/70">
+            <h3 className="text-lg font-semibold text-[var(--text)]">Upgrade to Pro</h3>
+            <p className="mt-2 text-sm text-[var(--muted)]">
               {upgradeModal.feature && PRO_FEATURE_DESCRIPTIONS[upgradeModal.feature]
                 ? `${PRO_FEATURE_DESCRIPTIONS[upgradeModal.feature]} This feature is Pro only.`
                 : upgradeModal.message ?? "Upgrade to Pro for more features."}
@@ -3064,7 +3066,7 @@ export function NoteApp({
               <Link
                 href="/billing"
                 onClick={() => setUpgradeModal({ show: false })}
-                className="flex flex-1 min-w-[140px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+                className="flex flex-1 min-w-[140px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-lg transition hover:from-purple-500 hover:to-blue-500"
               >
                 <Sparkles className="h-4 w-4" />
                 Upgrade to Pro
@@ -3079,12 +3081,12 @@ export function NoteApp({
 
       {/* Improve toast */}
       {improveToast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-4 py-2.5 text-sm text-white shadow-lg backdrop-blur">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] px-4 py-2.5 text-sm text-[var(--text)] shadow-lg backdrop-blur">
           Notes improved
         </div>
       )}
       {linkCopiedToast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-4 py-2.5 text-sm text-white shadow-lg backdrop-blur">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] px-4 py-2.5 text-sm text-[var(--text)] shadow-lg backdrop-blur">
           Link copied!
         </div>
       )}
@@ -3120,7 +3122,7 @@ export function NoteApp({
           <button
             type="button"
             onClick={() => clearSaveErrorMessage()}
-            className="shrink-0 rounded-md p-1 text-red-300 transition hover:bg-red-500/20 hover:text-white"
+            className="shrink-0 rounded-md p-1 text-red-300 transition hover:bg-red-500/20 hover:text-[var(--text)]"
             aria-label="Dismiss"
           >
             <X className="h-4 w-4" />
@@ -3312,19 +3314,19 @@ function EditorPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-white/10 bg-black/20 backdrop-blur-xl md:rounded-2xl md:border">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--chrome-20)] backdrop-blur-xl md:rounded-2xl md:border">
       <NoteStudyProgressTrail
         completion={studyProgressCompletion}
         onStepPress={handleStudyProgressStep}
         disabled={improveLoading || summaryLoading}
       />
-      <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 md:gap-4 md:px-4 md:py-3">
+      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-3 py-2 md:gap-4 md:px-4 md:py-3">
         {onOpenMobileMenu ? (
           <button
             type="button"
             aria-label="Open menu"
             onClick={onOpenMobileMenu}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10 md:hidden touch-manipulation"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] transition hover:bg-[var(--btn-default-bg)] md:hidden touch-manipulation"
           >
             <Menu className="h-6 w-6" strokeWidth={2} aria-hidden />
           </button>
@@ -3332,7 +3334,7 @@ function EditorPanel({
         <button
           type="button"
           onClick={onBack}
-          className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/5 hover:text-white touch-manipulation md:min-h-0 md:rounded-lg md:px-2 md:py-1.5"
+          className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--input-bg)] hover:text-[var(--text)] touch-manipulation md:min-h-0 md:rounded-lg md:px-2 md:py-1.5"
         >
           <ChevronRight className="h-4 w-4 rotate-180 shrink-0" />
           <span className="hidden sm:inline">Back</span>
@@ -3341,7 +3343,7 @@ function EditorPanel({
           <select
             value={selectedNote.category_id ?? ""}
             onChange={(e) => onUpdate({ category_id: e.target.value || null })}
-            className="min-h-11 shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-white md:min-h-0 md:py-1.5"
+            className="min-h-11 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--input-bg)] px-2 py-2 text-sm text-[var(--text)] md:min-h-0 md:py-1.5"
           >
             {selectedNote.category_id === "pending" && !categories.some((c) => c.id === "pending") && (
               <option value="pending">General (creating…)</option>
@@ -3369,18 +3371,18 @@ function EditorPanel({
             <BookOpen className="mr-1.5 h-3.5 w-3.5" />
             Study
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => void onExportPdf()} className="border border-white/15 bg-white/10 text-white hover:bg-white/15">
+          <Button size="sm" variant="ghost" onClick={() => void onExportPdf()} className="border border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--text)] hover:bg-[var(--btn-default-hover)]">
             <Download className="mr-1.5 h-3.5 w-3.5" />
             PDF
           </Button>
-          <Button size="sm" variant="ghost" onClick={onExportMd} className="border border-white/15 bg-white/10 text-white hover:bg-white/15">
+          <Button size="sm" variant="ghost" onClick={onExportMd} className="border border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--text)] hover:bg-[var(--btn-default-hover)]">
             Markdown
           </Button>
         </div>
         <button
           type="button"
           onClick={onDeleteRequest}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/50 transition hover:bg-red-500/15 hover:text-red-300 touch-manipulation md:h-auto md:w-auto md:rounded-lg md:p-2"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--muted)] transition hover:bg-red-500/15 hover:text-red-300 touch-manipulation md:h-auto md:w-auto md:rounded-lg md:p-2"
           title="Delete note"
           aria-label="Delete note"
         >
@@ -3388,8 +3390,8 @@ function EditorPanel({
         </button>
       </div>
       {suggestBanner && (
-        <div className="flex items-center justify-between border-b border-white/10 bg-purple-500/10 px-4 py-2 text-sm">
-          <span className="text-white/90">
+        <div className="flex items-center justify-between border-b border-[var(--border)] bg-purple-500/10 px-4 py-2 text-sm">
+          <span className="text-[var(--text)]">
             We suggest: <strong>{suggestBanner.name}</strong> — Apply?
           </span>
           <div className="flex gap-2">
@@ -3402,11 +3404,11 @@ function EditorPanel({
           </div>
         </div>
       )}
-      <div className="border-b border-white/10 px-4 py-3 md:px-6 md:py-4">
+      <div className="border-b border-[var(--border)] px-4 py-3 md:px-6 md:py-4">
         <input
           value={editTitle}
           onChange={(e) => setEditTitle(e.target.value)}
-          className="w-full min-h-11 bg-transparent text-xl font-semibold text-white outline-none placeholder:text-white/40 md:text-2xl"
+          className="w-full min-h-11 bg-transparent text-xl font-semibold text-[var(--text)] outline-none placeholder:text-[var(--placeholder)] md:text-2xl"
           placeholder="Note title"
         />
       </div>
@@ -3421,20 +3423,20 @@ function EditorPanel({
         {summaryBelow && (
           <div className="mt-4 rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-purple-300">Summary</p>
-            <p className="mt-1 text-sm leading-relaxed text-white/90">{summaryBelow}</p>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--text)]">{summaryBelow}</p>
           </div>
         )}
         {toolbarError && (
           <div className="mt-4 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
             <p className="text-sm text-red-200">{toolbarError}</p>
-            <button type="button" onClick={onToolbarErrorDismiss} className="text-red-300 hover:text-white">
+            <button type="button" onClick={onToolbarErrorDismiss} className="text-red-300 hover:text-[var(--text)]">
               <X className="h-4 w-4" />
             </button>
           </div>
         )}
         {suggestTagsChips && suggestTagsChips.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-white/60">Suggested tags:</span>
+            <span className="text-xs text-[var(--muted)]">Suggested tags:</span>
             {suggestTagsChips.map((tag) => (
               <Badge
                 key={tag}
@@ -3447,7 +3449,7 @@ function EditorPanel({
             <button
               type="button"
               onClick={onSuggestTagDismiss}
-              className="rounded px-2 py-0.5 text-xs text-white/50 hover:text-white/80"
+              className="rounded px-2 py-0.5 text-xs text-[var(--muted)] hover:text-[var(--text)]"
             >
               Dismiss
             </button>
@@ -3610,7 +3612,7 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "group max-w-full overflow-x-hidden rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-500/30 hover:bg-white/10",
+        "group max-w-full overflow-x-hidden rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] p-5 transition hover:border-purple-500/30 hover:bg-[var(--btn-default-bg)]",
         selectMode ? "cursor-default" : "cursor-pointer",
         selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30",
         categoryColor && "border-l-4"
@@ -3627,13 +3629,13 @@ function NoteCard({
               onToggleSelect?.();
             }}
             onClick={(e) => e.stopPropagation()}
-            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-white/30 bg-white/10 text-purple-500 focus:ring-purple-500"
+            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--border)] bg-[var(--btn-default-bg)] text-purple-500 focus:ring-purple-500"
             aria-label={selected ? "Deselect note" : "Select note"}
           />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="flex-1 truncate font-semibold text-white">{note.title || "Untitled"}</h3>
+            <h3 className="flex-1 truncate font-semibold text-[var(--text)]">{note.title || "Untitled"}</h3>
             {!selectMode && (
               <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
                 <button
@@ -3642,7 +3644,7 @@ function NoteCard({
                     e.stopPropagation();
                     onTogglePin();
                   }}
-                  className="rounded p-1 text-white/50 hover:text-amber-400"
+                  className="rounded p-1 text-[var(--muted)] hover:text-amber-400"
                 >
                   <Pin className={cn("h-3.5 w-3.5", note.pinned && "fill-amber-400 text-amber-400")} />
                 </button>
@@ -3653,19 +3655,19 @@ function NoteCard({
                       e.stopPropagation();
                       onExportToggle();
                     }}
-                    className="rounded p-1 text-white/50 hover:text-white"
+                    className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"
                   >
                     <Download className="h-3.5 w-3.5" />
                   </button>
                   {exportOpen && (
-                    <div className="absolute right-0 top-full z-10 mt-1 min-w-[140px] rounded-lg border border-white/10 bg-black/95 py-1 shadow-xl">
+                    <div className="absolute right-0 top-full z-10 mt-1 min-w-[140px] rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] py-1 shadow-xl">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onExportPdf();
                         }}
-                        className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                        className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
                       >
                         Export PDF
                       </button>
@@ -3675,7 +3677,7 @@ function NoteCard({
                           e.stopPropagation();
                           onExportMd();
                         }}
-                        className="block w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                        className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
                       >
                         Export Markdown
                       </button>
@@ -3688,14 +3690,14 @@ function NoteCard({
                     e.stopPropagation();
                     onStudy();
                   }}
-                  className="rounded p-1 text-white/50 hover:text-white"
+                  className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"
                 >
                   <BookOpen className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
           </div>
-          <p className="mt-2 line-clamp-2 text-sm text-white/60">{preview || "No content"}</p>
+          <p className="mt-2 line-clamp-2 text-sm text-[var(--muted)]">{preview || "No content"}</p>
           <div className="mt-3" title="Study progress">
             <NoteStudyProgressBar completion={studyProgressCompletion} />
           </div>
@@ -3703,7 +3705,7 @@ function NoteCard({
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
-                categoryColor ? "text-white/90" : categoryName === "Uncategorized" ? "bg-white/10 text-white/60" : "bg-purple-500/20 text-purple-300"
+                categoryColor ? "text-[var(--text)]" : categoryName === "Uncategorized" ? "bg-[var(--btn-default-bg)] text-[var(--muted)]" : "bg-purple-500/20 text-purple-300"
               )}
               style={categoryColor ? { backgroundColor: `${categoryColor}30`, color: categoryColor } : undefined}
             >
@@ -3716,7 +3718,7 @@ function NoteCard({
               )}
               {categoryName}
             </span>
-            <span className="text-xs text-white/50">{formattedDate}</span>
+            <span className="text-xs text-[var(--muted)]">{formattedDate}</span>
           </div>
           {(note.tags ?? []).length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
@@ -3727,8 +3729,8 @@ function NoteCard({
               ))}
             </div>
           )}
-          {summary && <p className="mt-2 line-clamp-2 text-xs text-white/50">{summary}</p>}
-          {summaryLoading && <Loader2 className="mt-2 h-3 w-3 animate-spin text-white/50" />}
+          {summary && <p className="mt-2 line-clamp-2 text-xs text-[var(--muted)]">{summary}</p>}
+          {summaryLoading && <Loader2 className="mt-2 h-3 w-3 animate-spin text-[var(--muted)]" />}
           {!selectMode && !summary && !summaryLoading && (
             <button type="button" onClick={(e) => { e.stopPropagation(); onSummarize(); }} className="mt-2 text-xs text-purple-400 hover:underline">
               Summarize
@@ -3745,7 +3747,7 @@ function NoteCard({
       {ctxMenu && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed z-[80] min-w-[160px] rounded-lg border border-white/10 bg-black/95 py-1 shadow-xl"
+              className="fixed z-[80] min-w-[160px] rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] py-1 shadow-xl"
               style={{ left: ctxMenu.x, top: ctxMenu.y }}
               onPointerDown={(e) => e.stopPropagation()}
               role="menu"
@@ -3754,7 +3756,7 @@ function NoteCard({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-white/10"
+                className="block w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-[var(--btn-default-bg)]"
                 onClick={() => {
                   onRequestDelete();
                   setCtxMenu(null);
@@ -3803,27 +3805,27 @@ function CategoryTab({
         className={cn(
           "flex min-h-11 min-w-0 flex-1 touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition duration-200",
           selected
-            ? "bg-gradient-to-r from-purple-500/18 to-blue-500/10 text-white shadow-[inset_0_0_0_1px_rgba(168,85,247,0.25)]"
-            : "text-white/70 hover:bg-white/[0.05] hover:text-white/92"
+            ? "bg-gradient-to-r from-purple-500/18 to-blue-500/10 text-[var(--text)] shadow-[inset_0_0_0_1px_rgba(168,85,247,0.25)]"
+            : "text-[var(--muted)] hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
         )}
       >
         {icon ? (
           <span className="shrink-0">{icon}</span>
         ) : color ? (
           <span
-            className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white/10"
+            className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-[var(--border)]"
             style={{ backgroundColor: color }}
             aria-hidden
           />
         ) : (
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-white/25 ring-2 ring-white/10" aria-hidden />
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-white/25 ring-2 ring-[var(--border)]" aria-hidden />
         )}
         <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
         {count !== undefined ? (
           <span
             className={cn(
               "shrink-0 tabular-nums text-xs",
-              selected ? "text-white/55" : "text-white/35"
+              selected ? "text-[var(--muted)]" : "text-[var(--placeholder)]"
             )}
           >
             {count}
@@ -3847,7 +3849,7 @@ function CategoryTab({
       {!isAll && (onRename || onDelete) ? (
         <button
           type="button"
-          className="flex h-9 w-6 shrink-0 touch-manipulation items-center justify-center rounded-lg text-white/40 opacity-90 transition hover:bg-white/10 hover:text-white/70 md:opacity-0 md:group-hover:opacity-100"
+          className="flex h-9 w-6 shrink-0 touch-manipulation items-center justify-center rounded-lg text-[var(--faint)] opacity-90 transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--muted)] md:opacity-0 md:group-hover:opacity-100"
           aria-label={`Category actions for ${name}`}
           onClick={(e) => {
             e.stopPropagation();
@@ -3858,7 +3860,7 @@ function CategoryTab({
         </button>
       ) : null}
       {menu && !isAll && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[8rem] rounded-xl border border-white/[0.08] bg-black/95 py-1 shadow-xl">
+        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[8rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl">
           {onRename && (
             <button
               type="button"
@@ -3866,7 +3868,7 @@ function CategoryTab({
                 onRename();
                 setMenu(false);
               }}
-              className="block w-full px-3 py-2 text-left text-sm text-white transition hover:bg-white/10"
+              className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] transition hover:bg-[var(--btn-default-bg)]"
             >
               Rename
             </button>
@@ -3878,7 +3880,7 @@ function CategoryTab({
                 onDelete();
                 setMenu(false);
               }}
-              className="block w-full px-3 py-2 text-left text-sm text-red-400 transition hover:bg-white/10"
+              className="block w-full px-3 py-2 text-left text-sm text-red-400 transition hover:bg-[var(--btn-default-bg)]"
             >
               Delete
             </button>
@@ -3904,12 +3906,12 @@ function StreakMilestoneModal({
   const { title, subtitle } = copy[milestone];
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--scrim-heavy)] p-4 backdrop-blur-md"
       role="dialog"
       aria-modal
       aria-labelledby="streak-milestone-title"
     >
-      <Card className="studara-streak-milestone-enter relative w-full max-w-sm overflow-hidden border border-violet-400/25 bg-[#0c0c12]/95 p-8 text-center shadow-2xl shadow-violet-900/20">
+      <Card className="studara-streak-milestone-enter relative w-full max-w-sm overflow-hidden border border-violet-400/25 bg-[var(--modal-surface)] p-8 text-center shadow-2xl shadow-violet-900/20">
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
           {[...Array(12)].map((_, i) => (
             <span
@@ -3928,16 +3930,16 @@ function StreakMilestoneModal({
           <Flame className="h-11 w-11 text-amber-100" strokeWidth={1.5} aria-hidden />
         </div>
         <p className="relative mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-violet-300/90">Milestone</p>
-        <h2 id="streak-milestone-title" className="relative mt-2 text-2xl font-bold text-white">
+        <h2 id="streak-milestone-title" className="relative mt-2 text-2xl font-bold text-[var(--text)]">
           {title}
         </h2>
-        <p className="relative mt-1 text-sm text-white/60">{subtitle}</p>
+        <p className="relative mt-1 text-sm text-[var(--muted)]">{subtitle}</p>
         <p className="relative mt-4 text-5xl font-black tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-orange-200 to-rose-200">
           {milestone}
         </p>
         <Button
           type="button"
-          className="relative mt-8 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white"
+          className="relative mt-8 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)]"
           onClick={onClose}
         >
           Keep going
@@ -4046,14 +4048,14 @@ function StudyModal({
 
   if (mode === "menu") {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
-        <Card className="studara-study-modal-enter relative mx-auto w-full max-w-2xl border border-white/10 bg-[#0c0c12]/95 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim)] p-4 backdrop-blur-md">
+        <Card className="studara-study-modal-enter relative mx-auto w-full max-w-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-2xl backdrop-blur-xl sm:p-8">
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/30 to-cyan-500/20 ring-1 ring-white/10">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/30 to-cyan-500/20 ring-1 ring-[var(--border)]">
               <GraduationCap className="h-8 w-8 text-violet-200" strokeWidth={1.5} />
             </div>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">Study Mode</h2>
-            <p className="mt-1.5 max-w-md text-sm text-white/55">
+            <h2 className="mt-5 text-2xl font-semibold tracking-tight text-[var(--text)]">Study Mode</h2>
+            <p className="mt-1.5 max-w-md text-sm text-[var(--muted)]">
               {studyScope === "multi"
                 ? "We’ll combine your selected notes. Choose flashcards or a quiz to generate."
                 : "Choose how you want to practice — flip through cards or test yourself with a quiz."}
@@ -4061,7 +4063,7 @@ function StudyModal({
             <button
               type="button"
               onClick={onClose}
-              className="absolute right-4 top-4 rounded-lg p-2 text-white/45 transition hover:bg-white/10 hover:text-white sm:right-6 sm:top-6"
+              className="absolute right-4 top-4 rounded-lg p-2 text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] sm:right-6 sm:top-6"
               aria-label="Close"
             >
               <X className="h-5 w-5" />
@@ -4071,19 +4073,19 @@ function StudyModal({
           {error && <p className="mt-4 text-center text-sm text-red-400">{error}</p>}
 
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            <div className="flex flex-col rounded-2xl border border-white/[0.08] bg-[#12121a] p-5 shadow-inner sm:min-h-[220px]">
+            <div className="flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--modal-surface)] p-5 shadow-inner sm:min-h-[220px]">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15 text-violet-200">
                 <SquareStack className="h-6 w-6" strokeWidth={1.75} />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-white">Flashcards</h3>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-white/55">
+              <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">Flashcards</h3>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-[var(--muted)]">
                 Key terms and definitions you can flip through at your own pace.
               </p>
               <Button
                 type="button"
                 onClick={onLoadFlashcards}
                 disabled={!!loading}
-                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
+                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
               >
                 {loading === "flashcards" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -4094,19 +4096,19 @@ function StudyModal({
               </Button>
             </div>
 
-            <div className="flex flex-col rounded-2xl border border-white/[0.08] bg-[#12121a] p-5 shadow-inner sm:min-h-[220px]">
+            <div className="flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--modal-surface)] p-5 shadow-inner sm:min-h-[220px]">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-200">
                 <HelpCircle className="h-6 w-6" strokeWidth={1.75} />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-white">Quiz</h3>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-white/55">
+              <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">Quiz</h3>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-[var(--muted)]">
                 Multiple choice questions to check your understanding and track progress.
               </p>
               <Button
                 type="button"
                 onClick={onLoadQuiz}
                 disabled={!!loading}
-                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
+                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
               >
                 {loading === "quiz" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -4127,14 +4129,14 @@ function StudyModal({
 
     if (flashcardsSessionComplete) {
       return (
-        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-md sm:items-center sm:p-4">
-          <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-white/10 bg-[#0c0c12]/95 p-6 shadow-2xl backdrop-blur-sm sm:rounded-2xl sm:border max-sm:flex-1">
+        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-[var(--scrim)] p-0 backdrop-blur-md sm:items-center sm:p-4">
+          <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-2xl backdrop-blur-sm sm:rounded-2xl sm:border max-sm:flex-1">
             <div className="flex flex-1 flex-col items-center justify-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/35 to-violet-500/25 ring-1 ring-white/10">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/35 to-violet-500/25 ring-1 ring-[var(--border)]">
                 <SquareStack className="h-8 w-8 text-emerald-200" strokeWidth={1.5} />
               </div>
-              <h3 className="mt-5 text-xl font-semibold text-white">Session complete</h3>
-              <p className="mt-2 max-w-xs text-sm text-white/55">
+              <h3 className="mt-5 text-xl font-semibold text-[var(--text)]">Session complete</h3>
+              <p className="mt-2 max-w-xs text-sm text-[var(--muted)]">
                 {reviewDueOnly
                   ? `You reviewed all ${totalCards} due card${totalCards === 1 ? "" : "s"}. Great work — spaced repetition will surface them again when it’s time.`
                   : "Nice work. Keep rating cards when you flip them to build your personal review schedule."}
@@ -4150,11 +4152,11 @@ function StudyModal({
 
     const card = flashcards[cardIndex];
     return (
-      <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-md sm:items-center sm:p-4">
-        <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-white/10 bg-[#0c0c12]/95 shadow-2xl backdrop-blur-sm sm:max-h-[min(90dvh,880px)] sm:rounded-2xl sm:border sm:p-6 max-sm:flex-1">
+      <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-[var(--scrim)] p-0 backdrop-blur-md sm:items-center sm:p-4">
+        <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] shadow-2xl backdrop-blur-sm sm:max-h-[min(90dvh,880px)] sm:rounded-2xl sm:border sm:p-6 max-sm:flex-1">
           <div className="flex shrink-0 items-start justify-between gap-3 px-4 pb-2 pt-4 sm:px-0 sm:pb-0 sm:pt-0">
             <div className="min-w-0 flex-1">
-              <h3 className="text-base font-semibold tracking-tight text-white sm:text-sm">Flashcards</h3>
+              <h3 className="text-base font-semibold tracking-tight text-[var(--text)] sm:text-sm">Flashcards</h3>
               {studyScope === "multi" && (
                 <p className="mt-1 text-xs text-violet-300/90">From multiple notes</p>
               )}
@@ -4168,7 +4170,7 @@ function StudyModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/50 transition hover:bg-white/10 hover:text-white touch-manipulation sm:h-auto sm:w-auto sm:rounded-lg sm:p-1.5"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] touch-manipulation sm:h-auto sm:w-auto sm:rounded-lg sm:p-1.5"
               aria-label="Close"
             >
               <X className="h-6 w-6 sm:h-5 sm:w-5" />
@@ -4183,13 +4185,13 @@ function StudyModal({
 
           {flashcardReviewDueTotal != null && flashcardReviewDueTotal > 0 ? (
             <div className="mt-3 px-4 sm:px-0">
-              <div className="mb-1 flex justify-between text-xs text-white/50">
+              <div className="mb-1 flex justify-between text-xs text-[var(--muted)]">
                 <span>Due today</span>
                 <span className="tabular-nums">
                   {flashcardSessionReviewed} / {flashcardReviewDueTotal} reviewed
                 </span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--btn-default-bg)]">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-violet-500 to-emerald-400 transition-[width] duration-300"
                   style={{
@@ -4200,7 +4202,7 @@ function StudyModal({
             </div>
           ) : null}
 
-          <p className="mt-3 px-4 text-center text-sm text-white/45 sm:px-0">Tap the card to flip</p>
+          <p className="mt-3 px-4 text-center text-sm text-[var(--muted)] sm:px-0">Tap the card to flip</p>
 
           {/* Fixed-size flip card: full width, taller on mobile for easy tapping */}
           <div className="mt-3 min-h-0 flex-1 px-3 sm:px-0">
@@ -4224,23 +4226,23 @@ function StudyModal({
                 >
                   {/* Front — term / question */}
                   <div
-                    className="absolute inset-0 flex min-h-[min(48dvh,320px)] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-white/[0.08] bg-[#12121a] px-5 py-8 text-center [backface-visibility:hidden] [transform:rotateY(0deg)] sm:min-h-[220px] sm:py-6"
+                    className="absolute inset-0 flex min-h-[min(48dvh,320px)] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-[var(--border-subtle)] bg-[var(--modal-surface)] px-5 py-8 text-center [backface-visibility:hidden] [transform:rotateY(0deg)] sm:min-h-[220px] sm:py-6"
                   >
                     <span className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-indigo-300">
                       Question
                     </span>
-                    <p className="max-w-full text-lg font-medium leading-relaxed text-white/95 [overflow-wrap:anywhere] sm:text-base">
+                    <p className="max-w-full text-lg font-medium leading-relaxed text-[var(--text)] [overflow-wrap:anywhere] sm:text-base">
                       {card.front}
                     </p>
                   </div>
                   {/* Back — definition / answer */}
                   <div
-                    className="absolute inset-0 flex min-h-[min(48dvh,320px)] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-white/[0.08] bg-[#12121a] px-5 py-8 text-center [backface-visibility:hidden] [transform:rotateY(180deg)] sm:min-h-[220px] sm:py-6"
+                    className="absolute inset-0 flex min-h-[min(48dvh,320px)] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-[var(--border-subtle)] bg-[var(--modal-surface)] px-5 py-8 text-center [backface-visibility:hidden] [transform:rotateY(180deg)] sm:min-h-[220px] sm:py-6"
                   >
                     <span className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-violet-300">
                       Answer
                     </span>
-                    <p className="max-w-full text-lg leading-relaxed text-white/90 [overflow-wrap:anywhere] sm:text-base">
+                    <p className="max-w-full text-lg leading-relaxed text-[var(--text)] [overflow-wrap:anywhere] sm:text-base">
                       {card.back}
                     </p>
                   </div>
@@ -4249,13 +4251,13 @@ function StudyModal({
             </div>
           </div>
 
-          <p className="mt-4 px-4 text-center text-base font-medium tabular-nums text-white/55 sm:px-0 sm:text-sm">
+          <p className="mt-4 px-4 text-center text-base font-medium tabular-nums text-[var(--muted)] sm:px-0 sm:text-sm">
             {cardIndex + 1} of {totalCards}
           </p>
 
           {cardFlipped ? (
             <div className="mt-4 space-y-2 px-4 sm:px-0">
-              <p className="text-center text-xs text-white/45">How well did you recall this?</p>
+              <p className="text-center text-xs text-[var(--muted)]">How well did you recall this?</p>
               <div className="flex gap-2 sm:gap-3">
                 <button
                   type="button"
@@ -4288,7 +4290,7 @@ function StudyModal({
           {canPersistStudy && (
             <Button
               type="button"
-              className="mx-4 mt-3 w-[calc(100%-2rem)] border-0 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-base font-medium text-white shadow-md shadow-violet-500/20 disabled:opacity-50 sm:mx-0 sm:w-full sm:py-2 sm:text-sm"
+              className="mx-4 mt-3 w-[calc(100%-2rem)] border-0 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-base font-medium text-[var(--inverse-text)] shadow-md shadow-violet-500/20 disabled:opacity-50 sm:mx-0 sm:w-full sm:py-2 sm:text-sm"
               onClick={() => void onSaveFlashcards()}
               disabled={studySaveLoading === "flashcards"}
             >
@@ -4305,7 +4307,7 @@ function StudyModal({
             <Button
               type="button"
               variant="ghost"
-              className="min-h-12 min-w-0 flex-1 gap-2 border border-white/10 bg-white/[0.04] px-4 text-base text-white hover:bg-white/10 touch-manipulation sm:min-h-10 sm:min-w-[7.5rem] sm:flex-initial sm:text-sm"
+              className="min-h-12 min-w-0 flex-1 gap-2 border border-[var(--border)] bg-[var(--input-bg)] px-4 text-base text-[var(--text)] hover:bg-[var(--btn-default-bg)] touch-manipulation sm:min-h-10 sm:min-w-[7.5rem] sm:flex-initial sm:text-sm"
               onClick={onCardPrev}
               disabled={cardIndex === 0}
             >
@@ -4315,7 +4317,7 @@ function StudyModal({
             <Button
               type="button"
               variant="ghost"
-              className="min-h-12 min-w-0 flex-1 gap-2 border border-white/10 bg-white/[0.04] px-4 text-base text-white hover:bg-white/10 touch-manipulation sm:min-h-10 sm:min-w-[7.5rem] sm:flex-initial sm:text-sm"
+              className="min-h-12 min-w-0 flex-1 gap-2 border border-[var(--border)] bg-[var(--input-bg)] px-4 text-base text-[var(--text)] hover:bg-[var(--btn-default-bg)] touch-manipulation sm:min-h-10 sm:min-w-[7.5rem] sm:flex-initial sm:text-sm"
               onClick={onCardNext}
               disabled={cardIndex === totalCards - 1}
             >
@@ -4337,17 +4339,17 @@ function StudyModal({
 
     if (done) {
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
-          <Card className="studara-study-modal-enter mx-auto w-full max-w-md border border-white/10 bg-[#0c0c12]/95 p-6 text-center shadow-2xl backdrop-blur-xl sm:p-8">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/35 to-cyan-500/25 ring-1 ring-white/10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim)] p-4 backdrop-blur-md">
+          <Card className="studara-study-modal-enter mx-auto w-full max-w-md border border-[var(--border)] bg-[var(--modal-surface)] p-6 text-center shadow-2xl backdrop-blur-xl sm:p-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/35 to-cyan-500/25 ring-1 ring-[var(--border)]">
               <GraduationCap className="h-8 w-8 text-violet-100" strokeWidth={1.5} />
             </div>
-            <h2 className="mt-5 text-2xl font-semibold text-white">Quiz complete</h2>
+            <h2 className="mt-5 text-2xl font-semibold text-[var(--text)]">Quiz complete</h2>
             <p className="mt-2 text-5xl font-bold tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-cyan-300">
               {finalScore}/{total}
             </p>
-            <p className="mt-1 text-lg font-medium text-white/80">{pct}% correct</p>
-            <p className="mt-4 text-sm leading-relaxed text-white/60">{quizEncouragementMessage(finalScore, total)}</p>
+            <p className="mt-1 text-lg font-medium text-[var(--text)]">{pct}% correct</p>
+            <p className="mt-4 text-sm leading-relaxed text-[var(--muted)]">{quizEncouragementMessage(finalScore, total)}</p>
             {error && (
               <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">{error}</p>
             )}
@@ -4355,7 +4357,7 @@ function StudyModal({
               {canPersistStudy && (
                 <Button
                   type="button"
-                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-lg shadow-violet-500/25"
+                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-lg shadow-violet-500/25"
                   onClick={() => void onSaveQuiz()}
                   disabled={studySaveLoading === "quiz"}
                 >
@@ -4371,7 +4373,7 @@ function StudyModal({
                 <Button
                   type="button"
                   onClick={onQuizTryAgain}
-                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-white shadow-md shadow-violet-500/20 sm:w-auto sm:min-w-[140px]"
+                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-md shadow-violet-500/20 sm:w-auto sm:min-w-[140px]"
                 >
                   Try again
                 </Button>
@@ -4379,7 +4381,7 @@ function StudyModal({
                   type="button"
                   variant="ghost"
                   onClick={onClose}
-                  className="w-full border border-white/15 bg-white/[0.06] text-white hover:bg-white/10 sm:w-auto sm:min-w-[140px]"
+                  className="w-full border border-[var(--border)] bg-[var(--badge-free-bg)] text-[var(--text)] hover:bg-[var(--btn-default-bg)] sm:w-auto sm:min-w-[140px]"
                 >
                   {studyLeaveButtonLabel}
                 </Button>
@@ -4400,12 +4402,12 @@ function StudyModal({
         : null);
 
     return (
-      <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/65 p-0 backdrop-blur-md sm:items-center sm:p-4">
-        <Card className="mx-auto flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-y-auto overflow-x-hidden rounded-none border-0 border-white/10 bg-[#0c0c12]/95 shadow-2xl backdrop-blur-sm sm:max-h-[min(92dvh,900px)] sm:rounded-2xl sm:border sm:p-6">
+      <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-[var(--scrim)] p-0 backdrop-blur-md sm:items-center sm:p-4">
+        <Card className="mx-auto flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-y-auto overflow-x-hidden rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] shadow-2xl backdrop-blur-sm sm:max-h-[min(92dvh,900px)] sm:rounded-2xl sm:border sm:p-6">
           <div className="flex shrink-0 items-start justify-between gap-3 px-4 pt-4 sm:px-0 sm:pt-0">
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium uppercase tracking-wider text-white/40">Quiz</p>
-              <p className="mt-1 text-sm font-medium tabular-nums text-white/70">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--faint)]">Quiz</p>
+              <p className="mt-1 text-sm font-medium tabular-nums text-[var(--muted)]">
                 Question {quizIndex + 1} of {total}
               </p>
               {studyScope === "multi" && (
@@ -4417,7 +4419,7 @@ function StudyModal({
               {error && (
                 <p className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-200">{error}</p>
               )}
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--btn-default-bg)]">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 transition-[width] duration-300 ease-out"
                   style={{ width: `${((quizIndex + 1) / total) * 100}%` }}
@@ -4427,7 +4429,7 @@ function StudyModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/50 transition hover:bg-white/10 hover:text-white touch-manipulation sm:h-auto sm:w-auto sm:rounded-lg sm:p-1.5"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] touch-manipulation sm:h-auto sm:w-auto sm:rounded-lg sm:p-1.5"
               aria-label="Close"
             >
               <X className="h-6 w-6 sm:h-5 sm:w-5" />
@@ -4436,8 +4438,8 @@ function StudyModal({
 
           <div className="mt-5 w-full flex-1 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pb-0">
             <div className="rounded-2xl bg-gradient-to-br from-violet-500/50 via-indigo-500/35 to-cyan-500/40 p-[1px] shadow-[0_0_40px_-12px_rgba(139,92,246,0.35)]">
-              <div className="flex min-h-[min(52dvh,360px)] flex-col rounded-[15px] border border-white/[0.08] bg-[#12121a] p-4 sm:min-h-[340px] sm:p-6">
-                <h3 className="text-center text-lg font-bold leading-snug text-white [overflow-wrap:anywhere] sm:text-lg">
+              <div className="flex min-h-[min(52dvh,360px)] flex-col rounded-[15px] border border-[var(--border-subtle)] bg-[var(--modal-surface)] p-4 sm:min-h-[340px] sm:p-6">
+                <h3 className="text-center text-lg font-bold leading-snug text-[var(--text)] [overflow-wrap:anywhere] sm:text-lg">
                   {q.question}
                 </h3>
                 <div className="mt-5 flex flex-1 flex-col gap-3">
@@ -4453,25 +4455,25 @@ function StudyModal({
                         disabled={revealed || !String(opt).trim()}
                         className={cn(
                           "flex min-h-14 w-full touch-manipulation items-start gap-3 rounded-xl border px-4 py-4 text-left text-base leading-snug transition sm:min-h-0 sm:py-3 sm:text-sm",
-                          !revealed && String(opt).trim() && "border-white/10 bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10",
-                          !String(opt).trim() && "cursor-not-allowed border-dashed border-white/[0.08] bg-white/[0.02] opacity-40",
+                          !revealed && String(opt).trim() && "border-[var(--border)] bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10",
+                          !String(opt).trim() && "cursor-not-allowed border-dashed border-[var(--border-subtle)] bg-[var(--input-bg)] opacity-40",
                           revealed && isCorrect && "border-emerald-500/70 bg-emerald-500/15 text-emerald-100",
                           revealed && !isCorrect && isPicked && "border-red-500/80 bg-red-500/15 text-red-100",
-                          revealed && !isCorrect && !isPicked && "border-white/[0.06] opacity-50"
+                          revealed && !isCorrect && !isPicked && "border-[var(--sidebar-border)] opacity-50"
                         )}
                       >
                         <span
                           className={cn(
                             "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold sm:h-7 sm:w-7 sm:text-xs",
-                            !revealed && "bg-white/10 text-white/80",
+                            !revealed && "bg-[var(--btn-default-bg)] text-[var(--text)]",
                             revealed && isCorrect && "bg-emerald-500/30 text-emerald-100",
                             revealed && !isCorrect && isPicked && "bg-red-500/30 text-red-100",
-                            revealed && !isCorrect && !isPicked && "bg-white/5 text-white/40"
+                            revealed && !isCorrect && !isPicked && "bg-[var(--input-bg)] text-[var(--faint)]"
                           )}
                         >
                           {optionLetters[i]}
                         </span>
-                        <span className="pt-0.5 leading-relaxed text-white/90 [overflow-wrap:anywhere]">
+                        <span className="pt-0.5 leading-relaxed text-[var(--text)] [overflow-wrap:anywhere]">
                           {String(opt).trim() || "—"}
                         </span>
                       </button>
@@ -4480,7 +4482,7 @@ function StudyModal({
                 </div>
 
                 {showExplain && fallbackExplain && (
-                  <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] px-3 py-2.5 text-center text-xs leading-relaxed text-white/65 [overflow-wrap:anywhere]">
+                  <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--input-bg)] px-3 py-2.5 text-center text-xs leading-relaxed text-[var(--muted)] [overflow-wrap:anywhere]">
                     {fallbackExplain}
                   </div>
                 )}
@@ -4489,7 +4491,7 @@ function StudyModal({
                   <div className="mt-auto pt-4">
                     <Button
                       type="button"
-                      className="min-h-12 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-base font-medium text-white shadow-md shadow-violet-500/20 touch-manipulation sm:min-h-10 sm:text-sm"
+                      className="min-h-12 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-base font-medium text-[var(--inverse-text)] shadow-md shadow-violet-500/20 touch-manipulation sm:min-h-10 sm:text-sm"
                       onClick={onQuizNext}
                     >
                       {quizIndex < total - 1 ? (

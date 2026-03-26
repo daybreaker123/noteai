@@ -69,8 +69,8 @@ function ToolbarButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40 md:h-8 md:w-8 md:rounded-md",
-        active && "bg-purple-500/25 text-purple-200 ring-1 ring-purple-500/40"
+        "flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] disabled:pointer-events-none disabled:opacity-40 md:h-8 md:w-8 md:rounded-md",
+        active && "bg-purple-500/25 text-[var(--accent-fg)] ring-1 ring-purple-500/40"
       )}
     >
       {children}
@@ -79,7 +79,7 @@ function ToolbarButton({
 }
 
 function ToolbarDivider() {
-  return <div className="mx-0.5 h-8 w-px shrink-0 self-center bg-white/10 md:mx-1 md:h-6" aria-hidden />;
+  return <div className="mx-0.5 h-8 w-px shrink-0 self-center bg-[var(--btn-default-bg)] md:mx-1 md:h-6" aria-hidden />;
 }
 
 function insertImageFromFile(editor: Editor | null, noteId: string | null, file: File) {
@@ -119,9 +119,9 @@ function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: 
   const inTable = editor.isActive("table");
 
   return (
-    <div className="shrink-0 overflow-x-auto overflow-y-hidden border-b border-white/10 bg-black/30 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="shrink-0 overflow-x-auto overflow-y-hidden border-b border-[var(--border)] bg-[var(--editor-chrome-bg)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="flex min-w-max flex-nowrap items-center gap-0.5 px-1 py-1.5 md:min-w-0 md:flex-wrap md:px-2 md:py-2">
-      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-white/35 md:inline">Edit</span>
+      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-[var(--placeholder)] md:inline">Edit</span>
       <ToolbarButton
         title="Undo (⌘Z)"
         disabled={!editor.can().undo()}
@@ -137,7 +137,7 @@ function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: 
         <ArrowRight className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarDivider />
-      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-white/35 md:inline">Text</span>
+      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-[var(--placeholder)] md:inline">Text</span>
       <ToolbarButton
         title="Bold (⌘B)"
         active={editor.isActive("bold")}
@@ -183,7 +183,7 @@ function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: 
 
       <ToolbarDivider />
 
-      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-white/35 md:inline">Headings</span>
+      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-[var(--placeholder)] md:inline">Headings</span>
       <ToolbarButton
         title="Heading 1"
         active={editor.isActive("heading", { level: 1 })}
@@ -215,7 +215,7 @@ function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: 
 
       <ToolbarDivider />
 
-      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-white/35 md:inline">Lists</span>
+      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-[var(--placeholder)] md:inline">Lists</span>
       <ToolbarButton
         title="Bullet list"
         active={editor.isActive("bulletList")}
@@ -240,7 +240,7 @@ function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: 
 
       <ToolbarDivider />
 
-      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-white/35 md:inline">Insert</span>
+      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-[var(--placeholder)] md:inline">Insert</span>
       <ToolbarButton
         title="Blockquote"
         active={editor.isActive("blockquote")}
@@ -283,7 +283,7 @@ function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: 
 
       <ToolbarDivider />
 
-      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-white/35 md:inline">Align</span>
+      <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-[var(--placeholder)] md:inline">Align</span>
       <ToolbarButton
         title="Align left"
         active={editor.isActive({ textAlign: "left" })}
@@ -309,7 +309,7 @@ function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: 
       {inTable ? (
         <>
           <ToolbarDivider />
-          <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-white/35 md:inline">
+          <span className="mr-1 hidden text-[10px] font-semibold uppercase tracking-wider text-[var(--placeholder)] md:inline">
             Table
           </span>
           <ToolbarButton
@@ -375,15 +375,15 @@ export function NoteRichTextEditor({
       TaskItem.configure({ nested: true }),
       Image.configure({
         allowBase64: true,
-        HTMLAttributes: { class: "rounded-lg max-w-full border border-white/10 my-2" },
+        HTMLAttributes: { class: "rounded-lg max-w-full border border-[var(--border)] my-2" },
       }),
       Table.configure({
         resizable: true,
-        HTMLAttributes: { class: "border-collapse border border-white/15 text-sm" },
+        HTMLAttributes: { class: "border-collapse border border-[var(--border)] text-sm" },
       }),
       TableRow,
-      TableHeader.configure({ HTMLAttributes: { class: "border border-white/15 bg-white/5 px-2 py-1.5 font-semibold" } }),
-      TableCell.configure({ HTMLAttributes: { class: "border border-white/15 px-2 py-1.5 align-top" } }),
+      TableHeader.configure({ HTMLAttributes: { class: "border border-[var(--border)] bg-[var(--input-bg)] px-2 py-1.5 font-semibold" } }),
+      TableCell.configure({ HTMLAttributes: { class: "border border-[var(--border)] px-2 py-1.5 align-top" } }),
       CodeBlockLowlight.configure({
         lowlight,
         HTMLAttributes: { class: "hljs studara-code-block" },
@@ -393,7 +393,7 @@ export function NoteRichTextEditor({
     content: html,
     editorProps: {
       attributes: {
-        class: "studara-tiptap note-editor-scrollbar min-h-[min(42dvh,240px)] max-w-none flex-1 px-3 py-3 text-[16px] leading-relaxed text-white/90 outline-none md:min-h-[280px] md:px-4",
+        class: "studara-tiptap note-editor-scrollbar min-h-[min(42dvh,240px)] max-w-none flex-1 px-3 py-3 text-[16px] leading-relaxed text-[var(--tiptap-body)] outline-none md:min-h-[280px] md:px-4",
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -438,7 +438,7 @@ export function NoteRichTextEditor({
   return (
     <div
       className={cn(
-        "studara-tiptap-root flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-white/10 bg-white/5 md:rounded-xl md:border",
+        "studara-tiptap-root flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--editor-surface)] md:rounded-xl md:border",
         className
       )}
       onDrop={onDrop}

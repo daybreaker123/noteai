@@ -53,7 +53,7 @@ export function TutorImageLightbox({ src, onClose }: TutorImageLightboxProps) {
           {/* Dark blurred backdrop — click to close */}
           <motion.div
             role="presentation"
-            className="absolute inset-0 z-0 cursor-zoom-out bg-black/75 backdrop-blur-xl"
+            className="absolute inset-0 z-0 cursor-zoom-out bg-[var(--scrim-heavy)] backdrop-blur-xl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -64,7 +64,7 @@ export function TutorImageLightbox({ src, onClose }: TutorImageLightboxProps) {
           <button
             type="button"
             onClick={() => onCloseRef.current()}
-            className="absolute right-4 top-4 z-[20] flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white shadow-lg backdrop-blur-md transition hover:bg-black/70"
+            className="absolute right-4 top-4 z-[20] flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--chrome-50)] text-[var(--text)] shadow-lg backdrop-blur-md transition hover:bg-[var(--scrim-heavy)]"
             aria-label="Close"
           >
             <X className="h-5 w-5" strokeWidth={2} />
@@ -83,7 +83,7 @@ export function TutorImageLightbox({ src, onClose }: TutorImageLightboxProps) {
             <img
               src={src}
               alt=""
-              className="max-h-[min(90vh,calc(100dvh-5rem))] max-w-[min(92vw,100%)] rounded-lg object-contain shadow-2xl ring-1 ring-white/10"
+              className="max-h-[min(90vh,calc(100dvh-5rem))] max-w-[min(92vw,100%)] rounded-lg object-contain shadow-2xl ring-1 ring-[var(--border)]"
               onClick={(e) => e.stopPropagation()}
               draggable={false}
             />

@@ -6,7 +6,7 @@ import { resolveAnnotationSpans } from "@/lib/essay-annotations";
 import { cn } from "@/lib/cn";
 
 const TEXTAREA_CLASS =
-  "min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-2xl border border-white/10 bg-transparent p-4 text-sm leading-relaxed text-transparent caret-white shadow-inner [scrollbar-width:none] placeholder:text-white/35 focus:border-purple-500/45 focus:outline-none focus:ring-2 focus:ring-purple-500/25 disabled:opacity-50 [&::-webkit-scrollbar]:[display:none]";
+  "min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-2xl border border-[var(--border)] bg-transparent p-4 text-sm leading-relaxed text-transparent caret-white shadow-inner [scrollbar-width:none] placeholder:text-[var(--placeholder)] focus:border-purple-500/45 focus:outline-none focus:ring-2 focus:ring-purple-500/25 disabled:opacity-50 [&::-webkit-scrollbar]:[display:none]";
 
 function highlightClass(type: EssayAnnotationIssueType): string {
   switch (type) {
@@ -47,7 +47,7 @@ function buildMirrorNodes(essay: string, annotations: EssayAnnotation[]): React.
     nodes.push(
       <span
         key={`a-${r.start}-${r.end}-${idx}`}
-        className={cn("rounded-sm bg-white/[0.04] px-0.5", highlightClass(r.type))}
+        className={cn("rounded-sm bg-[var(--input-bg)] px-0.5", highlightClass(r.type))}
       >
         {slice}
       </span>
@@ -116,7 +116,7 @@ export function EssayAnnotatedEditor({
         "relative min-h-0 flex-1 overflow-hidden",
         embedded
           ? "rounded-none border-0 bg-transparent shadow-none"
-          : "rounded-2xl border border-white/10 bg-black/35 shadow-inner",
+          : "rounded-2xl border border-[var(--border)] bg-[var(--chrome-35)] shadow-inner",
         className
       )}
     >
@@ -145,20 +145,20 @@ export function EssayAnnotatedEditor({
       >
         <div
           className={cn(
-            "px-4 py-4 text-sm leading-relaxed text-white will-change-transform select-none",
+            "px-4 py-4 text-sm leading-relaxed text-[var(--text)] will-change-transform select-none",
             footerSlot && "pb-9"
           )}
           style={{ transform: `translateY(-${scrollTop}px)` }}
         >
           {showPlaceholder ? (
-            <span className="text-white/35">{PLACEHOLDER}</span>
+            <span className="text-[var(--placeholder)]">{PLACEHOLDER}</span>
           ) : (
             <div className="whitespace-pre-wrap break-words">{mirrorNodes}</div>
           )}
         </div>
       </div>
       {footerSlot ? (
-        <div className="pointer-events-none absolute bottom-3 right-4 z-[3] text-[11px] tabular-nums text-white/40">
+        <div className="pointer-events-none absolute bottom-3 right-4 z-[3] text-[11px] tabular-nums text-[var(--faint)]">
           {footerSlot}
         </div>
       ) : null}

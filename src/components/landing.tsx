@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { PRO_FEATURES } from "@/components/pro-plan-selector";
 import { cn } from "@/lib/cn";
 import {
@@ -75,7 +76,7 @@ export function Landing() {
   }, []);
 
   return (
-    <main className="min-h-dvh bg-[#0a0a0f] text-white antialiased">
+    <main className="min-h-dvh bg-[var(--bg)] text-[var(--text)] antialiased">
       {/* Subtle gradient orbs - minimal */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-purple-500/[0.07] blur-[100px]" />
@@ -86,16 +87,17 @@ export function Landing() {
         {/* Header */}
         <header className="flex h-16 items-center justify-between sm:h-[4.5rem]">
           <StudaraWordmarkLink href="/" />
-          <nav className="flex items-center gap-4">
+          <nav className="flex items-center gap-3 sm:gap-4">
+            <ThemeToggle variant="icon" />
             <Link
               href="/login"
-              className="text-sm text-white/60 transition hover:text-white/90"
+              className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
             >
               Log in
             </Link>
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/95"
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--text)] px-4 py-2 text-sm font-semibold text-[var(--inverse-text)] transition hover:opacity-90"
             >
               Get started free
               <ArrowRight className="h-4 w-4" />
@@ -105,31 +107,31 @@ export function Landing() {
 
         {/* Hero */}
         <Section className="mt-20 text-center md:mt-28">
-          <p className="text-sm font-medium text-white/50">For students, built by students.</p>
+          <p className="text-sm font-medium text-[var(--muted)]">For students, built by students.</p>
           <div className="mt-6 flex justify-center px-2 sm:mt-8 md:mt-10">
             <StudaraWordmarkLink href="/" />
           </div>
           <h1 className="relative mt-8 max-w-4xl mx-auto text-4xl font-bold tracking-tight sm:mt-10 sm:text-5xl md:text-6xl lg:text-7xl">
-            <span className="relative z-10 bg-gradient-to-b from-white to-white/90 bg-clip-text text-transparent">
+            <span className="relative z-10 bg-gradient-to-b from-[var(--text)] to-[var(--muted)] bg-clip-text text-transparent">
               Your notes. Finally working for you.
             </span>
             <span className="absolute -inset-4 -z-0 rounded-2xl bg-gradient-to-r from-purple-500/20 via-transparent to-blue-500/20 blur-2xl" aria-hidden />
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/60">
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[var(--muted)]">
             Stop re-reading your notes hoping something sticks. Studara improves your notes, turns them into summaries,
             flashcards, quizzes, and gives you a 24/7 AI tutor — so you actually learn.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="/login"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-black transition hover:bg-white/95 sm:w-auto"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--text)] px-6 py-3.5 text-base font-semibold text-[var(--inverse-text)] transition hover:opacity-90 sm:w-auto"
             >
               Start free — no card required
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="#how"
-              className="text-sm text-white/50 transition hover:text-white/70"
+              className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
             >
               See how it works
             </Link>
@@ -137,44 +139,44 @@ export function Landing() {
 
           {/* App mockup */}
           <div className="mt-16 md:mt-24">
-            <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur">
-              <div className="flex border-b border-white/10 px-4 py-3">
+            <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--chrome-40)] shadow-2xl backdrop-blur">
+              <div className="flex border-b border-[var(--border)] px-4 py-3">
                 <div className="flex gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-white/20" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-white/20" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-[var(--faint)]" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-[var(--faint)]" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-[var(--faint)]" />
                 </div>
-                <div className="mx-auto flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5">
-                  <FileText className="h-3.5 w-3.5 text-white/50" />
-                  <span className="text-xs text-white/50">Lecture Notes — Biology 101</span>
+                <div className="mx-auto flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--input-bg)] px-3 py-1.5">
+                  <FileText className="h-3.5 w-3.5 text-[var(--muted)]" />
+                  <span className="text-xs text-[var(--muted)]">Lecture Notes — Biology 101</span>
                 </div>
               </div>
               <div className="flex min-h-[280px]">
-                <div className="hidden w-56 shrink-0 border-r border-white/10 p-4 md:block">
-                  <div className="mb-4 h-8 rounded-lg bg-white/10" />
+                <div className="hidden w-56 shrink-0 border-r border-[var(--border)] p-4 md:block">
+                  <div className="mb-4 h-8 rounded-lg bg-[var(--btn-default-bg)]" />
                   <div className="space-y-1">
                     <div className="h-6 rounded bg-purple-500/20" />
-                    <div className="h-6 rounded bg-white/5" />
-                    <div className="h-6 rounded bg-white/5" />
-                    <div className="h-6 rounded bg-white/5" />
+                    <div className="h-6 rounded bg-[var(--input-bg)]" />
+                    <div className="h-6 rounded bg-[var(--input-bg)]" />
+                    <div className="h-6 rounded bg-[var(--input-bg)]" />
                   </div>
                 </div>
                 <div className="flex-1 p-6">
-                  <div className="h-6 w-48 rounded bg-white/10" />
+                  <div className="h-6 w-48 rounded bg-[var(--btn-default-bg)]" />
                   <div className="mt-4 space-y-2">
-                    <div className="h-3 w-full rounded bg-white/10" />
-                    <div className="h-3 w-5/6 rounded bg-white/10" />
-                    <div className="h-3 w-4/5 rounded bg-white/10" />
-                    <div className="mt-4 h-3 w-3/4 rounded bg-white/10" />
-                    <div className="h-3 w-full rounded bg-white/10" />
+                    <div className="h-3 w-full rounded bg-[var(--btn-default-bg)]" />
+                    <div className="h-3 w-5/6 rounded bg-[var(--btn-default-bg)]" />
+                    <div className="h-3 w-4/5 rounded bg-[var(--btn-default-bg)]" />
+                    <div className="mt-4 h-3 w-3/4 rounded bg-[var(--btn-default-bg)]" />
+                    <div className="h-3 w-full rounded bg-[var(--btn-default-bg)]" />
                   </div>
                   <div className="mt-6 rounded-lg border border-purple-500/20 bg-purple-500/5 p-4">
                     <div className="flex items-center gap-2 text-xs font-medium text-purple-300">
                       <Sparkles className="h-3.5 w-3.5" />
                       AI Summary
                     </div>
-                    <div className="mt-2 h-4 w-full rounded bg-white/10" />
-                    <div className="mt-1 h-4 w-4/5 rounded bg-white/10" />
+                    <div className="mt-2 h-4 w-full rounded bg-[var(--btn-default-bg)]" />
+                    <div className="mt-1 h-4 w-4/5 rounded bg-[var(--btn-default-bg)]" />
                   </div>
                 </div>
               </div>
@@ -188,7 +190,7 @@ export function Landing() {
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
               AI that actually gets it
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-white/60">
+            <p className="mx-auto mt-3 max-w-lg text-[var(--muted)]">
               No fluff. Just features that help you learn.
             </p>
           </div>
@@ -228,14 +230,14 @@ export function Landing() {
             ].map((f) => (
               <div
                 key={f.title}
-                className="flex h-full flex-row gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-6 transition hover:border-white/15"
+                className="flex h-full flex-row gap-4 rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] p-6 transition hover:border-[var(--border)]"
               >
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)]">
                   {f.icon}
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-lg font-semibold sm:text-xl">{f.title}</h3>
-                  <p className="mt-2 text-sm text-white/60">{f.desc}</p>
+                  <p className="mt-2 text-sm text-[var(--muted)]">{f.desc}</p>
                 </div>
               </div>
             ))}
@@ -248,7 +250,7 @@ export function Landing() {
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
               How it works
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-white/60">
+            <p className="mx-auto mt-3 max-w-lg text-[var(--muted)]">
               Three steps. No learning curve.
             </p>
           </div>
@@ -273,14 +275,14 @@ export function Landing() {
             ].map((s) => (
               <div
                 key={s.step}
-                className="flex gap-6 rounded-2xl border border-white/10 bg-white/[0.02] p-6 transition hover:border-white/15"
+                className="flex gap-6 rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] p-6 transition hover:border-[var(--border)]"
               >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg font-semibold text-white/80">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-lg font-semibold text-[var(--text)]">
                   {s.step}
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold">{s.title}</h3>
-                  <p className="mt-1 text-white/60">{s.desc}</p>
+                  <p className="mt-1 text-[var(--muted)]">{s.desc}</p>
                 </div>
               </div>
             ))}
@@ -293,16 +295,16 @@ export function Landing() {
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
               Simple pricing
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-white/60">
+            <p className="mx-auto mt-3 max-w-lg text-[var(--muted)]">
               Start free. Upgrade when you&apos;re ready — compare plans and billing options below.
             </p>
           </div>
 
           {/* Monthly / Annual toggle — applies to Pro pricing */}
           <div className="mx-auto mt-12 flex max-w-4xl flex-col items-center gap-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/45">Pro billing period</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Pro billing period</p>
             <div
-              className="inline-flex rounded-xl border border-white/12 bg-black/40 p-1 shadow-inner shadow-black/40"
+              className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--chrome-40)] p-1 shadow-inner shadow-black/40"
               role="group"
               aria-label="Pro plan billing period"
             >
@@ -312,8 +314,8 @@ export function Landing() {
                 className={cn(
                   "rounded-lg px-5 py-2.5 text-sm font-semibold transition",
                   billingInterval === "month"
-                    ? "bg-gradient-to-r from-purple-500/40 to-blue-500/35 text-white shadow-sm"
-                    : "text-white/55 hover:text-white/85"
+                    ? "bg-gradient-to-r from-purple-500/40 to-blue-500/35 text-[var(--text)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--text)]"
                 )}
               >
                 Monthly
@@ -324,14 +326,14 @@ export function Landing() {
                 className={cn(
                   "rounded-lg px-5 py-2.5 text-sm font-semibold transition",
                   billingInterval === "year"
-                    ? "bg-gradient-to-r from-purple-500/40 to-blue-500/35 text-white shadow-sm"
-                    : "text-white/55 hover:text-white/85"
+                    ? "bg-gradient-to-r from-purple-500/40 to-blue-500/35 text-[var(--text)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--text)]"
                 )}
               >
                 Annual
               </button>
             </div>
-            <p className="max-w-md text-center text-xs text-white/45">
+            <p className="max-w-md text-center text-xs text-[var(--muted)]">
               {billingInterval === "year" ? (
                 <>
                   <span className="font-medium text-purple-200/90">~{proAnnualApproxPercentOff}% off</span>
@@ -347,18 +349,18 @@ export function Landing() {
 
           <div className="mx-auto mt-10 grid max-w-5xl gap-8 lg:grid-cols-2 lg:items-stretch">
             {/* Free */}
-            <Card className="flex flex-col border-white/10 bg-black/30 p-7 backdrop-blur-xl sm:p-8">
-              <div className="text-sm font-semibold uppercase tracking-wide text-white/55">Free</div>
+            <Card className="flex flex-col border-[var(--border)] bg-[var(--chrome-30)] p-7 backdrop-blur-xl sm:p-8">
+              <div className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">Free</div>
               <div className="mt-3 flex items-baseline gap-1">
-                <span className="text-4xl font-bold tracking-tight text-white">{formatUsd(0, 0)}</span>
-                <span className="text-white/50">/month</span>
+                <span className="text-4xl font-bold tracking-tight text-[var(--text)]">{formatUsd(0, 0)}</span>
+                <span className="text-[var(--muted)]">/month</span>
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-white/55">
+              <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
                 Everything you need to try Studara. No credit card required.
               </p>
               <ul className="mt-6 flex flex-1 flex-col gap-2.5">
                 {LANDING_FREE_FEATURES.map((t) => (
-                  <li key={t} className="flex items-start gap-2.5 text-sm leading-snug text-white/80">
+                  <li key={t} className="flex items-start gap-2.5 text-sm leading-snug text-[var(--text)]">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400/85" aria-hidden />
                     <span>{t}</span>
                   </li>
@@ -366,7 +368,7 @@ export function Landing() {
               </ul>
               <Link
                 href="/login"
-                className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--badge-free-bg)] py-3 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--btn-default-bg)]"
               >
                 Get started free
                 <ArrowRight className="h-4 w-4" />
@@ -383,45 +385,45 @@ export function Landing() {
                 className="pointer-events-none absolute -inset-px rounded-2xl shadow-[0_0_48px_-6px_rgba(139,92,246,0.5)]"
                 aria-hidden
               />
-              <Card className="relative flex min-h-full flex-col border-white/10 bg-black/40 p-7 backdrop-blur-xl sm:p-8">
+              <Card className="relative flex min-h-full flex-col border-[var(--border)] bg-[var(--chrome-40)] p-7 backdrop-blur-xl sm:p-8">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold uppercase tracking-wide text-white/90">Pro</span>
-                  <span className="rounded-full border border-white/10 bg-gradient-to-r from-purple-500/45 to-blue-500/35 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                  <span className="text-sm font-semibold uppercase tracking-wide text-[var(--text)]">Pro</span>
+                  <span className="rounded-full border border-[var(--border)] bg-gradient-to-r from-purple-500/45 to-blue-500/35 px-3 py-1 text-xs font-semibold text-[var(--text)] shadow-sm">
                     Most Popular
                   </span>
                 </div>
                 <div className="mt-4 flex flex-wrap items-baseline gap-1">
                   {billingInterval === "year" ? (
                     <>
-                      <span className="text-4xl font-bold tracking-tight text-white">
+                      <span className="text-4xl font-bold tracking-tight text-[var(--text)]">
                         {formatUsd(proAnnualMonthlyEquivalent)}
                       </span>
-                      <span className="text-white/50">/month</span>
-                      <span className="ml-1 text-sm text-white/45">billed annually</span>
+                      <span className="text-[var(--muted)]">/month</span>
+                      <span className="ml-1 text-sm text-[var(--muted)]">billed annually</span>
                     </>
                   ) : (
                     <>
-                      <span className="text-4xl font-bold tracking-tight text-white">{formatUsd(PRO_MONTHLY_USD, 0)}</span>
-                      <span className="text-white/50">/month</span>
+                      <span className="text-4xl font-bold tracking-tight text-[var(--text)]">{formatUsd(PRO_MONTHLY_USD, 0)}</span>
+                      <span className="text-[var(--muted)]">/month</span>
                     </>
                   )}
                 </div>
                 {billingInterval === "year" ? (
-                  <p className="mt-2 text-sm text-white/55">
-                    <span className="font-medium text-white/80">{formatUsd(PRO_ANNUAL_TOTAL_USD, 0)}</span> per year
+                  <p className="mt-2 text-sm text-[var(--muted)]">
+                    <span className="font-medium text-[var(--text)]">{formatUsd(PRO_ANNUAL_TOTAL_USD, 0)}</span> per year
                     {" · "}
                     <span className="text-purple-200/85">Save {formatUsd(proAnnualSavingsUsd, 0)}/year</span>
                   </p>
                 ) : (
-                  <p className="mt-2 text-sm text-white/50">Billed monthly · cancel anytime</p>
+                  <p className="mt-2 text-sm text-[var(--muted)]">Billed monthly · cancel anytime</p>
                 )}
-                <p className="mt-3 text-sm leading-relaxed text-white/55">
+                <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
                   Full power for students who want their notes to work harder — unlimited AI, search, exports, and study
                   tools.
                 </p>
                 <ul className="mt-6 flex flex-1 flex-col gap-2.5">
                   {PRO_FEATURES.map((t) => (
-                    <li key={t} className="flex items-start gap-2.5 text-sm leading-snug text-white/85">
+                    <li key={t} className="flex items-start gap-2.5 text-sm leading-snug text-[var(--text)]">
                       <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400/90" aria-hidden />
                       <span>{t}</span>
                     </li>
@@ -429,7 +431,7 @@ export function Landing() {
                 </ul>
                 <Link
                   href={billingInterval === "year" ? "/billing?interval=year" : "/billing"}
-                  className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/15 transition hover:from-purple-500 hover:to-blue-500"
+                  className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-500/15 transition hover:from-purple-500 hover:to-blue-500"
                 >
                   <Sparkles className="h-4 w-4" />
                   Upgrade to Pro
@@ -445,7 +447,7 @@ export function Landing() {
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
               What students are saying
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-white/60">
+            <p className="mx-auto mt-3 max-w-lg text-[var(--muted)]">
               Real feedback from people who actually use it.
             </p>
           </div>
@@ -472,15 +474,15 @@ export function Landing() {
               },
             ].map((t) => (
               <Card key={t.name} className="flex flex-col p-6">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-medium text-white/80">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--btn-default-bg)] text-sm font-medium text-[var(--text)]">
                   {t.initials}
                 </div>
-                <p className="mt-4 flex-1 text-sm leading-relaxed text-white/80">
+                <p className="mt-4 flex-1 text-sm leading-relaxed text-[var(--text)]">
                   &ldquo;{t.quote}&rdquo;
                 </p>
                 <div className="mt-4">
-                  <div className="font-semibold text-white/90">{t.name}</div>
-                  <div className="text-xs text-white/50">{t.role}</div>
+                  <div className="font-semibold text-[var(--text)]">{t.name}</div>
+                  <div className="text-xs text-[var(--muted)]">{t.role}</div>
                 </div>
               </Card>
             ))}
@@ -489,13 +491,13 @@ export function Landing() {
 
         {/* Final CTA */}
         <Section className="mt-32 md:mt-40">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.02] px-6 py-16 text-center md:px-12 md:py-24">
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--input-bg)] px-6 py-16 text-center md:px-12 md:py-24">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
               Stop losing knowledge.
               <br />
               Start actually learning.
             </h2>
-            <p className="mx-auto mt-4 max-w-lg text-white/60">
+            <p className="mx-auto mt-4 max-w-lg text-[var(--muted)]">
               Join students who are finally making their notes work for them.
             </p>
             <Link
@@ -509,40 +511,40 @@ export function Landing() {
         </Section>
 
         {/* Footer */}
-        <footer className="mt-24 border-t border-white/10 py-12">
+        <footer className="mt-24 border-t border-[var(--border)] py-12">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <StudaraWordmarkLink href="/" />
-            <div className="flex flex-wrap gap-6 text-sm text-white/50">
-              <Link href="#features" className="transition hover:text-white/80">
+            <div className="flex flex-wrap gap-6 text-sm text-[var(--muted)]">
+              <Link href="#features" className="transition hover:text-[var(--text)]">
                 Features
               </Link>
-              <Link href="#how" className="transition hover:text-white/80">
+              <Link href="#how" className="transition hover:text-[var(--text)]">
                 How it works
               </Link>
-              <Link href="#pricing" className="transition hover:text-white/80">
+              <Link href="#pricing" className="transition hover:text-[var(--text)]">
                 Pricing
               </Link>
-              <Link href="/login" className="transition hover:text-white/80">
+              <Link href="/login" className="transition hover:text-[var(--text)]">
                 Log in
               </Link>
-              <Link href="/terms" className="transition hover:text-white/80">
+              <Link href="/terms" className="transition hover:text-[var(--text)]">
                 Terms of Service
               </Link>
-              <Link href="/privacy" className="transition hover:text-white/80">
+              <Link href="/privacy" className="transition hover:text-[var(--text)]">
                 Privacy Policy
               </Link>
-              <Link href="/cookies" className="transition hover:text-white/80">
+              <Link href="/cookies" className="transition hover:text-[var(--text)]">
                 Cookie Policy
               </Link>
               <a
                 href="mailto:studarausersupport@gmail.com"
-                className="transition hover:text-white/80"
+                className="transition hover:text-[var(--text)]"
               >
                 Support · support@studara.org
               </a>
             </div>
           </div>
-          <div className="mt-8 text-xs text-white/40">
+          <div className="mt-8 text-xs text-[var(--faint)]">
             © {new Date().getFullYear()} Studara. For students, built by students.
           </div>
         </footer>
