@@ -26,6 +26,12 @@ const ALLOWED_CONTENT_TYPES = [
 const VOICE_PATH = /^voice\/[a-zA-Z0-9._-]{1,200}$/;
 
 /**
+ * How long the client token remains valid for `put()` (large uploads).
+ * The Blob SDK uses `validUntil` (epoch ms), not an `expiresIn` seconds option.
+ */
+const VOICE_BLOB_TOKEN_TTL_MS = 300 * 1000; // 300 seconds = 5 minutes
+
+/**
  * Issues a short-lived client token so the browser can call `put()` from `@vercel/blob/client`
  * and upload audio directly to Blob (bypasses Vercel’s ~4.5MB serverless request body limit).
  */
@@ -36,6 +42,18 @@ export async function POST(request: Request) {
       { error: "Blob storage is not configured. Set BLOB_READ_WRITE_TOKEN for large voice uploads." },
       { status: 503 }
     );
+  }
+
+  let pathname: string;
+  try {
+    const body = (await request.json()) as { pathname?: unknown };
+    pathname = typeof body.pathname === "string" ? body.pathname.trim() : "";
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (!pathname || !VOICE_PATH.test(pathname)) {
+    return NextResponse.json({ error: "Invalid pathname" }, { status: 400 });
   }
 
   const session = await getServerSession(authOptions);
@@ -62,25 +80,15 @@ export async function POST(request: Request) {
     );
   }
 
-  let pathname: string;
   try {
-    const body = (await request.json()) as { pathname?: unknown };
-    pathname = typeof body.pathname === "string" ? body.pathname.trim() : "";
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  if (!pathname || !VOICE_PATH.test(pathname)) {
-    return NextResponse.json({ error: "Invalid pathname" }, { status: 400 });
-  }
-
-  try {
+    const validUntil = Date.now() + VOICE_BLOB_TOKEN_TTL_MS;
     const clientToken = await generateClientTokenFromReadWriteToken({
       token: rw,
       pathname,
       maximumSizeInBytes: MAX_VOICE_BYTES,
       allowedContentTypes: ALLOWED_CONTENT_TYPES,
       addRandomSuffix: true,
+      validUntil,
     });
     return NextResponse.json({ token: clientToken });
   } catch (e) {

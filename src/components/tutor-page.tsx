@@ -698,7 +698,7 @@ export function TutorPage() {
             <span className="hidden h-5 w-px shrink-0 bg-[var(--divider-fade)] sm:block" aria-hidden />
             <div className="flex min-w-0 items-center gap-2">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-gradient-to-br from-purple-500/35 to-blue-500/25 shadow-sm shadow-purple-900/20">
-                <GraduationCap className="h-3.5 w-3.5 text-purple-100/95" strokeWidth={2} />
+                <GraduationCap className="h-3.5 w-3.5 text-[var(--accent-fg)]" strokeWidth={2} />
               </div>
               <h1 className="truncate text-[0.9375rem] font-semibold tracking-tight text-[var(--text)] sm:text-base">
                 AI Tutor
@@ -858,7 +858,7 @@ export function TutorPage() {
                 <div className="mb-6 flex flex-col items-center gap-3">
                   <StudaraWordmark className="text-3xl sm:text-4xl" />
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-gradient-to-br from-purple-500/20 to-blue-500/15 shadow-lg shadow-purple-900/20">
-                    <GraduationCap className="h-8 w-8 text-purple-200/90" />
+                    <GraduationCap className="h-8 w-8 text-[var(--accent-fg)]" />
                   </div>
                 </div>
                 <h2 className="text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
@@ -1003,7 +1003,7 @@ export function TutorPage() {
                   Use My Notes
                 </button>
                 {useMyNotes ? (
-                  <span className="text-[11px] leading-snug text-purple-200/85 sm:text-xs">
+                  <span className="text-[11px] leading-snug text-[var(--accent-fg)] sm:text-xs">
                     Your notes are included with each message you send.
                   </span>
                 ) : (
@@ -1047,7 +1047,7 @@ export function TutorPage() {
               ) : null}
               {pendingAttachment?.kind === "document" ? (
                 <div className="flex max-w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] py-2 pl-3 pr-2">
-                  <FileText className="h-9 w-9 shrink-0 text-purple-300/90" aria-hidden />
+                  <FileText className="h-9 w-9 shrink-0 text-[var(--accent-fg)]" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--text)]">{pendingAttachment.fileName}</p>
                     <p className="text-xs text-[var(--muted)]">{pendingAttachment.displayType} · text ready to send</p>
@@ -1129,7 +1129,7 @@ export function TutorPage() {
                   ? ` · ${Math.max(0, tutorImagesLimit - tutorImagesUsed)} image uploads left`
                   : ""}{" "}
                 this month.{" "}
-                <Link href="/billing" className="font-medium text-purple-300 underline-offset-2 hover:underline">
+                <Link href="/billing" className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">
                   Upgrade to Pro
                 </Link>{" "}
                 for unlimited tutoring and images.

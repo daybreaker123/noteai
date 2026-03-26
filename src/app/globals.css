@@ -61,6 +61,10 @@
   --badge-free-bg: rgba(255, 255, 255, 0.06);
   --badge-free-border: rgba(255, 255, 255, 0.15);
   --badge-free-text: rgba(255, 255, 255, 0.55);
+  /* Pro tier pill (headers, profile) — readable on tinted surfaces in both themes */
+  --pro-badge-fg: rgba(233, 213, 255, 0.92);
+  --pro-badge-border: rgba(168, 85, 247, 0.35);
+  --pro-badge-bg: rgba(168, 85, 247, 0.12);
   --divider-fade: rgba(255, 255, 255, 0.08);
   --landing-card-border: rgba(255, 255, 255, 0.1);
   --landing-mock-bg: rgba(0, 0, 0, 0.4);
@@ -137,6 +141,9 @@
   --badge-free-bg: rgba(26, 26, 46, 0.06);
   --badge-free-border: rgba(26, 26, 46, 0.12);
   --badge-free-text: rgba(26, 26, 46, 0.55);
+  --pro-badge-fg: #4c1d95;
+  --pro-badge-border: rgba(91, 33, 182, 0.32);
+  --pro-badge-bg: rgba(91, 33, 182, 0.08);
   --divider-fade: rgba(26, 26, 46, 0.1);
   --landing-card-border: rgba(26, 26, 46, 0.12);
   --landing-mock-bg: rgba(255, 255, 255, 0.95);

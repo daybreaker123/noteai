@@ -138,6 +138,9 @@ export function VoiceToNotesControl({
           ...meta,
         });
 
+        // Load Blob client before requesting a token so `put()` starts immediately after the token returns.
+        const { put: blobPut } = await import("@vercel/blob/client");
+
         const tokenRes = await fetch("/api/notes/voice-blob-token", {
           method: "POST",
           credentials: "include",
@@ -182,13 +185,12 @@ export function VoiceToNotesControl({
           throw new Error("Missing upload token");
         }
 
-        console.log("[voice-to-notes] /api/notes/voice-blob-token OK, calling put()", {
+        console.log("[voice-to-notes] /api/notes/voice-blob-token OK, calling put() immediately", {
           pathname,
           multipart: file.size >= 5 * 1024 * 1024,
         });
 
-        const { put } = await import("@vercel/blob/client");
-        const uploaded = await put(pathname, file, {
+        const uploaded = await blobPut(pathname, file, {
           access: "public",
           token,
           multipart: file.size >= 5 * 1024 * 1024,

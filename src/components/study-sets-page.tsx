@@ -124,7 +124,7 @@ export function StudySetsPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-gradient-to-br from-purple-500/25 to-indigo-500/15">
-                  <Bookmark className="h-4 w-4 text-purple-200/90" />
+                  <Bookmark className="h-4 w-4 text-[var(--accent-fg)]" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Study sets</h1>
@@ -224,8 +224,8 @@ export function StudySetsPage() {
                     className={cn(
                       "w-fit border-0 text-xs font-medium",
                       s.kind === "flashcards"
-                        ? "bg-violet-500/20 text-violet-200"
-                        : "bg-cyan-500/15 text-cyan-200"
+                        ? "bg-violet-500/20 text-[var(--accent-fg)]"
+                        : "bg-cyan-500/15 text-[var(--accent2)]"
                     )}
                   >
                     {s.kind === "flashcards" ? "Flashcards" : "Quiz"}

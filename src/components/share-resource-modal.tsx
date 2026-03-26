@@ -143,7 +143,7 @@ export function ShareResourceModal({
           <X className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-2 pr-10">
-          <Link2 className="h-5 w-5 text-purple-300" aria-hidden />
+          <Link2 className="h-5 w-5 text-[var(--accent-fg)]" aria-hidden />
           <h2 id="share-modal-title" className="text-lg font-semibold text-[var(--text)]">
             {title}
           </h2>

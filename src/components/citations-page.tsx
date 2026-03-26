@@ -216,7 +216,7 @@ export function CitationsPage() {
           <div className="hidden h-8 w-px bg-[var(--input-bg)] sm:block" aria-hidden />
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-gradient-to-br from-violet-500/25 to-cyan-500/15 shadow-inner">
-              <Quote className="h-5 w-5 text-violet-100/95" strokeWidth={1.75} />
+              <Quote className="h-5 w-5 text-[var(--accent-fg)]" strokeWidth={1.75} />
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">Citations</h1>
@@ -228,7 +228,7 @@ export function CitationsPage() {
               {remaining} free left this month
             </span>
           ) : plan === "pro" ? (
-            <span className="rounded-full border border-purple-500/25 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-200/90">
+            <span className="rounded-full border border-[var(--pro-badge-border)] bg-[var(--pro-badge-bg)] px-3 py-1.5 text-xs font-medium text-[var(--pro-badge-fg)]">
               Pro · unlimited
             </span>
           ) : null}
@@ -321,7 +321,7 @@ export function CitationsPage() {
               {(error.includes("upgrade") || error.includes("Pro") || error.includes("free citations")) && (
                 <Link
                   href="/billing"
-                  className="ml-2 font-medium text-purple-300 underline-offset-2 hover:underline"
+                  className="ml-2 font-medium text-[var(--accent)] underline-offset-2 hover:underline"
                 >
                   View plans
                 </Link>
@@ -336,7 +336,7 @@ export function CitationsPage() {
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-5 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--sidebar-border)] pb-4">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-violet-300/85">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent-fg)]">
                     {CITATION_STYLE_OPTIONS.find((o) => o.id === selectedStyle)?.label ?? selectedStyle}
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{current.description}</p>

@@ -58,7 +58,7 @@ function LockedSectionPreview() {
         {text}
       </div>
       <div className="studara-overlay-scan absolute inset-0 flex flex-col items-center justify-center gap-2.5 px-4 backdrop-blur-[2px]">
-        <span className="flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-purple-200/95">
+        <span className="flex items-center gap-1.5 rounded-full border border-[var(--pro-badge-border)] bg-[var(--pro-badge-bg)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--pro-badge-fg)]">
           <Lock className="h-3 w-3" strokeWidth={2.5} />
           Pro
         </span>
@@ -87,7 +87,7 @@ function GradeLockedHeader() {
         </p>
       </div>
       <div className="studara-overlay-75 absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-sm">
-        <Lock className="h-6 w-6 text-purple-300/80" strokeWidth={1.75} />
+        <Lock className="h-6 w-6 text-[var(--accent-fg)]" strokeWidth={1.75} />
         <p className="text-center text-sm font-medium text-[var(--text)]">Grade estimate is a Pro feature</p>
         <Link
           href="/billing"
@@ -118,7 +118,7 @@ function FeedbackSection({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-3 py-3.5 text-left transition hover:bg-white/[0.03]"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-purple-200/90">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--accent-fg)]">
           <Icon className="h-4 w-4" strokeWidth={1.75} />
         </span>
         <span className="min-w-0 flex-1 text-sm font-medium text-[var(--text)]">{section.title}</span>

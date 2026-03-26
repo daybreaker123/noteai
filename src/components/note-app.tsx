@@ -3894,7 +3894,7 @@ function CategoryTab({
       {onStudyGuide && !isAll ? (
         <button
           type="button"
-          className="flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg text-violet-300/90 opacity-90 transition hover:bg-violet-500/15 hover:text-violet-200 md:opacity-0 md:group-hover:opacity-100"
+          className="flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg text-[var(--accent-fg)] opacity-90 transition hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--accent)] md:opacity-0 md:group-hover:opacity-100"
           aria-label={`Generate study guide for ${name}`}
           title="Generate study guide (Pro)"
           onClick={(e) => {
@@ -3908,14 +3908,14 @@ function CategoryTab({
       {!isAll && (onRename || onDelete) ? (
         <button
           type="button"
-          className="flex h-9 w-6 shrink-0 touch-manipulation items-center justify-center rounded-lg text-[var(--faint)] opacity-90 transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--muted)] md:opacity-0 md:group-hover:opacity-100"
+          className="flex h-9 w-6 shrink-0 touch-manipulation items-center justify-center rounded-lg text-[var(--muted)] opacity-90 transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] md:opacity-0 md:group-hover:opacity-100"
           aria-label={`Category actions for ${name}`}
           onClick={(e) => {
             e.stopPropagation();
             setMenu((m) => !m);
           }}
         >
-          <ChevronRight className="h-3.5 w-3.5" />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-current" strokeWidth={2} aria-hidden />
         </button>
       ) : null}
       {menu && !isAll && (

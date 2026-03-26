@@ -372,7 +372,9 @@ export function ProfilePage() {
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span className="text-lg font-medium text-[var(--text)]">Current plan</span>
               {plan.tier === "pro" ? (
-                <Badge className="border-purple-500/50 bg-purple-500/25 text-purple-100">Pro</Badge>
+                <Badge className="border-[var(--pro-badge-border)] bg-[var(--pro-badge-bg)] text-[var(--pro-badge-fg)]">
+                  Pro
+                </Badge>
               ) : (
                 <Badge className="border-zinc-500/35 bg-zinc-500/15 text-zinc-300">Free</Badge>
               )}
