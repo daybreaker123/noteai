@@ -42,7 +42,7 @@ function pickRecorderMime(): string | null {
   return null;
 }
 
-/** Path must match `voice-blob-client` route: `voice/<uuid>-<safeName>`. */
+/** Path must match `voice-blob-token` route: `voice/<uuid>-<safeName>`. */
 function safeVoicePathname(filename: string): string {
   const base = filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "audio";
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -131,12 +131,31 @@ export function VoiceToNotesControl({
 
       let res: Response;
       try {
-        const { upload } = await import("@vercel/blob/client");
         const pathname = safeVoicePathname(filename);
-        console.log("[voice-to-notes] Vercel Blob client upload → transcription (JSON)", meta);
-        const uploaded = await upload(pathname, file, {
+        const tokenRes = await fetch("/api/notes/voice-blob-token", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pathname }),
+        });
+        if (!tokenRes.ok) {
+          const errJson = (await tokenRes.json().catch(() => ({}))) as { error?: string; code?: string };
+          if (errJson.code === "PRO_FEATURE_VOICE_TRANSCRIPTION" && tokenRes.status === 402) {
+            onRequirePro();
+            return;
+          }
+          throw new Error(errJson.error ?? `Blob token failed (${tokenRes.status})`);
+        }
+        const { token } = (await tokenRes.json()) as { token?: string };
+        if (!token) {
+          throw new Error("Missing upload token");
+        }
+
+        const { put } = await import("@vercel/blob/client");
+        console.log("[voice-to-notes] Vercel Blob put() → transcription (JSON)", meta);
+        const uploaded = await put(pathname, file, {
           access: "public",
-          handleUploadUrl: "/api/notes/voice-blob-client",
+          token,
           multipart: file.size >= 5 * 1024 * 1024,
           contentType:
             file instanceof File && file.type && file.type !== "application/octet-stream"

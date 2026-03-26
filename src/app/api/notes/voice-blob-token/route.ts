@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { generateClientTokenFromReadWriteToken } from "@vercel/blob/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,8 +25,13 @@ const ALLOWED_CONTENT_TYPES = [
 
 const VOICE_PATH = /^voice\/[a-zA-Z0-9._-]{1,200}$/;
 
+/**
+ * Issues a short-lived client token so the browser can call `put()` from `@vercel/blob/client`
+ * and upload audio directly to Blob (bypasses Vercel’s ~4.5MB serverless request body limit).
+ */
 export async function POST(request: Request) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN?.trim()) {
+  const rw = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  if (!rw) {
     return NextResponse.json(
       { error: "Blob storage is not configured. Set BLOB_READ_WRITE_TOKEN for large voice uploads." },
       { status: 503 }
@@ -57,31 +62,29 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: HandleUploadBody;
+  let pathname: string;
   try {
-    body = (await request.json()) as HandleUploadBody;
+    const body = (await request.json()) as { pathname?: unknown };
+    pathname = typeof body.pathname === "string" ? body.pathname.trim() : "";
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  if (!pathname || !VOICE_PATH.test(pathname)) {
+    return NextResponse.json({ error: "Invalid pathname" }, { status: 400 });
+  }
+
   try {
-    const result = await handleUpload({
-      request,
-      body,
-      onBeforeGenerateToken: async (pathname) => {
-        if (!VOICE_PATH.test(pathname)) {
-          throw new Error("Invalid upload path");
-        }
-        return {
-          allowedContentTypes: ALLOWED_CONTENT_TYPES,
-          maximumSizeInBytes: MAX_VOICE_BYTES,
-          addRandomSuffix: true,
-        };
-      },
+    const clientToken = await generateClientTokenFromReadWriteToken({
+      token: rw,
+      pathname,
+      maximumSizeInBytes: MAX_VOICE_BYTES,
+      allowedContentTypes: ALLOWED_CONTENT_TYPES,
+      addRandomSuffix: true,
     });
-    return NextResponse.json(result);
+    return NextResponse.json({ token: clientToken });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Upload token failed";
+    const message = e instanceof Error ? e.message : "Token generation failed";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
