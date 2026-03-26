@@ -9,6 +9,12 @@ import { Mic, ChevronDown, Square, Upload } from "lucide-react";
 const ACCEPT_AUDIO =
   "audio/mpeg,audio/mp4,audio/x-m4a,audio/m4a,audio/wav,audio/webm,video/mp4,.mp3,.m4a,.wav,.mp4";
 
+/** Must match `MAX_BYTES` in `/api/notes/voice-transcription`. */
+const VOICE_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+
+const PAYLOAD_TOO_LARGE_HINT =
+  "The upload hit your hosting provider’s request size limit (Vercel is often about 4.5MB per request). Studara accepts up to 25MB once the request reaches the app—try a shorter recording, export as a smaller MP3/M4A, or split the file. If you self-host, ensure your reverse proxy allows larger request bodies.";
+
 export type VoiceTranscriptionSuccessPayload = {
   id?: string;
   title?: string;
@@ -34,6 +40,15 @@ function pickRecorderMime(): string | null {
     if (MediaRecorder.isTypeSupported(c)) return c;
   }
   return null;
+}
+
+/** Path must match `voice-blob-client` route: `voice/<uuid>-<safeName>`. */
+function safeVoicePathname(filename: string): string {
+  const base = filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "audio";
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `voice/${crypto.randomUUID()}-${base}`;
+  }
+  return `voice/${Date.now()}-${base}`;
 }
 
 type VoiceToNotesControlProps = {
@@ -97,13 +112,15 @@ export function VoiceToNotesControl({
   }, []);
 
   async function postAudio(file: File | Blob, filename: string) {
+    if (file.size > VOICE_UPLOAD_MAX_BYTES) {
+      const mb = (file.size / (1024 * 1024)).toFixed(1);
+      onError(
+        `That file is too large (${mb}MB). Voice uploads can be at most 25MB. Try a shorter recording or a more compressed format.`
+      );
+      return;
+    }
     setProcessing(true);
     try {
-      const fd = new FormData();
-      fd.append("audio", file, filename);
-      if (categoryId) fd.append("category_id", categoryId);
-      if (appendNoteId) fd.append("append_note_id", appendNoteId);
-      if (draftVoiceAppend) fd.append("skip_persist", "true");
       const meta = {
         filename,
         size: file instanceof Blob ? file.size : undefined,
@@ -111,13 +128,51 @@ export function VoiceToNotesControl({
         appendNoteId: appendNoteId ?? undefined,
         draftVoiceAppend,
       };
-      console.log("[voice-to-notes] POST /api/notes/voice-transcription (FormData)", meta);
 
-      const res = await fetch("/api/notes/voice-transcription", {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
+      let res: Response;
+      try {
+        const { upload } = await import("@vercel/blob/client");
+        const pathname = safeVoicePathname(filename);
+        console.log("[voice-to-notes] Vercel Blob client upload → transcription (JSON)", meta);
+        const uploaded = await upload(pathname, file, {
+          access: "public",
+          handleUploadUrl: "/api/notes/voice-blob-client",
+          multipart: file.size >= 5 * 1024 * 1024,
+          contentType:
+            file instanceof File && file.type && file.type !== "application/octet-stream"
+              ? file.type
+              : undefined,
+        });
+        res = await fetch("/api/notes/voice-transcription", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            blobUrl: uploaded.url,
+            filename,
+            contentType:
+              file instanceof File && file.type
+                ? file.type
+                : uploaded.contentType ?? undefined,
+            category_id: categoryId ?? undefined,
+            append_note_id: appendNoteId ?? undefined,
+            skip_persist: draftVoiceAppend,
+          }),
+        });
+      } catch (blobErr) {
+        console.warn("[voice-to-notes] blob upload failed; falling back to direct FormData", blobErr);
+        const fd = new FormData();
+        fd.append("audio", file, filename);
+        if (categoryId) fd.append("category_id", categoryId);
+        if (appendNoteId) fd.append("append_note_id", appendNoteId);
+        if (draftVoiceAppend) fd.append("skip_persist", "true");
+        console.log("[voice-to-notes] POST /api/notes/voice-transcription (FormData fallback)", meta);
+        res = await fetch("/api/notes/voice-transcription", {
+          method: "POST",
+          credentials: "include",
+          body: fd,
+        });
+      }
 
       const rawBody = await res.text();
       console.log("[voice-to-notes] voice-transcription response", {
@@ -125,6 +180,11 @@ export function VoiceToNotesControl({
         ok: res.ok,
         body: rawBody.slice(0, 8000),
       });
+
+      if (res.status === 413) {
+        onError(PAYLOAD_TOO_LARGE_HINT);
+        return;
+      }
 
       let json: VoiceTranscriptionSuccessPayload & {
         error?: string;
