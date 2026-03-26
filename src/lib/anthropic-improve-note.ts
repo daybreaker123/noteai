@@ -25,3 +25,23 @@ export async function anthropicImproveNoteContent(userId: string, content: strin
     usage: { userId },
   });
 }
+
+/** System prompt for Voice to Notes: raw Whisper text → structured study notes (Claude). */
+export const VOICE_TRANSCRIPTION_IMPROVE_SYSTEM_PROMPT = `These are raw spoken lecture notes from a voice recording. Convert them into well-structured, detailed study notes. Fix any transcription errors, add proper formatting with headings and bullet points, expand on key concepts, organize the content logically by topic, and make them exam-ready. Preserve all the important information from the original transcription but present it in a clean, studyable format.
+
+Output format (required):
+- Return HTML only as a fragment for a rich text editor: use <h2> and <h3> for headings, <p> for paragraphs, <ul>/<ol>/<li> for lists, and <strong>/<em> where appropriate.
+- Do not wrap the output in markdown code fences. Do not include <html>, <head>, or <body> wrappers.
+
+Return only the improved notes, no preamble or commentary.`;
+
+/**
+ * Sends **plain-text** raw transcription from Whisper to Claude with {@link VOICE_TRANSCRIPTION_IMPROVE_SYSTEM_PROMPT}.
+ */
+export async function anthropicImproveVoiceTranscription(userId: string, rawTranscriptPlainText: string): Promise<string> {
+  return anthropicComplete(VOICE_TRANSCRIPTION_IMPROVE_SYSTEM_PROMPT, rawTranscriptPlainText.slice(0, 200_000), {
+    maxTokens: 8192,
+    model: ANTHROPIC_MODEL_SONNET,
+    usage: { userId },
+  });
+}

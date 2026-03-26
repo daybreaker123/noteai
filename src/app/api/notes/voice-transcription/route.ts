@@ -3,9 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hasAnthropicKey } from "@/lib/anthropic";
-import { anthropicImproveNoteContent } from "@/lib/anthropic-improve-note";
+import { anthropicImproveVoiceTranscription } from "@/lib/anthropic-improve-note";
 import { hasOpenAIKey, transcribeAudioWithWhisper } from "@/lib/openai-whisper";
-import { migratePlainTextToHtml, normalizeImprovedNoteHtml } from "@/lib/note-content-html";
+import { normalizeImprovedNoteHtml } from "@/lib/note-content-html";
 import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 import { normalizeOptionalCategoryId } from "@/lib/category-id";
 
@@ -178,19 +178,25 @@ export async function POST(req: Request) {
     month: "long",
     day: "numeric",
   })}`;
-  const rawHtml = migratePlainTextToHtml(transcript);
 
-  let finalContent = rawHtml;
-  let improvedOk = false;
+  let finalContent: string;
   try {
-    const improved = await anthropicImproveNoteContent(session.user.id, rawHtml);
+    const improved = await anthropicImproveVoiceTranscription(session.user.id, transcript);
     finalContent = normalizeImprovedNoteHtml(improved);
-    improvedOk = true;
   } catch (e) {
-    console.error("[voice-transcription] improve", e);
-    finalContent = rawHtml;
+    console.error("[voice-transcription] Claude improve failed", e);
+    return NextResponse.json(
+      {
+        error:
+          e instanceof Error
+            ? e.message
+            : "Failed to improve transcribed notes. Please try again.",
+      },
+      { status: 502 }
+    );
   }
 
+  const improvedAt = new Date().toISOString();
   const insertPayload = {
     user_id: session.user.id,
     category_id: categoryId,
@@ -198,14 +204,14 @@ export async function POST(req: Request) {
     content: finalContent,
     pinned: false,
     tags: [] as string[],
-    ...(improvedOk ? { improved_at: new Date().toISOString() } : {}),
+    improved_at: improvedAt,
   };
   console.log("[voice-transcription] inserting note:", {
     user_id: session.user.id,
     category_id: categoryId,
     titleLen: title.length,
     contentLen: finalContent.length,
-    improve_applied: improvedOk,
+    improve_applied: true,
   });
 
   const { data: inserted, error: insertErr } = await supabaseAdmin
@@ -248,7 +254,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ...inserted,
-    improve_applied: improvedOk,
+    improve_applied: true,
     ...streakJson(streak),
   });
 }

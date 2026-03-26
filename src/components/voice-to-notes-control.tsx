@@ -336,14 +336,14 @@ export function VoiceToNotesControl({
             role="alertdialog"
             aria-busy="true"
             aria-live="polite"
-            aria-label="Transcribing audio"
+            aria-label="Transcribing and improving your notes"
           >
             <div className="max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-xl shadow-purple-950/40">
               <div
                 className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-purple-400 border-t-transparent"
                 aria-hidden
               />
-              <p className="mt-4 text-sm font-medium text-[var(--text)]">Transcribing &amp; improving notes…</p>
+              <p className="mt-4 text-sm font-medium text-[var(--text)]">Transcribing and improving your notes...</p>
               <p className="mt-1.5 text-xs text-[var(--muted)]">This can take a minute for long recordings.</p>
             </div>
           </div>
