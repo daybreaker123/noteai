@@ -46,7 +46,7 @@ import {
 } from "@/lib/google-docs-import-client";
 import type { Note, Category, StudySetSummary } from "@/lib/api-types";
 import { buildStudySetTitleFromNoteTitles } from "@/lib/study-set-utils";
-import { NoteStudyProgressBar, NoteStudyProgressTrail } from "@/components/note-study-progress";
+import { NoteStudyProgressTrail } from "@/components/note-study-progress";
 import {
   computeStudyProgressCompletion,
   noteHasSavedStudySet,
@@ -75,7 +75,6 @@ import {
   Bookmark,
   SquareStack,
   Save,
-  Pin,
   Upload,
   FilePenLine,
   LayoutGrid,
@@ -87,6 +86,7 @@ import {
   Link2,
   Presentation,
   Network,
+  MoreVertical,
 } from "lucide-react";
 
 type StudaraUserStats = {
@@ -351,12 +351,9 @@ export function NoteApp({
   const [flashcardSessionReviewed, setFlashcardSessionReviewed] = React.useState(0);
   const [flashcardsSessionComplete, setFlashcardsSessionComplete] = React.useState(false);
   const [flashcardRatingLoading, setFlashcardRatingLoading] = React.useState(false);
-  const [exportMenu, setExportMenu] = React.useState<string | null>(null);
   const [studySetLoadError, setStudySetLoadError] = React.useState<string | null>(null);
   const [suggestBanner, setSuggestBanner] = React.useState<{ categoryId: string; name: string } | null>(null);
   const [newNoteIds, setNewNoteIds] = React.useState<Set<string>>(new Set());
-  const [summaryCache, setSummaryCache] = React.useState<Record<string, string>>({});
-  const [summaryLoading, setSummaryLoading] = React.useState<Set<string>>(new Set());
   const [draftNote, setDraftNote] = React.useState<Note | null>(null);
   const [summaryBelow, setSummaryBelow] = React.useState<string | null>(null);
   const [summarizeLoading, setSummarizeLoading] = React.useState(false);
@@ -518,6 +515,8 @@ export function NoteApp({
         ? notes.find((n) => n.id === selectedNoteId) ?? null
         : null;
   const [editTitle, setEditTitle] = React.useState("");
+  /** Bumps when the title is replaced programmatically (e.g. AI) so the editor field resyncs without clobbering typing. */
+  const [titleSyncKey, setTitleSyncKey] = React.useState(0);
   const [editContent, setEditContent] = React.useState("");
   /** Bumps when AI replaces full body so Tiptap remounts with new HTML. */
   const [editorContentRevision, setEditorContentRevision] = React.useState(0);
@@ -569,7 +568,7 @@ export function NoteApp({
       setConceptMapSaveNoteLoading(true);
       setToolbarError(null);
       try {
-        const sourceTitle = (editTitle || "Untitled").trim();
+        const sourceTitle = (editTitleRef.current || "Untitled").trim();
         const plain = conceptMapToNotePlainText(sourceTitle, data);
         const html = ensureEditorHtml(plain);
         const titleBase = sourceTitle.slice(0, 80);
@@ -579,7 +578,9 @@ export function NoteApp({
           await actions.update(note.id, { content: html });
           if (note.category_id) setSelectedCategoryId(note.category_id);
           setSelectedNoteId(note.id);
-          setEditTitle(note.title);
+          const t = note.title;
+          setEditTitle(t);
+          editTitleRef.current = t;
           setEditContent(html);
           setEditorContentRevision((r) => r + 1);
           setConceptMapModalOpen(false);
@@ -591,16 +592,15 @@ export function NoteApp({
         setConceptMapSaveNoteLoading(false);
       }
     },
-    [selectedNote, editTitle, actions, setSelectedCategoryId, setSelectedNoteId]
+    [selectedNote, actions, setSelectedCategoryId, setSelectedNoteId]
   );
   const editTitleRef = React.useRef(editTitle);
   const editContentRef = React.useRef(editContent);
   const skipSyncRef = React.useRef(false);
   const lastLoadedEditorNoteIdRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    editTitleRef.current = editTitle;
     editContentRef.current = editContent;
-  }, [editTitle, editContent]);
+  }, [editContent]);
 
   React.useEffect(() => {
     setEditorContentRevision(0);
@@ -618,11 +618,13 @@ export function NoteApp({
     if (!selectedNote) return;
     const id = selectedNote.id;
     if (lastLoadedEditorNoteIdRef.current === id) {
-      setEditTitle(selectedNote.title);
+      // Same note: do not reset title from `selectedNote` — list refetches after autosave would fight the input.
       return;
     }
     lastLoadedEditorNoteIdRef.current = id;
-    setEditTitle(selectedNote.title);
+    const nextTitle = selectedNote.title;
+    setEditTitle(nextTitle);
+    editTitleRef.current = nextTitle;
     setEditContent(ensureEditorHtml(selectedNote.content));
   }, [selectedNoteId, selectedNote, draftNote]);
 
@@ -945,7 +947,8 @@ export function NoteApp({
       return buildStudySetTitleFromNoteTitles(titles);
     }
     const nid = studyModal.noteId;
-    if (draftNote && nid === draftNote.id) return (editTitle ?? "Untitled").trim() || "Untitled";
+    if (draftNote && nid === draftNote.id)
+      return ((editTitleRef.current || editTitle || "Untitled").trim() || "Untitled");
     return (notes.find((n) => n.id === nid)?.title ?? "Untitled").trim() || "Untitled";
   }, [studyModal, notes, draftNote, editTitle]);
 
@@ -1050,61 +1053,114 @@ export function NoteApp({
     if (selectedNoteId && !draftNote && selectedNote && !selectedNoteId.startsWith("draft-")) {
       editorFlushRef.current = {
         id: selectedNoteId,
-        title: editTitle,
-        content: editContent,
+        title: editTitleRef.current,
+        content: editContentRef.current,
       };
     } else {
       editorFlushRef.current = { id: null, title: "", content: "" };
     }
   }, [selectedNoteId, editTitle, editContent, draftNote, selectedNote]);
 
+  const selectedNoteIdRef = React.useRef(selectedNoteId);
+  selectedNoteIdRef.current = selectedNoteId;
+  const selectedNoteRef = React.useRef(selectedNote);
+  selectedNoteRef.current = selectedNote;
+  const draftNoteRef = React.useRef(draftNote);
+  draftNoteRef.current = draftNote;
+  const newNoteIdsRef = React.useRef(newNoteIds);
+  newNoteIdsRef.current = newNoteIds;
+  const suggestBannerRef = React.useRef(suggestBanner);
+  suggestBannerRef.current = suggestBanner;
+  const planRef = React.useRef(plan);
+  planRef.current = plan;
+  const categoriesRef = React.useRef(categories);
+  categoriesRef.current = categories;
+
   const saveDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  React.useEffect(() => {
-    if (!selectedNoteId || !selectedNote || draftNote) return;
+  const titleUiDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const queueNoteAutosave = React.useCallback(() => {
+    const nid = selectedNoteIdRef.current;
+    if (!nid || draftNoteRef.current || selectedNoteRef.current == null || nid.startsWith("draft-")) return;
+
+    if (saveDebounce.current) clearTimeout(saveDebounce.current);
     saveDebounce.current = setTimeout(() => {
-      actions.update(selectedNoteId, { title: editTitle, content: editContent });
-      if (newNoteIds.has(selectedNoteId) && htmlToPlainText(editContent).trim().length > 50 && plan === "pro") {
-        const catIds = categories.map((c) => c.id);
-        const catNames = categories.map((c) => c.name);
+      const idNow = selectedNoteIdRef.current;
+      if (!idNow || draftNoteRef.current || idNow.startsWith("draft-")) return;
+
+      const title = editTitleRef.current;
+      const content = editContentRef.current;
+      void actionsRef.current.update(idNow, { title, content });
+
+      const plain = htmlToPlainText(content).trim();
+      const nids = newNoteIdsRef.current;
+      const pl = planRef.current;
+      const banner = suggestBannerRef.current;
+      const cats = categoriesRef.current;
+
+      if (nids.has(idNow) && plain.length > 50 && pl === "pro") {
+        const catIds = cats.map((c) => c.id);
+        const catNames = cats.map((c) => c.name);
         fetch("/api/ai/anthropic/suggest-category", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            content: htmlToPlainText(editContent),
+            content: plain,
             categoryIds: catIds,
             categoryNames: catNames,
           }),
         })
           .then((r) => r.json())
           .then((j: { category?: { id: string; name: string } }) => {
-            if (j.category && !suggestBanner) {
+            if (j.category && !suggestBannerRef.current) {
               setSuggestBanner({ categoryId: j.category.id, name: j.category.name });
             }
           })
           .catch(() => {});
         setNewNoteIds((prev) => {
           const next = new Set(prev);
-          next.delete(selectedNoteId);
+          next.delete(idNow);
           return next;
         });
       }
     }, 500);
+  }, []);
+
+  const onTitleDraftChange = React.useCallback((v: string) => {
+    editTitleRef.current = v;
+    if (draftNoteRef.current && selectedNoteIdRef.current === draftNoteRef.current.id) {
+      setDraftNote((d) => (d ? { ...d, title: v } : null));
+    }
+
+    if (selectedNoteIdRef.current && !draftNoteRef.current && selectedNoteRef.current && !selectedNoteIdRef.current.startsWith("draft-")) {
+      editorFlushRef.current = {
+        id: selectedNoteIdRef.current,
+        title: v,
+        content: editContentRef.current,
+      };
+    }
+
+    if (titleUiDebounceRef.current) clearTimeout(titleUiDebounceRef.current);
+    titleUiDebounceRef.current = setTimeout(() => {
+      setEditTitle(v);
+      titleUiDebounceRef.current = null;
+    }, 500);
+
+    queueNoteAutosave();
+  }, [queueNoteAutosave]);
+
+  React.useEffect(() => {
+    return () => {
+      if (titleUiDebounceRef.current) clearTimeout(titleUiDebounceRef.current);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    queueNoteAutosave();
     return () => {
       if (saveDebounce.current) clearTimeout(saveDebounce.current);
     };
-  }, [editTitle, editContent, selectedNoteId, selectedNote, draftNote, actions, categories, plan, newNoteIds, suggestBanner]);
-
-  React.useEffect(() => {
-    if (!exportMenu) return;
-    function onPointerDown(e: PointerEvent) {
-      const root = document.querySelector(`[data-note-export-root="${exportMenu}"]`);
-      const t = e.target;
-      if (root && t instanceof Node && root.contains(t)) return;
-      setExportMenu(null);
-    }
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [exportMenu]);
+  }, [editContent, queueNoteAutosave]);
 
   const openNewNotePicker = React.useCallback(() => {
     if (onboardingGate === "needs" && guidedOnboarding && guidedOnboarding.step >= 2 && guidedOnboarding.step <= 4) {
@@ -1142,6 +1198,7 @@ export function NoteApp({
       setDraftNote(draft);
       setSelectedNoteId(draftId);
       setEditTitle(title);
+      editTitleRef.current = title;
       setEditContent(bodyHtml);
       setNewNoteIds((prev) => new Set(prev).add(draftId));
       setMobileSidebarOpen(false);
@@ -1209,6 +1266,7 @@ export function NoteApp({
     const { note, truncated } = result;
     setSelectedNoteId(note.id);
     setEditTitle(note.title);
+    editTitleRef.current = note.title;
     setEditContent(ensureEditorHtml(note.content));
     setDraftNote(null);
     setSelectedCategoryId(note.category_id ?? "all");
@@ -1262,7 +1320,9 @@ export function NoteApp({
       await actions.refresh();
       lastLoadedEditorNoteIdRef.current = null;
       setSelectedNoteId(json.id);
-      setEditTitle(json.title ?? "Untitled");
+      const slideTitle = json.title ?? "Untitled";
+      setEditTitle(slideTitle);
+      editTitleRef.current = slideTitle;
       setEditContent(ensureEditorHtml(json.content ?? ""));
       setDraftNote(null);
       setSelectedCategoryId(json.category_id ?? "all");
@@ -1341,7 +1401,9 @@ export function NoteApp({
       await actions.refresh();
       lastLoadedEditorNoteIdRef.current = null;
       setSelectedNoteId(json.id);
-      setEditTitle(json.title ?? "Untitled");
+      const gdocTitle = json.title ?? "Untitled";
+      setEditTitle(gdocTitle);
+      editTitleRef.current = gdocTitle;
       setEditContent(ensureEditorHtml(json.content ?? ""));
       setDraftNote(null);
       setSelectedCategoryId(json.category_id ?? "all");
@@ -1393,7 +1455,10 @@ export function NoteApp({
       if (json.appended === true && typeof json.id === "string") {
         lastLoadedEditorNoteIdRef.current = json.id;
         setSelectedNoteId(json.id);
-        setEditTitle(json.title ?? "Untitled");
+        const voiceTitleA = json.title ?? "Untitled";
+        setEditTitle(voiceTitleA);
+        editTitleRef.current = voiceTitleA;
+        setTitleSyncKey((k) => k + 1);
         setEditContent(ensureEditorHtml(json.content ?? ""));
         setEditorContentRevision((r) => r + 1);
         setDraftNote(null);
@@ -1415,7 +1480,9 @@ export function NoteApp({
 
       lastLoadedEditorNoteIdRef.current = null;
       setSelectedNoteId(json.id);
-      setEditTitle(json.title ?? "Untitled");
+      const voiceTitleB = json.title ?? "Untitled";
+      setEditTitle(voiceTitleB);
+      editTitleRef.current = voiceTitleB;
       setEditContent(ensureEditorHtml(json.content ?? ""));
       setDraftNote(null);
       setSelectedCategoryId(json.category_id ?? "all");
@@ -1471,7 +1538,6 @@ export function NoteApp({
           next.delete(id);
           return next;
         });
-        setExportMenu((m) => (m === id ? null : m));
         if (studyModal?.kind === "single" && studyModal.noteId === id) setStudyModal(null);
         if (studyModal?.kind === "multi" && studyModal.noteIds.includes(id)) setStudyModal(null);
         setDeleteNoteModal(null);
@@ -1481,12 +1547,6 @@ export function NoteApp({
       if (!ok) return;
       setSelectedNoteId(null);
       setDraftNote(null);
-      setSummaryCache((c) => {
-        const next = { ...c };
-        delete next[id];
-        return next;
-      });
-      setExportMenu((m) => (m === id ? null : m));
       if (studyModal?.kind === "single" && studyModal.noteId === id) setStudyModal(null);
       if (studyModal?.kind === "multi" && studyModal.noteIds.includes(id)) setStudyModal(null);
       setGridSelectedIds((prev) => {
@@ -2273,7 +2333,8 @@ export function NoteApp({
             onOpenMobileMenu={() => setMobileSidebarOpen(true)}
             richEditorKey={`${selectedNote!.id}-${editorContentRevision}`}
             editTitle={editTitle}
-            setEditTitle={setEditTitle}
+            titleSyncKey={titleSyncKey}
+            onTitleDraftChange={onTitleDraftChange}
             editContent={editContent}
             setEditContent={setEditContent}
             suggestBanner={suggestBanner}
@@ -2384,6 +2445,8 @@ export function NoteApp({
                   consumeStreakJson(json);
                   const title = sanitizeGeneratedNoteTitle(json.title);
                   setEditTitle(title);
+                  editTitleRef.current = title;
+                  setTitleSyncKey((k) => k + 1);
                   if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
                     if (draftNote && selectedNote.id === draftNote.id) {
                       setDraftNote((d) => (d ? { ...d, title } : null));
@@ -2478,7 +2541,7 @@ export function NoteApp({
                 return;
               }
               const { jsPDF } = await import("jspdf");
-              const title = (editTitle || "Untitled").trim() || "note";
+              const title = (editTitleRef.current || editTitle || "Untitled").trim() || "note";
               const doc = new jsPDF();
               doc.setFontSize(16);
               doc.text(title, 20, 20);
@@ -2492,7 +2555,7 @@ export function NoteApp({
                 setUpgradeModal({ show: true, feature: "export" });
                 return;
               }
-              const title = (editTitle || "Untitled").trim() || "note";
+              const title = (editTitleRef.current || editTitle || "Untitled").trim() || "note";
               const blob = new Blob([`# ${title}\n\n${htmlToPlainText(editContent || "")}`], {
                 type: "text/markdown",
               });
@@ -2750,96 +2813,27 @@ export function NoteApp({
                 </div>
               </div>
             ) : (
-              <div className="grid flex-1 grid-cols-1 content-start gap-4 overflow-y-auto overflow-x-hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredNotes.map((note) => (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    categories={categories}
-                    plan={plan}
-                    studyProgressCompletion={computeStudyProgressCompletion(note, {
-                      hasSummaryInSession: !!summaryCache[note.id],
-                      hasSavedStudySet: noteHasSavedStudySet(note.id, savedStudySets),
-                    })}
-                    selectMode={gridSelectMode}
-                    selected={gridSelectedIds.has(note.id)}
-                    onToggleSelect={() => toggleGridNoteSelected(note.id)}
-                    summary={summaryCache[note.id]}
-                    summaryLoading={summaryLoading.has(note.id)}
-                    onSelect={() => {
-                      setSelectedNoteId(note.id);
-                      setMobileSidebarOpen(false);
-                    }}
-                    onUpdateCategory={(catId) => actions.update(note.id, { category_id: catId })}
-                    onTogglePin={() => actions.update(note.id, { pinned: !note.pinned })}
-                    onRequestDelete={() =>
-                      setDeleteNoteModal({ id: note.id, title: note.title || "Untitled" })
-                    }
-                    onSummarize={async () => {
-                      setSummaryLoading((s) => new Set(s).add(note.id));
-                      const res = await fetch("/api/ai/anthropic/summarize", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ content: htmlToPlainText(note.content) }),
-                      });
-                      setSummaryLoading((s) => {
-                        const next = new Set(s);
-                        next.delete(note.id);
-                        return next;
-                      });
-                      const json = (await res.json()) as { summary?: string; code?: string; error?: string };
-                      if (json.code && res.status === 402) {
-                        setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
-                        return;
+              <div className="flex min-h-0 flex-1 justify-center overflow-y-auto overflow-x-hidden px-1 pb-2">
+                <div className="grid w-full max-w-[1600px] content-start justify-center gap-4 [grid-template-columns:repeat(auto-fill,280px)]">
+                  {filteredNotes.map((note) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      categories={categories}
+                      selectMode={gridSelectMode}
+                      selected={gridSelectedIds.has(note.id)}
+                      onToggleSelect={() => toggleGridNoteSelected(note.id)}
+                      onSelect={() => {
+                        setSelectedNoteId(note.id);
+                        setMobileSidebarOpen(false);
+                      }}
+                      onRequestDelete={() =>
+                        setDeleteNoteModal({ id: note.id, title: note.title || "Untitled" })
                       }
-                      if (json.summary) {
-                        consumeStreakJson(json);
-                        void loadUserStats();
-                        setSummaryCache((c) => ({ ...c, [note.id]: json.summary! }));
-                        void actions.update(note.id, { record_summarization: true });
-                      }
-                    }}
-                    onExportPdf={async () => {
-                      if (plan !== "pro") {
-                        setUpgradeModal({ show: true, feature: "export" });
-                        return;
-                      }
-                      const { jsPDF } = await import("jspdf");
-                      const doc = new jsPDF();
-                      doc.setFontSize(16);
-                      doc.text(note.title, 20, 20);
-                      doc.setFontSize(11);
-                      const lines = doc.splitTextToSize(htmlToPlainText(note.content || ""), 170);
-                      doc.text(lines, 20, 30);
-                      doc.save(`${note.title || "note"}.pdf`);
-                    }}
-                    onExportMd={() => {
-                      if (plan !== "pro") {
-                        setUpgradeModal({ show: true, feature: "export" });
-                        return;
-                      }
-                      const blob = new Blob([`# ${note.title}\n\n${htmlToPlainText(note.content || "")}`], {
-                        type: "text/markdown",
-                      });
-                      const a = document.createElement("a");
-                      a.href = URL.createObjectURL(blob);
-                      a.download = `${note.title || "note"}.md`;
-                      a.click();
-                      URL.revokeObjectURL(a.href);
-                    }}
-                    onStudy={() => {
-                      if (plan !== "pro") {
-                        setUpgradeModal({ show: true, feature: "study" });
-                        return;
-                      }
-                      setStudyModal({ kind: "single", noteId: note.id });
-                      setStudyMode("menu");
-                    }}
-                    exportOpen={exportMenu === note.id}
-                    onExportToggle={() => setExportMenu((m) => (m === note.id ? null : note.id))}
-                    setUpgradeModal={setUpgradeModal}
-                  />
-                ))}
+                      onShare={() => setShareNoteModalNoteId(note.id)}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -2924,7 +2918,7 @@ export function NoteApp({
                 const body: { kind: "flashcards"; content?: string; title?: string } = { kind: "flashcards" };
                 if (draftNote && nid === draftNote.id) {
                   body.content = htmlToPlainText(editContent);
-                  body.title = editTitle;
+                  body.title = editTitleRef.current || editTitle;
                 }
                 const post = await fetch(`/api/study/${nid}`, {
                   method: "POST",
@@ -2973,7 +2967,7 @@ export function NoteApp({
                 const body: { kind: "quiz"; content?: string; title?: string } = { kind: "quiz" };
                 if (draftNote && nid === draftNote.id) {
                   body.content = htmlToPlainText(editContent);
-                  body.title = editTitle;
+                  body.title = editTitleRef.current || editTitle;
                 }
                 const post = await fetch(`/api/study/${nid}`, {
                   method: "POST",
@@ -3167,7 +3161,7 @@ export function NoteApp({
           setConceptMapGraph(null);
         }}
         graph={conceptMapGraph}
-        sourceTitle={editTitle || "Untitled"}
+        sourceTitle={editTitleRef.current || editTitle || "Untitled"}
         onSaveAsNote={saveConceptMapAsNote}
         saveNoteLoading={conceptMapSaveNoteLoading}
       />
@@ -3274,7 +3268,8 @@ function EditorPanel({
   richEditorKey,
   onOpenMobileMenu,
   editTitle,
-  setEditTitle,
+  titleSyncKey,
+  onTitleDraftChange,
   editContent,
   setEditContent,
   suggestBanner,
@@ -3315,7 +3310,8 @@ function EditorPanel({
   richEditorKey: string;
   onOpenMobileMenu?: () => void;
   editTitle: string;
-  setEditTitle: (v: string) => void;
+  titleSyncKey: number;
+  onTitleDraftChange: (v: string) => void;
   editContent: string;
   setEditContent: (v: string) => void;
   suggestBanner: { categoryId: string; name: string } | null;
@@ -3351,6 +3347,18 @@ function EditorPanel({
   studyProgressCompletion: StudyProgressCompletion;
   onDeleteRequest: () => void;
 }) {
+  const [localTitle, setLocalTitle] = React.useState(editTitle);
+  const titleSyncGuardRef = React.useRef({ id: selectedNote.id, key: titleSyncKey });
+  React.useLayoutEffect(() => {
+    const prev = titleSyncGuardRef.current;
+    const idChanged = prev.id !== selectedNote.id;
+    const keyChanged = prev.key !== titleSyncKey;
+    titleSyncGuardRef.current = { id: selectedNote.id, key: titleSyncKey };
+    if (idChanged || keyChanged) {
+      setLocalTitle(editTitle);
+    }
+  }, [selectedNote.id, titleSyncKey, editTitle]);
+
   function handleStudyProgressStep(step: StudyProgressStepId) {
     switch (step) {
       case "write":
@@ -3465,8 +3473,12 @@ function EditorPanel({
       )}
       <div className="border-b border-[var(--border)] px-4 py-3 md:px-6 md:py-4">
         <input
-          value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
+          value={localTitle}
+          onChange={(e) => {
+            const v = e.target.value;
+            setLocalTitle(v);
+            onTitleDraftChange(v);
+          }}
           className="w-full min-h-11 bg-transparent text-xl font-semibold text-[var(--text)] outline-none placeholder:text-[var(--placeholder)] md:text-2xl"
           placeholder="Note title"
         />
@@ -3552,45 +3564,21 @@ function EditorPanel({
 function NoteCard({
   note,
   categories,
-  plan: _plan,
-  studyProgressCompletion,
   selectMode = false,
   selected = false,
   onToggleSelect,
-  summary,
-  summaryLoading,
   onSelect,
-  onUpdateCategory: _onUpdateCategory,
-  onTogglePin,
   onRequestDelete,
-  onSummarize,
-  onExportPdf,
-  onExportMd,
-  onStudy,
-  exportOpen,
-  onExportToggle,
-  setUpgradeModal: _setUpgradeModal,
+  onShare,
 }: {
   note: Note;
   categories: Category[];
-  plan: string;
-  studyProgressCompletion: StudyProgressCompletion;
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
-  summary?: string;
-  summaryLoading: boolean;
   onSelect: () => void;
-  onUpdateCategory: (id: string) => void;
-  onTogglePin: () => void;
   onRequestDelete: () => void;
-  onSummarize: () => void;
-  onExportPdf: () => void;
-  onExportMd: () => void;
-  onStudy: () => void;
-  exportOpen: boolean;
-  onExportToggle: () => void;
-  setUpgradeModal: (x: { show: boolean; message?: string; feature?: string }) => void;
+  onShare: () => void;
 }) {
   const category = note.category_id ? categories.find((c) => c.id === note.category_id) : null;
   const categoryName = category?.name ?? "Uncategorized";
@@ -3599,6 +3587,9 @@ function NoteCard({
   const formattedDate = date ? new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
   const preview = noteContentPreview(note.content || "");
 
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuWrapRef = React.useRef<HTMLDivElement>(null);
+
   const [ctxMenu, setCtxMenu] = React.useState<{ x: number; y: number } | null>(null);
   const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -3606,12 +3597,23 @@ function NoteCard({
 
   function openMenuAt(clientX: number, clientY: number) {
     const pad = 8;
-    const mw = 160;
-    const mh = 48;
+    const mw = 176;
+    const mh = 120;
     const x = Math.max(pad, Math.min(clientX, window.innerWidth - mw - pad));
     const y = Math.max(pad, Math.min(clientY, window.innerHeight - mh - pad));
     setCtxMenu({ x, y });
   }
+
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      const t = e.target;
+      if (menuWrapRef.current && t instanceof Node && menuWrapRef.current.contains(t)) return;
+      setMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [menuOpen]);
 
   React.useEffect(() => {
     if (!ctxMenu) return;
@@ -3636,6 +3638,28 @@ function NoteCard({
     }
     touchStartRef.current = null;
   }
+
+  function runOpen() {
+    setMenuOpen(false);
+    setCtxMenu(null);
+    onSelect();
+  }
+
+  function runDelete() {
+    setMenuOpen(false);
+    setCtxMenu(null);
+    onRequestDelete();
+  }
+
+  function runShare() {
+    setMenuOpen(false);
+    setCtxMenu(null);
+    onShare();
+  }
+
+  const categoryPillStyle = categoryColor
+    ? ({ backgroundColor: `${categoryColor}28`, color: categoryColor } as React.CSSProperties)
+    : undefined;
 
   const card = (
     <div
@@ -3671,131 +3695,117 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "note-dashboard-card group max-w-full overflow-x-hidden rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] p-5 transition hover:border-purple-500/30 hover:bg-[var(--btn-default-bg)]",
-        selectMode ? "cursor-default" : "cursor-pointer",
-        selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30",
-        categoryColor && "border-l-4"
+        "note-dashboard-card group relative box-border flex h-[180px] w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-white/[0.06] bg-[#15151d] p-3.5 text-left shadow-sm outline-none transition-[transform,box-shadow,border-color] duration-200 ease-out",
+        "hover:-translate-y-0.5 hover:border-purple-500/55 hover:shadow-[0_0_0_1px_rgba(168,85,247,0.35),0_12px_32px_-12px_rgba(139,92,246,0.35)]",
+        "focus-visible:ring-2 focus-visible:ring-purple-500/40",
+        selectMode && "cursor-default",
+        selected && selectMode && "ring-2 ring-purple-500/50 ring-offset-2 ring-offset-[var(--bg)]"
       )}
-      style={categoryColor ? { borderLeftColor: categoryColor } : undefined}
     >
-      <div className="flex items-start gap-3">
-        {selectMode && (
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={(e) => {
-              e.stopPropagation();
-              onToggleSelect?.();
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--border)] bg-[var(--btn-default-bg)] text-purple-500 focus:ring-purple-500"
-            aria-label={selected ? "Deselect note" : "Select note"}
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="flex-1 truncate font-semibold text-[var(--text)]">{note.title || "Untitled"}</h3>
-            {!selectMode && (
-              <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTogglePin();
-                  }}
-                  className="rounded p-1 text-[var(--muted)] hover:text-amber-400"
-                >
-                  <Pin className={cn("h-3.5 w-3.5", note.pinned && "fill-amber-400 text-amber-400")} />
-                </button>
-                <div className="relative" data-note-export-root={note.id}>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onExportToggle();
-                    }}
-                    className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
-                  {exportOpen && (
-                    <div className="absolute right-0 top-full z-10 mt-1 min-w-[140px] rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] py-1 shadow-xl">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onExportPdf();
-                        }}
-                        className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
-                      >
-                        Export PDF
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onExportMd();
-                        }}
-                        className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
-                      >
-                        Export Markdown
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onStudy();
-                  }}
-                  className="rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-          <p className="mt-2 line-clamp-2 text-sm text-[var(--muted)]">{preview || "No content"}</p>
-          <div className="mt-3" title="Study progress">
-            <NoteStudyProgressBar completion={studyProgressCompletion} />
-          </div>
-          <div className="mt-3 flex items-center justify-between">
+      <div className="flex shrink-0 items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {selectMode ? (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(e) => {
+                e.stopPropagation();
+                onToggleSelect?.();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-white/20 bg-white/5 text-purple-500 focus:ring-purple-500"
+              aria-label={selected ? "Deselect note" : "Select note"}
+            />
+          ) : null}
+          {categoryColor ? (
             <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
-                categoryColor ? "text-[var(--text)]" : categoryName === "Uncategorized" ? "bg-[var(--btn-default-bg)] text-[var(--muted)]" : "bg-purple-500/20 text-purple-300"
-              )}
-              style={categoryColor ? { backgroundColor: `${categoryColor}30`, color: categoryColor } : undefined}
-            >
-              {categoryColor && (
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: categoryColor }}
-                  aria-hidden
-                />
-              )}
-              {categoryName}
-            </span>
-            <span className="text-xs text-[var(--muted)]">{formattedDate}</span>
-          </div>
-          {(note.tags ?? []).length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {(note.tags ?? []).map((t) => (
-                <Badge key={t} className="text-xs">
-                  {t}
-                </Badge>
-              ))}
-            </div>
-          )}
-          {summary && <p className="mt-2 line-clamp-2 text-xs text-[var(--muted)]">{summary}</p>}
-          {summaryLoading && <Loader2 className="mt-2 h-3 w-3 animate-spin text-[var(--muted)]" />}
-          {!selectMode && !summary && !summaryLoading && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onSummarize(); }} className="mt-2 text-xs text-purple-400 hover:underline">
-              Summarize
-            </button>
+              className="h-2.5 w-2.5 shrink-0 rounded-[3px] ring-1 ring-white/15"
+              style={{ backgroundColor: categoryColor }}
+              aria-hidden
+            />
+          ) : (
+            <span className="h-2.5 w-2.5 shrink-0 rounded-[3px] bg-white/20 ring-1 ring-white/10" aria-hidden />
           )}
         </div>
+        {!selectMode ? (
+          <div ref={menuWrapRef} className="relative shrink-0">
+            <button
+              type="button"
+              aria-label="Note actions"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((o) => !o);
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 opacity-100 transition hover:bg-white/[0.08] hover:text-zinc-200 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+            >
+              <MoreVertical className="h-4 w-4" strokeWidth={2} aria-hidden />
+            </button>
+            {menuOpen ? (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-lg border border-white/[0.08] bg-[#1c1c26] py-1 shadow-xl shadow-black/40"
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-white/[0.06]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runOpen();
+                  }}
+                >
+                  Open
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-white/[0.06]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runShare();
+                  }}
+                >
+                  Share
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runDelete();
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <h3 className="mt-2 shrink-0 truncate text-[15px] font-bold leading-tight text-white">{note.title || "Untitled"}</h3>
+
+      <p className="mt-1.5 min-h-0 flex-1 overflow-hidden text-[12px] leading-[1.45] text-zinc-500 line-clamp-2">
+        {preview || "No content"}
+      </p>
+
+      <div className="mt-auto flex shrink-0 items-center justify-between gap-2 border-t border-white/[0.06] pt-2.5">
+        <span
+          className={cn(
+            "min-w-0 max-w-[58%] truncate rounded-full px-2 py-0.5 text-[11px] font-medium",
+            !categoryColor && categoryName === "Uncategorized" && "bg-white/[0.08] text-zinc-400",
+            !categoryColor && categoryName !== "Uncategorized" && "bg-purple-500/20 text-purple-200"
+          )}
+          style={categoryPillStyle}
+          title={categoryName}
+        >
+          {categoryName}
+        </span>
+        <span className="shrink-0 text-[11px] tabular-nums text-zinc-500">{formattedDate}</span>
       </div>
     </div>
   );
@@ -3806,7 +3816,7 @@ function NoteCard({
       {ctxMenu && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed z-[80] min-w-[160px] rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] py-1 shadow-xl"
+              className="fixed z-[80] min-w-[9.5rem] rounded-lg border border-white/[0.1] bg-[#1c1c26] py-1 shadow-xl shadow-black/50"
               style={{ left: ctxMenu.x, top: ctxMenu.y }}
               onPointerDown={(e) => e.stopPropagation()}
               role="menu"
@@ -3815,11 +3825,24 @@ function NoteCard({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-[var(--btn-default-bg)]"
-                onClick={() => {
-                  onRequestDelete();
-                  setCtxMenu(null);
-                }}
+                className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-white/[0.06]"
+                onClick={() => runOpen()}
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-white/[0.06]"
+                onClick={() => runShare()}
+              >
+                Share
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
+                onClick={() => runDelete()}
               >
                 Delete
               </button>
