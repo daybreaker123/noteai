@@ -119,6 +119,8 @@ const PRO_FEATURE_DESCRIPTIONS: Record<string, string> = {
     "Concept Map uses AI to pull out key ideas from your notes and shows how they connect in an interactive diagram you can rearrange, export, or save.",
 };
 
+const STUDARA_SIDEBAR_CATEGORIES_COLLAPSED_KEY = "studara.sidebar.categoriesCollapsed";
+
 /** Skip global ⌘N / ⌘K when typing in the editor or any form field. */
 function shouldIgnoreAppShortcut(e: KeyboardEvent): boolean {
   const t = e.target;
@@ -418,6 +420,7 @@ export function NoteApp({
   const importDropdownRef = React.useRef<HTMLDivElement>(null);
   const [googleDocsImportEnabled, setGoogleDocsImportEnabled] = React.useState<boolean | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
+  const [sidebarCategoriesCollapsed, setSidebarCategoriesCollapsed] = React.useState(false);
   const importDocumentInputRef = React.useRef<HTMLInputElement>(null);
   const analyzeSlidesInputRef = React.useRef<HTMLInputElement>(null);
   const sidebarSearchInputRef = React.useRef<HTMLInputElement>(null);
@@ -457,6 +460,28 @@ export function NoteApp({
       document.body.style.overflow = prev;
     };
   }, [mobileSidebarOpen]);
+
+  React.useLayoutEffect(() => {
+    try {
+      if (localStorage.getItem(STUDARA_SIDEBAR_CATEGORIES_COLLAPSED_KEY) === "1") {
+        setSidebarCategoriesCollapsed(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleSidebarCategoriesCollapsed = React.useCallback(() => {
+    setSidebarCategoriesCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(STUDARA_SIDEBAR_CATEGORIES_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
 
   React.useEffect(() => {
     if (!linkCopiedToast) return;
@@ -2456,44 +2481,72 @@ export function NoteApp({
             </div>
           )}
           <div className="px-1">
-            <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">Notes</p>
-            <div className="space-y-1">
-              <CategoryTab
-                id="all"
-                name="All Notes"
-                count={noteCounts.total}
-                icon={<LayoutGrid className="h-4 w-4 shrink-0 text-[var(--muted)]" />}
-                selected={selectedCategoryId === "all"}
-                onClick={() => selectSidebarCategory("all")}
+            <button
+              type="button"
+              onClick={toggleSidebarCategoriesCollapsed}
+              aria-expanded={!sidebarCategoriesCollapsed}
+              aria-controls="sidebar-categories-panel"
+              className="mb-2.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left transition-colors duration-200 hover:bg-[var(--hover-bg-subtle)] touch-manipulation"
+            >
+              <ChevronRight
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0 text-[var(--muted)] transition-transform duration-300 ease-out",
+                  !sidebarCategoriesCollapsed && "rotate-90"
+                )}
+                strokeWidth={2.25}
+                aria-hidden
               />
-              {categories.map((c) => (
-                <CategoryTab
-                  key={c.id}
-                  id={c.id}
-                  name={c.name}
-                  color={c.color}
-                  count={noteCounts.byCategory.get(c.id) ?? 0}
-                  selected={selectedCategoryId === c.id}
-                  onClick={() => selectSidebarCategory(c.id)}
-                  onStudyGuide={() => requestStudyGuide(c.id, c.name)}
-                  onRename={() => {
-                    const name = prompt("Rename category:", c.name);
-                    if (name?.trim()) actions.updateCategory(c.id, name.trim());
-                  }}
-                  onDelete={() => setDeleteCategoryModal({ id: c.id, name: c.name })}
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  clearCategoryError();
-                  setCreateCategoryModalOpen(true);
-                }}
-                className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
-              >
-                <FolderPlus className="h-4 w-4 shrink-0 text-[var(--muted)]" />
-                Add category
-              </button>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">
+                Categories
+              </span>
+            </button>
+            <div
+              id="sidebar-categories-panel"
+              className={cn(
+                "grid transition-[grid-template-rows] duration-300 ease-out",
+                sidebarCategoriesCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
+              )}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <div className="space-y-1 pb-0.5">
+                  <CategoryTab
+                    id="all"
+                    name="All Notes"
+                    count={noteCounts.total}
+                    icon={<LayoutGrid className="h-4 w-4 shrink-0 text-[var(--muted)]" />}
+                    selected={selectedCategoryId === "all"}
+                    onClick={() => selectSidebarCategory("all")}
+                  />
+                  {categories.map((c) => (
+                    <CategoryTab
+                      key={c.id}
+                      id={c.id}
+                      name={c.name}
+                      color={c.color}
+                      count={noteCounts.byCategory.get(c.id) ?? 0}
+                      selected={selectedCategoryId === c.id}
+                      onClick={() => selectSidebarCategory(c.id)}
+                      onStudyGuide={() => requestStudyGuide(c.id, c.name)}
+                      onRename={() => {
+                        const name = prompt("Rename category:", c.name);
+                        if (name?.trim()) actions.updateCategory(c.id, name.trim());
+                      }}
+                      onDelete={() => setDeleteCategoryModal({ id: c.id, name: c.name })}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearCategoryError();
+                      setCreateCategoryModalOpen(true);
+                    }}
+                    className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
+                  >
+                    <FolderPlus className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+                    Add category
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
