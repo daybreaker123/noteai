@@ -83,24 +83,17 @@
   --tiptap-th-bg: rgba(255, 255, 255, 0.05);
   --tiptap-body: rgba(255, 255, 255, 0.9);
   --tiptap-img-border: rgba(255, 255, 255, 0.1);
-  /* Note grid tiles — distinct from dashboard bg, premium card feel */
-  --note-tile-bg: #1e1f2e;
-  --note-tile-border: rgba(255, 255, 255, 0.085);
-  --note-tile-title: #ffffff;
-  --note-tile-preview: #b8ab9d;
-  --note-tile-date: rgba(255, 255, 255, 0.38);
-  --note-tile-footer-border: rgba(255, 255, 255, 0.075);
-  --note-tile-menu-surface: #262736;
-  --note-tile-menu-border: rgba(255, 255, 255, 0.1);
-  --note-tile-menu-text: rgba(255, 255, 255, 0.92);
-  --note-tile-menu-hover: rgba(255, 255, 255, 0.06);
-  --note-tile-accent-fallback: rgba(255, 255, 255, 0.2);
-  --note-tile-pill-mix: #14151f;
-  --note-tile-pill-muted: rgba(255, 255, 255, 0.1);
-  --note-tile-pill-muted-text: rgba(255, 255, 255, 0.55);
-  --note-tile-shadow: none;
-  --note-tile-icon-muted: rgba(255, 255, 255, 0.42);
-  --note-tile-icon-hover-bg: rgba(255, 255, 255, 0.07);
+  /* Note grid cards — slightly lighter than dashboard bg */
+  --note-card-bg: color-mix(in oklab, var(--bg) 84%, white 16%);
+  --note-card-border: rgba(255, 255, 255, 0.11);
+  --note-card-title: #ffffff;
+  --note-card-preview: rgba(255, 255, 255, 0.5);
+  --note-card-date: rgba(255, 255, 255, 0.4);
+  --note-card-accent-fallback: rgba(255, 255, 255, 0.18);
+  --note-card-accent-border-fallback: rgba(255, 255, 255, 0.14);
+  --note-card-shadow: none;
+  --note-card-icon-muted: rgba(255, 255, 255, 0.45);
+  --note-card-icon-hover-bg: rgba(255, 255, 255, 0.08);
   /* Dashboard activity status bar */
   --dashboard-stats-bar-bg: color-mix(in oklab, var(--bg) 82%, white 18%);
   --dashboard-stats-bar-border: rgba(255, 255, 255, 0.09);
@@ -184,23 +177,16 @@
   --tiptap-th-bg: rgba(26, 26, 46, 0.06);
   --tiptap-body: rgba(26, 26, 46, 0.92);
   --tiptap-img-border: rgba(26, 26, 46, 0.12);
-  --note-tile-bg: #ffffff;
-  --note-tile-border: rgba(26, 26, 46, 0.1);
-  --note-tile-title: #1a1a2e;
-  --note-tile-preview: #6d645c;
-  --note-tile-date: rgba(26, 26, 46, 0.48);
-  --note-tile-footer-border: rgba(26, 26, 46, 0.08);
-  --note-tile-menu-surface: #ffffff;
-  --note-tile-menu-border: rgba(26, 26, 46, 0.12);
-  --note-tile-menu-text: #1a1a2e;
-  --note-tile-menu-hover: rgba(26, 26, 46, 0.06);
-  --note-tile-accent-fallback: rgba(26, 26, 46, 0.2);
-  --note-tile-pill-mix: #e8e6e3;
-  --note-tile-pill-muted: rgba(26, 26, 46, 0.07);
-  --note-tile-pill-muted-text: rgba(26, 26, 46, 0.52);
-  --note-tile-shadow: 0 1px 2px rgba(26, 26, 46, 0.04), 0 6px 24px -4px rgba(26, 26, 46, 0.08);
-  --note-tile-icon-muted: rgba(26, 26, 46, 0.45);
-  --note-tile-icon-hover-bg: rgba(26, 26, 46, 0.06);
+  --note-card-bg: #ffffff;
+  --note-card-border: rgba(26, 26, 46, 0.1);
+  --note-card-title: #1a1a2e;
+  --note-card-preview: rgba(26, 26, 46, 0.52);
+  --note-card-date: rgba(26, 26, 46, 0.46);
+  --note-card-accent-fallback: rgba(26, 26, 46, 0.22);
+  --note-card-accent-border-fallback: rgba(26, 26, 46, 0.16);
+  --note-card-shadow: 0 1px 2px rgba(26, 26, 46, 0.05), 0 6px 18px -4px rgba(26, 26, 46, 0.08);
+  --note-card-icon-muted: rgba(26, 26, 46, 0.45);
+  --note-card-icon-hover-bg: rgba(26, 26, 46, 0.08);
   --dashboard-stats-bar-bg: #ebecef;
   --dashboard-stats-bar-border: rgba(26, 26, 46, 0.1);
   --dashboard-stats-bar-divider: rgba(26, 26, 46, 0.12);
@@ -246,17 +232,18 @@ body {
   }
 }
 
-/* Dashboard note cards — category accent glow on hover, paper cards in light mode */
+/* Dashboard note cards — fixed grid; category-colored hover ring + slight lift */
 .note-dashboard-card {
-  --note-tile-accent: var(--accent);
-  background-color: var(--note-tile-bg);
-  box-shadow: var(--note-tile-shadow);
+  --note-card-accent: var(--accent);
+  background-color: var(--note-card-bg);
+  border-color: var(--note-card-border);
+  box-shadow: var(--note-card-shadow);
   transition:
-    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1),
     background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.3s ease,
-    border-left-color 0.3s ease;
+    border-color 0.25s ease,
+    border-left-color 0.25s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -266,29 +253,23 @@ body {
 }
 
 .note-dashboard-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--note-tile-accent) 36%, transparent),
-    0 14px 36px -10px color-mix(in srgb, var(--note-tile-accent) 30%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--note-card-accent) 32%, transparent),
+    0 5px 20px -6px color-mix(in srgb, var(--note-card-accent) 22%, transparent);
 }
 
 [data-theme="light"] .note-dashboard-card:hover {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--note-tile-accent) 18%, transparent),
-    0 2px 8px rgba(26, 26, 46, 0.05),
-    0 18px 44px -10px color-mix(in srgb, var(--note-tile-accent) 16%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--note-card-accent) 18%, transparent),
+    0 1px 3px rgba(26, 26, 46, 0.06),
+    0 8px 22px -6px color-mix(in srgb, var(--note-card-accent) 12%, transparent);
 }
 
-.note-tile-category-pill {
-  --pill-base: var(--accent);
-  background: color-mix(in srgb, var(--pill-base) 54%, var(--note-tile-pill-mix));
-  color: #fafaf9;
-}
-
-[data-theme="light"] .note-tile-category-pill {
-  /* Darker mix so white label stays readable on “paper” cards */
-  background: color-mix(in srgb, var(--pill-base) 68%, rgb(36, 34, 44));
-  color: #fafaf9;
+@media (prefers-reduced-motion: reduce) {
+  .note-dashboard-card:hover {
+    transform: none;
+  }
 }
 
 /* Notes dashboard: slim activity status bar (below grid header) */

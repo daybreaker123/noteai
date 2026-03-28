@@ -3656,20 +3656,10 @@ function NoteCard({
     onShare();
   }
 
-  const tileAccent = categoryColor ?? "var(--note-tile-accent-fallback)";
   const cardStyle = {
-    "--note-tile-accent": tileAccent,
-    borderLeftWidth: 4,
-    borderLeftStyle: "solid" as const,
-    borderLeftColor: "var(--note-tile-accent)",
+    ...(categoryColor ? ({ "--note-card-accent": categoryColor } as React.CSSProperties) : {}),
+    borderLeftColor: categoryColor ?? "var(--note-card-accent-border-fallback)",
   } as React.CSSProperties;
-
-  const categoryPillClass = cn(
-    "min-w-0 max-w-[58%] truncate rounded-full px-2.5 py-1 text-[11px] font-medium leading-tight",
-    categoryColor && "note-tile-category-pill",
-    !categoryColor && categoryName === "Uncategorized" && "bg-[var(--note-tile-pill-muted)] text-[var(--note-tile-pill-muted-text)]",
-    !categoryColor && categoryName !== "Uncategorized" && "note-tile-category-pill"
-  );
 
   const card = (
     <div
@@ -3706,101 +3696,110 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "note-dashboard-card group relative box-border flex h-[180px] w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--note-tile-border)] p-5 text-left outline-none",
-        "focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--note-tile-accent)_45%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
+        "note-dashboard-card group relative box-border flex h-[180px] w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--note-card-border)] border-l-[3px] p-4 text-left outline-none",
+        "focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--note-card-accent)_42%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
         selectMode && "cursor-default",
-        selected && selectMode && "ring-2 ring-purple-500/50 ring-offset-2 ring-offset-[var(--bg)]"
+        selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30"
       )}
     >
-      <div className="flex shrink-0 items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          {selectMode ? (
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={(e) => {
-                e.stopPropagation();
-                onToggleSelect?.();
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-[var(--note-tile-border)] bg-transparent text-purple-500 focus:ring-purple-500/50"
-              aria-label={selected ? "Deselect note" : "Select note"}
-            />
-          ) : null}
-        </div>
-        {!selectMode ? (
-          <div ref={menuWrapRef} className="relative shrink-0">
-            <button
-              type="button"
-              aria-label="Note actions"
-              aria-expanded={menuOpen}
-              aria-haspopup="menu"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen((o) => !o);
-              }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--note-tile-icon-muted)] transition-colors hover:bg-[var(--note-tile-icon-hover-bg)] hover:text-[var(--note-tile-title)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
-            >
-              <MoreVertical className="h-4 w-4" strokeWidth={2} aria-hidden />
-            </button>
-            {menuOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-lg border border-[var(--note-tile-menu-border)] bg-[var(--note-tile-menu-surface)] py-1 shadow-lg shadow-black/12 backdrop-blur-sm"
-                onPointerDown={(e) => e.stopPropagation()}
-              >
+      <div className="flex min-h-0 min-w-0 flex-1 items-start gap-3">
+        {selectMode ? (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleSelect?.();
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--border)] bg-[var(--btn-default-bg)] text-purple-500 focus:ring-purple-500"
+            aria-label={selected ? "Deselect note" : "Select note"}
+          />
+        ) : null}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="min-w-0 flex-1 truncate text-[15px] font-bold leading-snug text-[var(--note-card-title)]">
+              {note.title || "Untitled"}
+            </h3>
+            {!selectMode ? (
+              <div ref={menuWrapRef} className="relative shrink-0">
                 <button
                   type="button"
-                  role="menuitem"
-                  className="block w-full px-3 py-2 text-left text-sm text-[var(--note-tile-menu-text)] transition-colors hover:bg-[var(--note-tile-menu-hover)]"
+                  aria-label="Note actions"
+                  aria-expanded={menuOpen}
+                  aria-haspopup="menu"
                   onClick={(e) => {
                     e.stopPropagation();
-                    runOpen();
+                    setMenuOpen((o) => !o);
                   }}
+                  className="rounded p-1 text-[var(--note-card-icon-muted)] transition-colors hover:bg-[var(--note-card-icon-hover-bg)] hover:text-[var(--note-card-title)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
                 >
-                  Open
+                  <MoreVertical className="h-4 w-4" strokeWidth={2} aria-hidden />
                 </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="block w-full px-3 py-2 text-left text-sm text-[var(--note-tile-menu-text)] transition-colors hover:bg-[var(--note-tile-menu-hover)]"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    runShare();
-                  }}
-                >
-                  Share
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="block w-full px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10 dark:text-red-400"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    runDelete();
-                  }}
-                >
-                  Delete
-                </button>
+                {menuOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] py-1 shadow-xl"
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--btn-default-bg)]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        runOpen();
+                      }}
+                    >
+                      Open
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--btn-default-bg)]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        runShare();
+                      }}
+                    >
+                      Share
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="block w-full px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10 dark:text-red-400"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        runDelete();
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
-        ) : null}
-      </div>
-
-      <h3 className="mt-3 shrink-0 truncate text-[15px] font-bold leading-snug tracking-tight text-[var(--note-tile-title)]">
-        {note.title || "Untitled"}
-      </h3>
-
-      <p className="mt-2 min-h-0 flex-1 overflow-hidden text-[12.5px] leading-[1.5] text-[var(--note-tile-preview)] line-clamp-2">
-        {preview || "No content"}
-      </p>
-
-      <div className="mt-auto flex shrink-0 items-center justify-between gap-2 border-t border-[var(--note-tile-footer-border)] pt-3">
-        <span className={categoryPillClass} style={categoryColor ? ({ "--pill-base": categoryColor } as React.CSSProperties) : undefined} title={categoryName}>
-          {categoryName}
-        </span>
-        <span className="shrink-0 text-[10px] font-medium tabular-nums tracking-wide text-[var(--note-tile-date)]">{formattedDate}</span>
+          <p className="mt-2 line-clamp-2 text-sm leading-snug text-[var(--note-card-preview)]">{preview || "No content"}</p>
+          <div className="min-h-0 flex-1" aria-hidden />
+          <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
+            <span
+              className={cn(
+                "inline-flex min-w-0 max-w-[58%] items-center gap-1.5 truncate rounded-full px-2.5 py-0.5 text-xs font-medium",
+                !categoryColor && categoryName === "Uncategorized" && "bg-[var(--btn-default-bg)] text-[var(--muted)]",
+                !categoryColor && categoryName !== "Uncategorized" && "bg-purple-500/20 text-purple-400"
+              )}
+              style={categoryColor ? { backgroundColor: `${categoryColor}30`, color: categoryColor } : undefined}
+              title={categoryName}
+            >
+              {categoryColor ? (
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: categoryColor }} aria-hidden />
+              ) : null}
+              {categoryName}
+            </span>
+            <span className="shrink-0 text-xs tabular-nums text-[var(--note-card-date)]">{formattedDate}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -3811,7 +3810,7 @@ function NoteCard({
       {ctxMenu && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed z-[80] min-w-[9.5rem] rounded-lg border border-[var(--note-tile-menu-border)] bg-[var(--note-tile-menu-surface)] py-1 shadow-xl shadow-black/15 backdrop-blur-md"
+              className="fixed z-[80] min-w-[9.5rem] rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] py-1 shadow-xl"
               style={{ left: ctxMenu.x, top: ctxMenu.y }}
               onPointerDown={(e) => e.stopPropagation()}
               role="menu"
@@ -3820,7 +3819,7 @@ function NoteCard({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full px-3 py-2 text-left text-sm text-[var(--note-tile-menu-text)] transition-colors hover:bg-[var(--note-tile-menu-hover)]"
+                className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--btn-default-bg)]"
                 onClick={() => runOpen()}
               >
                 Open
@@ -3828,7 +3827,7 @@ function NoteCard({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full px-3 py-2 text-left text-sm text-[var(--note-tile-menu-text)] transition-colors hover:bg-[var(--note-tile-menu-hover)]"
+                className="block w-full px-3 py-2 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--btn-default-bg)]"
                 onClick={() => runShare()}
               >
                 Share
