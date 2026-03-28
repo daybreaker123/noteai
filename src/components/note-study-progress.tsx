@@ -31,7 +31,7 @@ export function NoteStudyProgressBar({
           className={cn(
             "h-1 min-w-0 flex-1 rounded-full transition-colors duration-300",
             completion[id]
-              ? "bg-gradient-to-r from-purple-500/90 to-violet-500/80 shadow-[0_0_8px_-2px_rgba(168,85,247,0.5)]"
+              ? "bg-gradient-to-r from-purple-500/90 to-violet-500/80 shadow-[0_0_8px_-2px_color-mix(in_oklab,var(--accent)_50%,transparent)]"
               : "bg-[var(--input-bg)]"
           )}
         />

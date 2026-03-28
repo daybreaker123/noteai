@@ -21,7 +21,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "action and content required" }, { status: 400 });
   }
   const prompts: Record<string, string> = {
-    summarize: "Summarize the following note in 3-5 sentences. Be concise.",
+    summarize:
+      "Summarize the following note in 3-5 sentences. Be concise. " +
+      "Do not use markdown formatting, hashtags for headers, or asterisks for bold/italic. " +
+      "Return plain text with clean line breaks and dashes for bullet points only (- item).",
     improve: "Improve the clarity and structure of the following note. Keep the same tone and length.",
     title: "Generate a short, descriptive title (3-8 words) for this note. Return only the title, no quotes.",
     tags: "Suggest 3-5 relevant tags for this note. Return only comma-separated tags, lowercase.",

@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { captureAnalytics } from "@/lib/analytics";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   CITATION_STYLE_OPTIONS,
@@ -22,7 +23,7 @@ import {
 } from "@/lib/citation-types";
 
 const headerSelectClass =
-  "min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--hover-bg-subtle)] py-2 pl-2.5 pr-7 text-base font-medium text-[var(--text)] outline-none transition focus:border-purple-500/45 focus:ring-2 focus:ring-purple-500/20 sm:min-h-10 sm:min-w-[10rem] sm:flex-none sm:pl-3 sm:text-xs md:text-sm";
+  "min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--hover-bg-subtle)] py-2 pl-2.5 pr-7 text-base font-medium text-[var(--text)] outline-none transition focus:border-[var(--focus-border-color)] focus:ring-2 focus:ring-[var(--focus-ring-color)] sm:min-h-10 sm:min-w-[10rem] sm:flex-none sm:pl-3 sm:text-xs md:text-sm";
 
 type CitationResult = {
   description: string;
@@ -52,7 +53,7 @@ function CopyCitationButton({ text }: { text: string }) {
     >
       {done ? (
         <>
-          <Check className="h-3.5 w-3.5 text-emerald-400" />
+          <Check className="h-3.5 w-3.5 text-[var(--status-success-fg)]" />
           Copied
         </>
       ) : (
@@ -166,6 +167,7 @@ export function CitationsPage() {
         sourceInput: text,
         sourceType,
       };
+      captureAnalytics("citation_generated", { source_type: sourceType });
       setCurrent(result);
 
       const item: CitationHistoryItem = {
@@ -200,8 +202,16 @@ export function CitationsPage() {
   return (
     <div className="flex min-h-dvh max-w-[100vw] flex-col overflow-x-hidden bg-[var(--bg)] text-[var(--text)]">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-32 left-1/2 h-[480px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/14 via-indigo-600/10 to-fuchsia-600/10 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-[320px] w-[480px] rounded-full bg-indigo-600/8 blur-3xl" />
+        <div
+          className="absolute -top-32 left-1/2 h-[480px] w-[900px] -translate-x-1/2 rounded-full blur-3xl"
+          style={{
+            background: `linear-gradient(to right, var(--page-glow-from), var(--page-glow-via), var(--page-glow-to))`,
+          }}
+        />
+        <div
+          className="absolute bottom-0 right-0 h-[320px] w-[480px] rounded-full blur-3xl"
+          style={{ background: `radial-gradient(circle, var(--page-glow-corner), transparent 70%)` }}
+        />
       </div>
 
       <header className="relative z-20 shrink-0 border-b border-[var(--sidebar-border)] bg-[var(--header-bar)] backdrop-blur-2xl">
@@ -215,8 +225,13 @@ export function CitationsPage() {
           </Link>
           <div className="hidden h-8 w-px bg-[var(--input-bg)] sm:block" aria-hidden />
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-gradient-to-br from-violet-500/25 to-cyan-500/15 shadow-inner">
-              <Quote className="h-5 w-5 text-[var(--accent-fg)]" strokeWidth={1.75} />
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] shadow-inner"
+              style={{
+                background: `linear-gradient(to bottom right, var(--header-icon-surface-from), var(--header-icon-surface-to))`,
+              }}
+            >
+              <Quote className="h-5 w-5 text-[var(--accent-icon)]" strokeWidth={1.75} />
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">Citations</h1>
@@ -238,7 +253,7 @@ export function CitationsPage() {
 
       <main className="relative z-10 mx-auto w-full max-w-[900px] flex-1 px-4 py-8 sm:px-8 sm:py-10">
         <form onSubmit={onSubmit} className="space-y-5">
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-6">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-5 shadow-[inset_0_1px_0_var(--inset-shine)] sm:p-6">
             <label htmlFor="citation-source" className="text-sm font-medium text-[var(--text)]">
               Source information
             </label>
@@ -252,7 +267,7 @@ export function CitationsPage() {
               disabled={loading}
               rows={6}
               placeholder="e.g. https://… or Smith, J. (2020). Learning Science. Penguin."
-              className="mt-3 w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--chrome-40)] px-4 py-3 text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--placeholder)] outline-none transition focus:border-purple-500/45 focus:ring-2 focus:ring-purple-500/15 disabled:opacity-50"
+              className="mt-3 w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--chrome-40)] px-4 py-3 text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--placeholder)] outline-none transition focus:border-[var(--focus-border-color)] focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-50"
             />
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
@@ -298,7 +313,7 @@ export function CitationsPage() {
               type="submit"
               disabled={loading || !sourceInput.trim() || (plan === "free" && remaining === 0)}
               className={cn(
-                "mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 py-3.5 text-base font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-950/40 transition hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 disabled:pointer-events-none disabled:opacity-40"
+                "mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 py-3.5 text-base font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-lg)] transition hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 disabled:pointer-events-none disabled:opacity-40"
               )}
             >
               {loading ? (
@@ -308,7 +323,7 @@ export function CitationsPage() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-5 w-5 text-amber-200/90" strokeWidth={2} />
+                  <Sparkles className="h-5 w-5 text-[var(--btn-primary-sparkle)]" strokeWidth={2} />
                   Generate citation
                 </>
               )}
@@ -316,7 +331,7 @@ export function CitationsPage() {
           </div>
 
           {error ? (
-            <div className="rounded-xl border border-red-500/25 bg-red-500/[0.08] px-4 py-3 text-sm text-red-200/95">
+            <div className="rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]">
               {error}
               {(error.includes("upgrade") || error.includes("Pro") || error.includes("free citations")) && (
                 <Link
@@ -390,7 +405,7 @@ export function CitationsPage() {
                       });
                       setSelectedStyle(h.selectedStyle);
                     }}
-                    className="w-full rounded-xl border border-[var(--sidebar-border)] bg-white/[0.03] px-4 py-3 text-left text-sm transition hover:border-[var(--border)] hover:bg-[var(--hover-bg-subtle)]"
+                    className="w-full rounded-xl border border-[var(--sidebar-border)] bg-[var(--surface-ghost)] px-4 py-3 text-left text-sm transition hover:border-[var(--border)] hover:bg-[var(--hover-bg-subtle)]"
                   >
                     <span className="font-medium text-[var(--text)] line-clamp-1">{h.sourceInput}</span>
                     <span className="mt-1 block text-xs text-[var(--muted)]">

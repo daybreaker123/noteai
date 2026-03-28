@@ -19,6 +19,7 @@ import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PRO_FEATURES } from "@/components/pro-plan-selector";
 import { cn } from "@/lib/cn";
+import { captureAnalytics } from "@/lib/analytics";
 import {
   formatUsd,
   proAnnualApproxPercentOff,
@@ -431,6 +432,12 @@ export function Landing() {
                 </ul>
                 <Link
                   href={billingInterval === "year" ? "/billing?interval=year" : "/billing"}
+                  onClick={() =>
+                    captureAnalytics("pro_upgrade_clicked", {
+                      placement: "landing_pricing",
+                      interval: billingInterval,
+                    })
+                  }
                   className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-500/15 transition hover:from-purple-500 hover:to-blue-500"
                 >
                   <Sparkles className="h-4 w-4" />

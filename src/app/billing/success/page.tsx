@@ -1,9 +1,15 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
+import { captureAnalytics } from "@/lib/analytics";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function BillingSuccessPage() {
+  React.useEffect(() => {
+    captureAnalytics("pro_upgrade_completed", {});
+  }, []);
+
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)] px-4">
       <div className="absolute right-4 top-4 sm:right-6 sm:top-6">

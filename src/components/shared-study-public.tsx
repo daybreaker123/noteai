@@ -17,6 +17,13 @@ export function SharedStudyPublic({ kind, cards, questions }: SharedStudyPublicP
   if (kind === "flashcards") {
     return <SharedFlashcardsPublic cards={cards} />;
   }
+  if (kind === "concept_map") {
+    return (
+      <p className="text-center text-sm leading-relaxed text-[var(--muted)]">
+        Interactive concept maps are available in the Studara app. This shared link is for flashcards and quizzes only.
+      </p>
+    );
+  }
   return <SharedQuizPublic questions={questions} />;
 }
 

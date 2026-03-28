@@ -25,6 +25,7 @@ export async function POST(req: Request) {
   try {
     const text = await anthropicComplete(system, userMessage, {
       maxTokens: 64,
+      /** Cost-efficient default: `claude-haiku-4-5-20251001` (see `ANTHROPIC_MODEL_HAIKU`). */
       model: ANTHROPIC_MODEL_HAIKU,
       usage: { userId: session.user.id },
     });

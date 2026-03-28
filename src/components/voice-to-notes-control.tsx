@@ -415,7 +415,7 @@ export function VoiceToNotesControl({
     <div
       role="menu"
       className={cn(
-        "absolute z-[80] min-w-[15rem] rounded-xl border border-[var(--border)] bg-[var(--surface-mid)] py-1 shadow-xl shadow-black/50",
+        "absolute z-[80] min-w-[15rem] rounded-xl border border-[var(--border)] bg-[var(--surface-mid)] py-1 shadow-[var(--shadow-brand-lg)]",
         isHero ? "left-0 right-0 mt-2" : "right-0 top-[calc(100%+6px)]"
       )}
     >
@@ -452,7 +452,7 @@ export function VoiceToNotesControl({
             aria-labelledby="voice-recording-title"
             aria-live="polite"
           >
-            <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-xl shadow-purple-950/40">
+            <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-[var(--shadow-brand-lg)]">
               <div className="flex items-center justify-center gap-2">
                 <span className="relative flex h-3 w-3">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-60" />
@@ -493,7 +493,7 @@ export function VoiceToNotesControl({
             aria-live="polite"
             aria-label="Transcribing and improving your notes"
           >
-            <div className="max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-xl shadow-purple-950/40">
+            <div className="max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-[var(--shadow-brand-lg)]">
               <div
                 className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-purple-400 border-t-transparent"
                 aria-hidden

@@ -38,7 +38,12 @@ export function parseConceptMapJson(raw: string): ConceptMapData | null {
   } catch {
     return null;
   }
-  const result = conceptMapJsonSchema.safeParse(parsed);
+  return parseConceptMapPayload(parsed);
+}
+
+/** Validate persisted or API `payload` objects (nodes + edges). */
+export function parseConceptMapPayload(payload: unknown): ConceptMapData | null {
+  const result = conceptMapJsonSchema.safeParse(payload);
   if (!result.success) return null;
   const data = result.data;
   const ids = new Set(data.nodes.map((n) => n.id));

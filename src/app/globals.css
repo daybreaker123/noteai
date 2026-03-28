@@ -83,6 +83,100 @@
   --tiptap-th-bg: rgba(255, 255, 255, 0.05);
   --tiptap-body: rgba(255, 255, 255, 0.9);
   --tiptap-img-border: rgba(255, 255, 255, 0.1);
+
+  /* Status & accents (readable on dark surfaces) */
+  --status-danger-fg: #fecaca;
+  --status-danger-fg-strong: #fca5a5;
+  --status-danger-bg: rgba(239, 68, 68, 0.14);
+  --status-danger-bg-elevated: rgba(239, 68, 68, 0.18);
+  --status-danger-border: rgba(248, 113, 113, 0.4);
+  --status-warning-fg: #fef3c7;
+  --status-warning-bg: rgba(245, 158, 11, 0.16);
+  --status-warning-border: rgba(251, 191, 36, 0.35);
+  --status-success-fg: #d1fae5;
+  --status-success-bg: rgba(16, 185, 129, 0.16);
+  --status-success-border: rgba(52, 211, 153, 0.45);
+  --status-info-fg: #cffafe;
+  --status-info-bg: rgba(6, 182, 212, 0.14);
+  --status-info-border: rgba(34, 211, 238, 0.4);
+  --accent-label: rgba(216, 180, 254, 0.95);
+  --accent-label-muted: rgba(196, 181, 253, 0.88);
+  --accent-icon: #c4b5fd;
+  --accent-nudge-fg: rgba(237, 233, 254, 0.95);
+  --accent-nudge-bg: rgba(139, 92, 246, 0.14);
+  --accent-nudge-border: rgba(167, 139, 250, 0.35);
+  --surface-ghost: rgba(255, 255, 255, 0.05);
+  --surface-ghost-hover: rgba(255, 255, 255, 0.08);
+  --inset-shine: rgba(255, 255, 255, 0.06);
+  --ring-inset-panel: rgba(255, 255, 255, 0.04);
+  --shadow-brand-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
+  --shadow-brand-md: 0 10px 40px -10px rgba(91, 33, 182, 0.35);
+  --shadow-composer-inset: rgba(0, 0, 0, 0.35);
+  --shadow-node: rgba(0, 0, 0, 0.45);
+  --editor-caret: #ffffff;
+  --annotation-unknown-decoration: rgba(255, 255, 255, 0.38);
+  --headline-stat-from: #fde68a;
+  --headline-stat-via: #fdba74;
+  --headline-stat-to: #fecdd3;
+  --stats-label-from: #ddd6fe;
+  --stats-label-to: #a5f3fc;
+  --category-dot-fallback: rgba(255, 255, 255, 0.22);
+  --accent-glow: 0 0 40px -12px rgba(139, 92, 246, 0.35);
+  /* Focus rings (selects, inputs) */
+  --focus-ring-color: rgba(167, 139, 250, 0.22);
+  --focus-border-color: rgba(167, 139, 250, 0.45);
+  /* Decorative page background blobs */
+  --page-glow-from: rgba(139, 92, 246, 0.14);
+  --page-glow-via: rgba(99, 102, 241, 0.1);
+  --page-glow-to: rgba(217, 70, 239, 0.1);
+  --page-glow-corner: rgba(79, 70, 229, 0.08);
+  /* Tool page header icon tile (gradient) */
+  --header-icon-surface-from: rgba(168, 85, 247, 0.22);
+  --header-icon-surface-to: rgba(56, 189, 248, 0.12);
+  /* Icon on primary gradient buttons (sparkle) */
+  --btn-primary-sparkle: rgba(254, 243, 199, 0.92);
+  /* Tutor / chat surfaces */
+  --tutor-header-icon-shadow: var(--shadow-brand-md);
+  --tutor-mobile-sidebar-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+  --tutor-composer-footer-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
+  --tutor-attach-active-glow: 0 0 20px color-mix(in oklab, var(--accent) 22%, transparent);
+  --tutor-attach-active-ring: color-mix(in oklab, var(--accent) 20%, transparent);
+  --tutor-dropzone-border: color-mix(in oklab, var(--accent) 70%, transparent);
+  --tutor-user-bubble-shadow: color-mix(in oklab, var(--accent) 10%, transparent);
+  --tutor-assistant-bubble-shadow: rgba(0, 0, 0, 0.2);
+  --tutor-input-hover-border: color-mix(in oklab, var(--accent) 30%, transparent);
+  --tutor-input-hover-bg: color-mix(in oklab, var(--accent) 10%, transparent);
+  --tutor-avatar-assistant-from: color-mix(in oklab, var(--accent2) 30%, transparent);
+  --tutor-avatar-assistant-to: color-mix(in oklab, var(--accent) 30%, transparent);
+  --tutor-avatar-assistant-icon: var(--status-success-fg);
+  --tutor-user-bubble-from: rgba(168, 85, 247, 0.35);
+  --tutor-user-bubble-mid: rgba(168, 85, 247, 0.22);
+  --tutor-user-bubble-to: rgba(59, 130, 246, 0.28);
+  --tutor-user-avatar-from: rgba(168, 85, 247, 0.45);
+  --tutor-user-avatar-to: rgba(59, 130, 246, 0.35);
+  --tutor-sidebar-active-border: color-mix(in oklab, var(--accent) 35%, transparent);
+  --tutor-sidebar-active-from: rgba(168, 85, 247, 0.15);
+  --tutor-sidebar-active-to: rgba(59, 130, 246, 0.1);
+  --tutor-sidebar-active-shadow: color-mix(in oklab, var(--accent) 10%, transparent);
+  --tutor-typing-dot: rgba(255, 255, 255, 0.45);
+  --tutor-send-btn-shadow: var(--shadow-brand-md);
+  --tutor-notes-toggle-shadow: var(--tutor-attach-active-glow);
+  --tutor-notes-toggle-ring: var(--tutor-attach-active-ring);
+  --concept-map-handle-root: color-mix(in oklab, var(--inverse-text) 90%, transparent);
+  /* Concept map nodes */
+  --concept-map-root-shadow: var(--shadow-brand-lg);
+  --concept-map-root-ring: rgba(255, 255, 255, 0.15);
+  --concept-map-node-border: color-mix(in oklab, var(--accent) 35%, transparent);
+  --concept-map-node-border-strong: color-mix(in oklab, var(--accent) 50%, transparent);
+  --concept-map-handle: color-mix(in oklab, var(--accent) 90%, transparent);
+  /* Essay editor highlight legend (matches typical marker hues) */
+  --annotation-legend-red: rgba(252, 165, 165, 0.92);
+  --annotation-legend-yellow: rgba(253, 230, 138, 0.9);
+  --annotation-legend-blue: rgba(125, 211, 252, 0.92);
+  --annotation-legend-orange: rgba(253, 186, 116, 0.92);
+  /* Essay structured panel grade header wash */
+  --structured-grade-header-from: rgba(168, 85, 247, 0.12);
+  --structured-grade-header-to: rgba(59, 130, 246, 0.1);
 }
 
 [data-theme="light"] {
@@ -162,6 +256,91 @@
   --tiptap-th-bg: rgba(26, 26, 46, 0.06);
   --tiptap-body: rgba(26, 26, 46, 0.92);
   --tiptap-img-border: rgba(26, 26, 46, 0.12);
+
+  --status-danger-fg: #991b1b;
+  --status-danger-fg-strong: #7f1d1d;
+  --status-danger-bg: rgba(239, 68, 68, 0.1);
+  --status-danger-bg-elevated: rgba(239, 68, 68, 0.14);
+  --status-danger-border: rgba(185, 28, 28, 0.35);
+  --status-warning-fg: #92400e;
+  --status-warning-bg: rgba(245, 158, 11, 0.12);
+  --status-warning-border: rgba(217, 119, 6, 0.38);
+  --status-success-fg: #047857;
+  --status-success-bg: rgba(16, 185, 129, 0.1);
+  --status-success-border: rgba(5, 150, 105, 0.4);
+  --status-info-fg: #0e7490;
+  --status-info-bg: rgba(6, 182, 212, 0.1);
+  --status-info-border: rgba(8, 145, 178, 0.38);
+  --accent-label: #5b21b6;
+  --accent-label-muted: #6d28d9;
+  --accent-icon: #6d28d9;
+  --accent-nudge-fg: var(--text);
+  --accent-nudge-bg: rgba(91, 33, 182, 0.08);
+  --accent-nudge-border: rgba(91, 33, 182, 0.22);
+  --surface-ghost: rgba(26, 26, 46, 0.05);
+  --surface-ghost-hover: rgba(26, 26, 46, 0.09);
+  --inset-shine: rgba(26, 26, 46, 0.07);
+  --ring-inset-panel: rgba(26, 26, 46, 0.08);
+  --shadow-brand-lg: 0 25px 50px -12px rgba(26, 26, 46, 0.18);
+  --shadow-brand-md: 0 10px 40px -10px rgba(124, 58, 237, 0.2);
+  --shadow-composer-inset: rgba(26, 26, 46, 0.1);
+  --shadow-node: rgba(26, 26, 46, 0.12);
+  --editor-caret: #1a1a2e;
+  --annotation-unknown-decoration: rgba(26, 26, 46, 0.35);
+  --headline-stat-from: #b45309;
+  --headline-stat-via: #c2410c;
+  --headline-stat-to: #be123c;
+  --stats-label-from: #5b21b6;
+  --stats-label-to: #0e7490;
+  --category-dot-fallback: rgba(26, 26, 46, 0.2);
+  --accent-glow: 0 0 40px -12px rgba(124, 58, 237, 0.22);
+  --focus-ring-color: rgba(124, 58, 237, 0.18);
+  --focus-border-color: rgba(91, 33, 182, 0.38);
+  --page-glow-from: rgba(124, 58, 237, 0.08);
+  --page-glow-via: rgba(99, 102, 241, 0.06);
+  --page-glow-to: rgba(192, 38, 211, 0.06);
+  --page-glow-corner: rgba(79, 70, 229, 0.05);
+  --header-icon-surface-from: rgba(124, 58, 237, 0.12);
+  --header-icon-surface-to: rgba(6, 182, 212, 0.1);
+  --btn-primary-sparkle: rgba(255, 255, 255, 0.95);
+  --tutor-header-icon-shadow: var(--shadow-brand-md);
+  --tutor-mobile-sidebar-shadow: 0 25px 50px -12px rgba(26, 26, 46, 0.18);
+  --tutor-composer-footer-shadow: 0 -12px 40px rgba(26, 26, 46, 0.12);
+  --tutor-attach-active-glow: 0 0 20px color-mix(in oklab, var(--accent) 18%, transparent);
+  --tutor-attach-active-ring: color-mix(in oklab, var(--accent) 22%, transparent);
+  --tutor-dropzone-border: color-mix(in oklab, var(--accent) 55%, transparent);
+  --tutor-user-bubble-shadow: color-mix(in oklab, var(--accent) 12%, transparent);
+  --tutor-assistant-bubble-shadow: rgba(26, 26, 46, 0.08);
+  --tutor-input-hover-border: color-mix(in oklab, var(--accent) 28%, transparent);
+  --tutor-input-hover-bg: color-mix(in oklab, var(--accent) 8%, transparent);
+  --tutor-avatar-assistant-from: color-mix(in oklab, var(--accent2) 28%, transparent);
+  --tutor-avatar-assistant-to: color-mix(in oklab, var(--accent) 25%, transparent);
+  --tutor-avatar-assistant-icon: var(--status-success-fg);
+  --tutor-user-bubble-from: rgba(124, 58, 237, 0.14);
+  --tutor-user-bubble-mid: rgba(124, 58, 237, 0.09);
+  --tutor-user-bubble-to: rgba(37, 99, 235, 0.12);
+  --tutor-user-avatar-from: rgba(124, 58, 237, 0.22);
+  --tutor-user-avatar-to: rgba(37, 99, 235, 0.16);
+  --tutor-sidebar-active-border: color-mix(in oklab, var(--accent) 32%, transparent);
+  --tutor-sidebar-active-from: rgba(124, 58, 237, 0.1);
+  --tutor-sidebar-active-to: rgba(37, 99, 235, 0.07);
+  --tutor-sidebar-active-shadow: rgba(26, 26, 46, 0.08);
+  --tutor-typing-dot: rgba(26, 26, 46, 0.28);
+  --tutor-send-btn-shadow: var(--shadow-brand-md);
+  --tutor-notes-toggle-shadow: var(--tutor-attach-active-glow);
+  --tutor-notes-toggle-ring: var(--tutor-attach-active-ring);
+  --concept-map-handle-root: color-mix(in oklab, var(--inverse-text) 92%, transparent);
+  --concept-map-root-shadow: var(--shadow-brand-lg);
+  --concept-map-root-ring: rgba(255, 255, 255, 0.2);
+  --concept-map-node-border: color-mix(in oklab, var(--accent) 32%, transparent);
+  --concept-map-node-border-strong: color-mix(in oklab, var(--accent) 48%, transparent);
+  --concept-map-handle: color-mix(in oklab, var(--accent) 88%, transparent);
+  --annotation-legend-red: #991b1b;
+  --annotation-legend-yellow: #a16207;
+  --annotation-legend-blue: #0369a1;
+  --annotation-legend-orange: #c2410c;
+  --structured-grade-header-from: rgba(124, 58, 237, 0.06);
+  --structured-grade-header-to: rgba(37, 99, 235, 0.06);
 }
 
 /* Overlays that must blend with theme background */
@@ -334,23 +513,18 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
   }
 }
 
-/* Tiptap note editor */
-.studara-tiptap-root .studara-tiptap {
-  min-height: min(42dvh, 240px);
-}
-
-@media (min-width: 768px) {
-  .studara-tiptap-root .studara-tiptap {
-    min-height: 280px;
-  }
-}
-
+/* Tiptap note editor — min-height / typography rhythm set on the node via Tailwind in note-rich-text-editor */
 .studara-tiptap:focus {
   outline: none;
 }
 
+.studara-tiptap {
+  text-align: left;
+}
+
 .studara-tiptap p {
   margin: 0.35em 0;
+  line-height: inherit;
 }
 
 .studara-tiptap h1 {
@@ -485,6 +659,27 @@ body.landing-hide-scrollbar::-webkit-scrollbar {
   height: 0;
   color: var(--tiptap-placeholder);
   pointer-events: none;
+}
+
+/* Auto-generated note title — brief fade / brightness pulse when AI fills the title */
+@keyframes studara-title-auto-reveal {
+  0% {
+    opacity: 0.58;
+    filter: brightness(0.9);
+  }
+  40% {
+    opacity: 1;
+    filter: brightness(1.1);
+  }
+  100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+.studara-title-auto-reveal {
+  animation: studara-title-auto-reveal 1.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 28%, transparent);
 }
 
 /* Dashboard note cards — hide scrollbars; line-clamp / ellipsis unchanged */

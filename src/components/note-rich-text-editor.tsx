@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { useEditor, useEditorState, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
@@ -37,6 +37,9 @@ import {
   Columns2,
   Undo2,
   Redo2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
 
 const lowlight = createLowlight(common);
@@ -58,12 +61,14 @@ function ToolbarButton({
     <button
       type="button"
       title={title}
+      aria-label={title}
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] disabled:pointer-events-none disabled:opacity-40 md:h-8 md:w-8",
-        active && "bg-[var(--btn-default-bg)] text-[var(--text)] ring-1 ring-[var(--border)]"
+        "flex h-7 w-7 shrink-0 touch-manipulation items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] disabled:pointer-events-none disabled:opacity-40",
+        active &&
+          "bg-[color-mix(in_oklab,var(--accent)_20%,transparent)] text-[var(--accent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent)_38%,transparent)]"
       )}
     >
       {children}
@@ -72,7 +77,15 @@ function ToolbarButton({
 }
 
 function ToolbarDivider() {
-  return <div className="mx-1 h-5 w-px shrink-0 self-center bg-[var(--border-subtle)]" aria-hidden />;
+  return <div className="mx-1 h-4 w-px shrink-0 self-center bg-[var(--border)]/55" aria-hidden />;
+}
+
+function currentTextAlign(editor: Editor): "left" | "center" | "right" {
+  const p = editor.getAttributes("paragraph").textAlign as string | undefined;
+  const h = editor.getAttributes("heading").textAlign as string | undefined;
+  const raw = p ?? h;
+  if (raw === "center" || raw === "right" || raw === "left") return raw;
+  return "left";
 }
 
 function insertImageFromFile(editor: Editor | null, noteId: string | null, file: File) {
@@ -104,115 +117,144 @@ function insertImageFromFile(editor: Editor | null, noteId: string | null, file:
   void run();
 }
 
-function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: string | null }) {
+function NoteEditorToolbar({ editor, noteId }: { editor: Editor; noteId: string | null }) {
   const fileRef = React.useRef<HTMLInputElement>(null);
 
-  if (!editor) return null;
+  useEditorState({
+    editor,
+    selector: (snap) => snap.transactionNumber,
+  });
 
   const inTable = editor.isActive("table");
+  const align = currentTextAlign(editor);
+  const iconClass = "h-3.5 w-3.5";
 
   return (
-    <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--editor-chrome-bg)]">
-      <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-2 py-1.5 md:px-3 md:py-2">
-        <div className="flex flex-wrap items-center gap-0.5">
+    <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg)]">
+      <div className="flex min-h-8 min-w-0 items-center gap-0 overflow-x-auto px-6 py-1 [scrollbar-width:none] md:py-1 [&::-webkit-scrollbar]:hidden">
+        {/* 1) Undo / Redo */}
+        <div className="flex shrink-0 items-center gap-px">
+          <ToolbarButton
+            title="Undo (⌘Z)"
+            disabled={!editor.can().undo()}
+            onClick={() => editor.chain().focus().undo().run()}
+          >
+            <Undo2 className={iconClass} strokeWidth={2} />
+          </ToolbarButton>
+          <ToolbarButton
+            title="Redo (⌘⇧Z)"
+            disabled={!editor.can().redo()}
+            onClick={() => editor.chain().focus().redo().run()}
+          >
+            <Redo2 className={iconClass} strokeWidth={2} />
+          </ToolbarButton>
+        </div>
+
+        <ToolbarDivider />
+
+        {/* 2) Text style */}
+        <div className="flex shrink-0 items-center gap-px">
           <ToolbarButton
             title="Bold (⌘B)"
             active={editor.isActive("bold")}
             onClick={() => editor.chain().focus().toggleBold().run()}
           >
-            <Bold className="h-4 w-4" strokeWidth={2} />
+            <Bold className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <ToolbarButton
             title="Italic (⌘I)"
             active={editor.isActive("italic")}
             onClick={() => editor.chain().focus().toggleItalic().run()}
           >
-            <Italic className="h-4 w-4" strokeWidth={2} />
+            <Italic className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <ToolbarButton
             title="Underline (⌘U)"
             active={editor.isActive("underline")}
             onClick={() => editor.chain().focus().toggleUnderline().run()}
           >
-            <UnderlineIcon className="h-4 w-4" strokeWidth={2} />
+            <UnderlineIcon className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <ToolbarButton
             title="Strikethrough"
             active={editor.isActive("strike")}
             onClick={() => editor.chain().focus().toggleStrike().run()}
           >
-            <Strikethrough className="h-4 w-4" strokeWidth={2} />
+            <Strikethrough className={iconClass} strokeWidth={2} />
           </ToolbarButton>
         </div>
 
         <ToolbarDivider />
 
-        <div className="flex flex-wrap items-center gap-0.5">
+        {/* 3) Headings */}
+        <div className="flex shrink-0 items-center gap-px">
           <ToolbarButton
             title="Heading 1"
             active={editor.isActive("heading", { level: 1 })}
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
           >
-            <Heading1 className="h-4 w-4" strokeWidth={2} />
+            <Heading1 className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <ToolbarButton
             title="Heading 2"
             active={editor.isActive("heading", { level: 2 })}
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           >
-            <Heading2 className="h-4 w-4" strokeWidth={2} />
+            <Heading2 className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <ToolbarButton
             title="Heading 3"
             active={editor.isActive("heading", { level: 3 })}
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
           >
-            <Heading3 className="h-4 w-4" strokeWidth={2} />
+            <Heading3 className={iconClass} strokeWidth={2} />
           </ToolbarButton>
         </div>
 
         <ToolbarDivider />
 
-        <div className="flex flex-wrap items-center gap-0.5">
+        {/* 4) Lists */}
+        <div className="flex shrink-0 items-center gap-px">
           <ToolbarButton
             title="Bullet list"
             active={editor.isActive("bulletList")}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
           >
-            <List className="h-4 w-4" strokeWidth={2} />
+            <List className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <ToolbarButton
             title="Numbered list"
             active={editor.isActive("orderedList")}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
           >
-            <ListOrdered className="h-4 w-4" strokeWidth={2} />
+            <ListOrdered className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <ToolbarButton
             title="Checklist"
             active={editor.isActive("taskList")}
             onClick={() => editor.chain().focus().toggleTaskList().run()}
           >
-            <ListChecks className="h-4 w-4" strokeWidth={2} />
+            <ListChecks className={iconClass} strokeWidth={2} />
           </ToolbarButton>
         </div>
 
         <ToolbarDivider />
 
-        <div className="flex flex-wrap items-center gap-0.5">
+        {/* 5) Insert: Table, Image, Divider */}
+        <div className="flex shrink-0 items-center gap-px">
           <ToolbarButton
             title="Insert table"
             onClick={() =>
               editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
             }
           >
-            <Table2 className="h-4 w-4" strokeWidth={2} />
-          </ToolbarButton>
-          <ToolbarButton title="Divider" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
-            <Minus className="h-4 w-4" strokeWidth={2} />
+            <Table2 className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <ToolbarButton title="Insert image" onClick={() => fileRef.current?.click()}>
-            <ImageIcon className="h-4 w-4" strokeWidth={2} />
+            <ImageIcon className={iconClass} strokeWidth={2} />
+          </ToolbarButton>
+          <ToolbarButton title="Horizontal divider" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+            <Minus className={iconClass} strokeWidth={2} />
           </ToolbarButton>
           <input
             ref={fileRef}
@@ -227,56 +269,64 @@ function NoteEditorToolbar({ editor, noteId }: { editor: Editor | null; noteId: 
           />
         </div>
 
+        <ToolbarDivider />
+
+        {/* 6) Alignment */}
+        <div className="flex shrink-0 items-center gap-px">
+          <ToolbarButton
+            title="Align left"
+            active={align === "left"}
+            onClick={() => editor.chain().focus().setTextAlign("left").run()}
+          >
+            <AlignLeft className={iconClass} strokeWidth={2} />
+          </ToolbarButton>
+          <ToolbarButton
+            title="Align center"
+            active={align === "center"}
+            onClick={() => editor.chain().focus().setTextAlign("center").run()}
+          >
+            <AlignCenter className={iconClass} strokeWidth={2} />
+          </ToolbarButton>
+          <ToolbarButton
+            title="Align right"
+            active={align === "right"}
+            onClick={() => editor.chain().focus().setTextAlign("right").run()}
+          >
+            <AlignRight className={iconClass} strokeWidth={2} />
+          </ToolbarButton>
+        </div>
+
         {inTable ? (
           <>
             <ToolbarDivider />
-            <div className="flex flex-wrap items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-px">
               <ToolbarButton title="Add row above" onClick={() => editor.chain().focus().addRowBefore().run()}>
-                <Rows2 className="h-4 w-4 scale-y-[-1]" strokeWidth={2} />
+                <Rows2 className={`${iconClass} scale-y-[-1]`} strokeWidth={2} />
               </ToolbarButton>
               <ToolbarButton title="Add row below" onClick={() => editor.chain().focus().addRowAfter().run()}>
-                <Rows2 className="h-4 w-4" strokeWidth={2} />
+                <Rows2 className={iconClass} strokeWidth={2} />
               </ToolbarButton>
               <ToolbarButton title="Delete row" onClick={() => editor.chain().focus().deleteRow().run()}>
-                <Trash2 className="h-4 w-4" strokeWidth={2} />
+                <Trash2 className={iconClass} strokeWidth={2} />
               </ToolbarButton>
               <ToolbarButton
                 title="Add column before"
                 onClick={() => editor.chain().focus().addColumnBefore().run()}
               >
-                <Columns2 className="h-4 w-4 scale-x-[-1]" strokeWidth={2} />
+                <Columns2 className={`${iconClass} scale-x-[-1]`} strokeWidth={2} />
               </ToolbarButton>
               <ToolbarButton title="Add column after" onClick={() => editor.chain().focus().addColumnAfter().run()}>
-                <Columns2 className="h-4 w-4" strokeWidth={2} />
+                <Columns2 className={iconClass} strokeWidth={2} />
               </ToolbarButton>
               <ToolbarButton title="Delete column" onClick={() => editor.chain().focus().deleteColumn().run()}>
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+                <Trash2 className={iconClass} strokeWidth={2} />
               </ToolbarButton>
               <ToolbarButton title="Delete table" onClick={() => editor.chain().focus().deleteTable().run()}>
-                <Table2 className="h-4 w-4 opacity-60" strokeWidth={2} />
+                <Table2 className={`${iconClass} opacity-60`} strokeWidth={2} />
               </ToolbarButton>
             </div>
           </>
         ) : null}
-
-        <div className="min-w-[4px] flex-1" aria-hidden />
-
-        <div className="flex flex-wrap items-center gap-0.5">
-          <ToolbarButton
-            title="Undo (⌘Z)"
-            disabled={!editor.can().undo()}
-            onClick={() => editor.chain().focus().undo().run()}
-          >
-            <Undo2 className="h-4 w-4" strokeWidth={2} />
-          </ToolbarButton>
-          <ToolbarButton
-            title="Redo (⌘⇧Z)"
-            disabled={!editor.can().redo()}
-            onClick={() => editor.chain().focus().redo().run()}
-          >
-            <Redo2 className="h-4 w-4" strokeWidth={2} />
-          </ToolbarButton>
-        </div>
       </div>
     </div>
   );
@@ -333,7 +383,7 @@ export function NoteRichTextEditor({
     editorProps: {
       attributes: {
         class:
-          "studara-tiptap note-editor-scrollbar min-h-[min(40dvh,220px)] max-w-[720px] mx-auto w-full px-4 py-5 text-[17px] leading-[1.65] text-[var(--tiptap-body)] outline-none md:min-h-[260px] md:px-8 md:py-8",
+          "studara-tiptap min-h-[min(40dvh,220px)] w-full max-w-none px-6 py-5 text-left text-base leading-[1.7] text-[var(--tiptap-body)] outline-none md:min-h-[260px] md:py-6",
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -376,19 +426,22 @@ export function NoteRichTextEditor({
   return (
     <div
       className={cn(
-        "studara-tiptap-root flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--editor-surface)] md:rounded-xl md:border",
+        "studara-tiptap-root flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-[var(--bg)]",
         className
       )}
       onDrop={onDrop}
       onDragOver={(e) => e.preventDefault()}
     >
-      <NoteEditorToolbar editor={editor} noteId={noteId} />
+      {editor ? <NoteEditorToolbar editor={editor} noteId={noteId} /> : null}
       {aiToolbar != null ? (
-        <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--editor-chrome-bg)]">{aiToolbar}</div>
+        <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg)]">{aiToolbar}</div>
       ) : null}
-      <EditorContent editor={editor} className="min-h-0 flex-1 overflow-y-auto bg-[var(--editor-surface)]" />
+      <EditorContent
+        editor={editor}
+        className="note-editor-scrollbar min-h-0 flex-1 bg-[var(--bg)] [&_.tiptap]:bg-[var(--bg)] [&_.ProseMirror]:bg-[var(--bg)] [&_.ProseMirror]:text-left"
+      />
       {statusBar != null ? (
-        <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--editor-chrome-bg)] px-3 py-1.5 md:px-4">
+        <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg)] px-6 py-1.5 md:px-6">
           {statusBar}
         </div>
       ) : null}

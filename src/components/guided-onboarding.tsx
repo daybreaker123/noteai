@@ -349,7 +349,7 @@ export function GuidedOnboarding({
           )}
           {showFlashcardCoach && (
             <BottomCoachMark>
-              Flashcards generated in seconds. Click any card to flip it.
+              Flashcards generated in seconds. Flip a card, then rate Got it, Almost, or Missed it for spaced repetition.
             </BottomCoachMark>
           )}
         </>

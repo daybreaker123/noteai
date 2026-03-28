@@ -50,7 +50,7 @@ export default async function SharedStudyPage({ params }: Props) {
 
   return (
     <SharedPublicShell pageTitle={result.title}>
-      <div className="rounded-2xl border border-[var(--border)] bg-white/[0.03] px-5 py-6 sm:px-8 sm:py-8">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-ghost)] px-5 py-6 sm:px-8 sm:py-8">
         <SharedStudyPublic kind={result.kind} cards={result.cards} questions={result.questions} />
       </div>
     </SharedPublicShell>

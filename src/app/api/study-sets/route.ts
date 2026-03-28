@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { StudySetKind, StudySetSummary } from "@/lib/api-types";
+import { parseConceptMapPayload } from "@/lib/concept-map-types";
 import { studySetItemCount } from "@/lib/study-set-utils";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -41,11 +42,11 @@ export async function POST(req: Request) {
     title?: string;
     note_id?: string | null;
     note_ids?: string[];
-    payload?: { cards?: unknown[]; questions?: unknown[] };
+    payload?: { cards?: unknown[]; questions?: unknown[]; nodes?: unknown[]; edges?: unknown[] };
   };
 
-  if (body.kind !== "flashcards" && body.kind !== "quiz") {
-    return NextResponse.json({ error: "kind must be flashcards or quiz" }, { status: 400 });
+  if (body.kind !== "flashcards" && body.kind !== "quiz" && body.kind !== "concept_map") {
+    return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
   }
 
   const title = (body.title ?? "").trim() || "Study set";
@@ -54,16 +55,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "payload required" }, { status: 400 });
   }
 
+  let rowPayload: Record<string, unknown>;
+
   if (body.kind === "flashcards") {
     const cards = (payload as { cards?: unknown }).cards;
     if (!Array.isArray(cards) || cards.length === 0) {
       return NextResponse.json({ error: "payload.cards must be a non-empty array" }, { status: 400 });
     }
-  } else {
+    rowPayload = { cards: (payload as { cards: unknown[] }).cards };
+  } else if (body.kind === "quiz") {
     const questions = (payload as { questions?: unknown }).questions;
     if (!Array.isArray(questions) || questions.length === 0) {
       return NextResponse.json({ error: "payload.questions must be a non-empty array" }, { status: 400 });
     }
+    rowPayload = { questions: (payload as { questions: unknown[] }).questions };
+  } else {
+    const graph = parseConceptMapPayload(payload);
+    if (!graph) {
+      return NextResponse.json({ error: "Invalid concept map payload" }, { status: 400 });
+    }
+    rowPayload = { nodes: graph.nodes, edges: graph.edges };
   }
 
   let noteIds = sanitizeNoteIds(body.note_ids);
@@ -77,13 +88,7 @@ export async function POST(req: Request) {
 
   const noteIdForRow = noteIds[0] ?? null;
 
-  /** Must match `study_sets.kind` (`flashcards` | `quiz`). */
   const studySetKind = body.kind;
-
-  const rowPayload =
-    studySetKind === "flashcards"
-      ? { cards: (payload as { cards: unknown[] }).cards }
-      : { questions: (payload as { questions: unknown[] }).questions };
 
   const { data, error } = await supabaseAdmin
     .from("study_sets")

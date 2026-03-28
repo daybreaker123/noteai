@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { captureAnalytics } from "@/lib/analytics";
 import type { Category, Note, ApiError } from "./api-types";
 import type { StreakMilestone } from "./streak-client";
 import { FREE_NOTE_TOTAL } from "./plan-limits";
@@ -131,6 +132,7 @@ export function useNotesRemote(
       emitStreakFromResponse(json);
       const note = json as Note;
       setNotes((prev) => [...prev, note]);
+      captureAnalytics("note_created", { source: "create", note_id: note.id });
       return note;
     },
 
@@ -176,6 +178,7 @@ export function useNotesRemote(
         updated_at: raw.updated_at,
       };
       setNotes((prev) => [...prev, note]);
+      captureAnalytics("note_created", { source: "import_document", note_id: note.id });
       return { ok: true, note, truncated };
     },
 
@@ -211,6 +214,29 @@ export function useNotesRemote(
       if (!res.ok) return false;
       setNotes((prev) => prev.filter((n) => n.id !== id));
       return true;
+    },
+
+    /** Load one note from the server and merge into `notes` (authoritative body for editor open). */
+    async fetchNoteById(id: string): Promise<Note | null> {
+      if (!id || id.startsWith("draft-")) return null;
+      try {
+        const res = await fetch(`/api/notes/${id}`, { credentials: "include", cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as Note | ApiError | null;
+        if (!res.ok || !json || typeof json !== "object" || !("id" in json)) {
+          return null;
+        }
+        const note = json as Note;
+        setNotes((prev) => {
+          const ix = prev.findIndex((n) => n.id === note.id);
+          if (ix === -1) return [...prev, note];
+          const next = [...prev];
+          next[ix] = note;
+          return next;
+        });
+        return note;
+      } catch {
+        return null;
+      }
     },
 
     async createCategory(name: string, color?: string): Promise<Category | null> {

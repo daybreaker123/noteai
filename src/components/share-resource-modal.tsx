@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X, Link2, Copy, Loader2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
+import { captureAnalytics } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
 
 type ShareResourceModalProps = {
@@ -116,6 +117,9 @@ export function ShareResourceModal({
     setCopyBusy(true);
     try {
       await navigator.clipboard.writeText(fullUrl);
+      if (resourceType === "note") {
+        captureAnalytics("note_shared", { resource_id: resourceId });
+      }
       onCopied();
     } catch {
       setError("Could not copy — try selecting the link manually.");
@@ -133,7 +137,7 @@ export function ShareResourceModal({
       aria-modal="true"
       aria-labelledby="share-modal-title"
     >
-      <Card className="relative w-full max-w-md border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-xl">
+      <Card className="relative w-full max-w-md border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-[var(--shadow-brand-lg)]">
         <button
           type="button"
           onClick={onClose}

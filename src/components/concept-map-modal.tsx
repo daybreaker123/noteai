@@ -16,71 +16,53 @@ import {
   type NodeTypes,
   Handle,
   Position,
-  MarkerType,
 } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { X, ZoomIn, ZoomOut, Maximize2, ImageDown, FileText, Loader2 } from "lucide-react";
+import { X, ZoomIn, ZoomOut, Maximize2, ImageDown, FileText, Loader2, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui";
 import { useStudaraTheme } from "@/components/theme-provider";
 import type { ConceptMapData } from "@/lib/concept-map-types";
+import {
+  buildConceptMapFlowElements,
+  type ConceptNodeFlowData,
+} from "@/lib/concept-map-layout";
 
-type ConceptNodeData = { label: string; description: string };
-
-function ConceptMapNode({ data }: NodeProps) {
-  const d = data as ConceptNodeData;
-  const label = d.label;
-  const description = d.description;
+function ConceptMapNode({ data }: NodeProps<Node<ConceptNodeFlowData>>) {
+  const { label, description, tier } = data;
+  const box =
+    tier === "root"
+      ? "w-[272px] min-h-[100px] rounded-2xl border-0 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 px-4 py-3.5 text-center shadow-[var(--concept-map-root-shadow)] ring-1 ring-[var(--concept-map-root-ring)]"
+      : tier === "primary"
+        ? "w-[228px] min-h-[86px] rounded-xl border-2 border-[var(--concept-map-node-border-strong)] bg-[var(--surface-mid)] px-3.5 py-3 text-center shadow-[0_10px_28px_-8px_var(--shadow-node)]"
+        : "w-[188px] min-h-[76px] rounded-lg border border-[var(--concept-map-node-border)] bg-[var(--surface-mid)] px-3 py-2.5 text-center shadow-[0_6px_18px_-6px_var(--shadow-node)]";
+  const titleClass =
+    tier === "root"
+      ? "text-base font-bold leading-snug text-[var(--inverse-text)]"
+      : tier === "primary"
+        ? "text-sm font-semibold leading-snug text-[var(--text)]"
+        : "text-xs font-semibold leading-snug text-[var(--text)]";
+  const descClass =
+    tier === "root"
+      ? "mt-1.5 text-center text-xs leading-snug text-[color-mix(in_oklab,var(--inverse-text)_85%,transparent)]"
+      : tier === "primary"
+        ? "mt-1.5 text-center text-[11px] leading-snug text-[var(--muted)]"
+        : "mt-1 text-center text-[10px] leading-snug text-[var(--muted)]";
+  const handleClass =
+    tier === "root"
+      ? "!h-2.5 !w-2.5 !border-0 !bg-[var(--concept-map-handle-root)]"
+      : "!h-2 !w-2 !border-0 !bg-[var(--concept-map-handle)]";
   return (
-    <div className="w-[min(200px,42vw)] rounded-xl border-2 border-purple-500/45 bg-[var(--surface-mid)] px-3 py-3 text-center shadow-lg shadow-black/40">
-      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-purple-400/90" />
-      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-0 !bg-purple-400/90" />
-      <p className="text-sm font-semibold leading-snug text-[var(--text)]">{label}</p>
-      {description ? <p className="mt-1.5 text-center text-xs leading-snug text-[var(--muted)]">{description}</p> : null}
-      <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-0 !bg-purple-400/90" />
-      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-purple-400/90" />
+    <div className={box}>
+      <Handle type="target" position={Position.Top} className={handleClass} />
+      <p className={titleClass}>{label}</p>
+      {description ? <p className={descClass}>{description}</p> : null}
+      <Handle type="source" position={Position.Bottom} className={handleClass} />
     </div>
   );
 }
 
 const nodeTypes: NodeTypes = { concept: ConceptMapNode };
-
-function buildFlowElements(data: ConceptMapData, edgeLabelBg: string): { nodes: Node[]; edges: Edge[] } {
-  const n = data.nodes.length;
-  const cx = 480;
-  const cy = 340;
-  const radius = Math.max(240, 72 * Math.sqrt(n));
-  const nodes: Node[] = data.nodes.map((node, i) => {
-    const angle = (2 * Math.PI * i) / Math.max(n, 1) - Math.PI / 2;
-    return {
-      id: node.id,
-      type: "concept",
-      position: {
-        x: cx + radius * Math.cos(angle) - 100,
-        y: cy + radius * Math.sin(angle) - 48,
-      },
-      data: { label: node.label, description: node.description },
-    };
-  });
-  const edges: Edge[] = data.edges.map((e, i) => ({
-    id: `e-${e.source}-${e.target}-${i}`,
-    source: e.source,
-    target: e.target,
-    label: e.label,
-    type: "smoothstep",
-    style: { stroke: "rgba(148, 163, 184, 0.45)", strokeWidth: 1.25 },
-    labelStyle: { fill: "#94a3b8", fontSize: 11, fontWeight: 500 },
-    labelBgStyle: { fill: edgeLabelBg, fillOpacity: 0.95 },
-    labelBgPadding: [6, 4] as [number, number],
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: "rgba(148, 163, 184, 0.5)",
-      width: 12,
-      height: 12,
-    },
-  }));
-  return { nodes, edges };
-}
 
 function ConceptMapCanvas({
   graph,
@@ -89,6 +71,10 @@ function ConceptMapCanvas({
   sourceTitle,
   onSaveAsNote,
   saveNoteLoading,
+  showSaveAsNote,
+  onSaveToStudySets,
+  saveStudySetsLoading,
+  showSaveToStudySets,
 }: {
   graph: ConceptMapData;
   flowWrapRef: React.RefObject<HTMLDivElement | null>;
@@ -96,10 +82,14 @@ function ConceptMapCanvas({
   sourceTitle: string;
   onSaveAsNote: () => void | Promise<void>;
   saveNoteLoading: boolean;
+  showSaveAsNote: boolean;
+  onSaveToStudySets: () => void | Promise<void>;
+  saveStudySetsLoading: boolean;
+  showSaveToStudySets: boolean;
 }) {
   const { theme } = useStudaraTheme();
   const edgeLabelBg = theme === "light" ? "#ffffff" : "#12121a";
-  const initial = React.useMemo(() => buildFlowElements(graph, edgeLabelBg), [graph, edgeLabelBg]);
+  const initial = React.useMemo(() => buildConceptMapFlowElements(graph, edgeLabelBg), [graph, edgeLabelBg]);
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
   const { fitView, zoomIn, zoomOut } = useReactFlow();
@@ -161,17 +151,36 @@ function ConceptMapCanvas({
             {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageDown className="h-3.5 w-3.5" />}
             Save as Image
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="gap-1.5 border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
-            disabled={saveNoteLoading}
-            onClick={() => void onSaveAsNote()}
-          >
-            {saveNoteLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-            Save as Note
-          </Button>
+          {showSaveToStudySets ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
+              disabled={saveStudySetsLoading}
+              onClick={() => void onSaveToStudySets()}
+            >
+              {saveStudySetsLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Bookmark className="h-3.5 w-3.5" />
+              )}
+              Save Concept Map
+            </Button>
+          ) : null}
+          {showSaveAsNote ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
+              disabled={saveNoteLoading}
+              onClick={() => void onSaveAsNote()}
+            >
+              {saveNoteLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              Save as Note
+            </Button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
@@ -243,6 +252,10 @@ export function ConceptMapModal({
   sourceTitle,
   onSaveAsNote,
   saveNoteLoading,
+  showSaveAsNote = true,
+  onSaveToStudySets,
+  saveStudySetsLoading,
+  showSaveToStudySets = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -250,6 +263,12 @@ export function ConceptMapModal({
   sourceTitle: string;
   onSaveAsNote: (data: ConceptMapData) => void | Promise<void>;
   saveNoteLoading: boolean;
+  /** Hide when there is no open note context (e.g. map opened from Study Sets). */
+  showSaveAsNote?: boolean;
+  onSaveToStudySets: (data: ConceptMapData) => void | Promise<void>;
+  saveStudySetsLoading: boolean;
+  /** False when the map is already a saved study set. */
+  showSaveToStudySets?: boolean;
 }) {
   const flowWrapRef = React.useRef<HTMLDivElement>(null);
 
@@ -272,7 +291,11 @@ export function ConceptMapModal({
           onClose={onClose}
           sourceTitle={sourceTitle}
           saveNoteLoading={saveNoteLoading}
+          showSaveAsNote={showSaveAsNote}
           onSaveAsNote={() => void onSaveAsNote(graph)}
+          saveStudySetsLoading={saveStudySetsLoading}
+          showSaveToStudySets={showSaveToStudySets}
+          onSaveToStudySets={() => void onSaveToStudySets(graph)}
         />
       </ReactFlowProvider>
     </div>

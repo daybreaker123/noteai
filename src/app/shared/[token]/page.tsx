@@ -55,7 +55,7 @@ export default async function SharedNotePage({ params }: Props) {
 
   return (
     <SharedPublicShell pageTitle={result.title}>
-      <article className="rounded-2xl border border-[var(--border)] bg-white/[0.03] px-5 py-6 sm:px-8 sm:py-8">
+      <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface-ghost)] px-5 py-6 sm:px-8 sm:py-8">
         <div className="space-y-4 text-[15px] leading-relaxed text-[var(--text)]/88">
           {paragraphs.length > 0
             ? paragraphs.map((p, i) => (

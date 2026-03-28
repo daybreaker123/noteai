@@ -31,11 +31,11 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
 function ratingBadgeClass(rating: EssayFeedbackRating): string {
   switch (rating) {
     case "Strong":
-      return "border-emerald-500/35 bg-emerald-500/15 text-emerald-100";
+      return "border-[var(--status-success-border)] bg-[var(--status-success-bg)] text-[var(--status-success-fg)]";
     case "Needs Work":
-      return "border-amber-500/40 bg-amber-500/12 text-amber-100";
+      return "border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)]";
     default:
-      return "border-sky-500/35 bg-sky-500/12 text-sky-100";
+      return "border-[var(--status-info-border)] bg-[var(--status-info-bg)] text-[var(--status-info-fg)]";
   }
 }
 
@@ -64,7 +64,7 @@ function LockedSectionPreview() {
         </span>
         <Link
           href="/billing"
-          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-xs font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-950/30 transition hover:from-violet-500 hover:to-purple-500"
+          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-xs font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] transition hover:from-violet-500 hover:to-purple-500"
         >
           Upgrade to Pro
         </Link>
@@ -91,7 +91,7 @@ function GradeLockedHeader() {
         <p className="text-center text-sm font-medium text-[var(--text)]">Grade estimate is a Pro feature</p>
         <Link
           href="/billing"
-          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-950/35 transition hover:from-violet-500 hover:to-purple-500"
+          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-lg)] transition hover:from-violet-500 hover:to-purple-500"
         >
           Upgrade to Pro
         </Link>
@@ -116,7 +116,7 @@ function FeedbackSection({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 py-3.5 text-left transition hover:bg-white/[0.03]"
+        className="flex w-full items-center gap-3 py-3.5 text-left transition hover:bg-[var(--surface-ghost-hover)]"
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--accent-fg)]">
           <Icon className="h-4 w-4" strokeWidth={1.75} />
@@ -164,11 +164,11 @@ export function EssayFeedbackStructuredPanel({ data }: { data: EssayFeedbackStru
   const firstUnlockedIdx = data.sections.findIndex((s) => !s.locked);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--modal-surface)] shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--modal-surface)] shadow-[inset_0_0_0_1px_var(--ring-inset-panel)]">
       {gradeLocked ? (
         <GradeLockedHeader />
       ) : (
-        <div className="shrink-0 border-b border-[var(--sidebar-border)] bg-gradient-to-br from-purple-500/12 via-[var(--bg-subtle)] to-blue-500/10 p-5 sm:p-6">
+        <div className="shrink-0 border-b border-[var(--sidebar-border)] bg-gradient-to-br from-[var(--structured-grade-header-from)] via-[var(--bg-subtle)] to-[var(--structured-grade-header-to)] p-5 sm:p-6">
           <p className="text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--faint)]">
             Estimated grade
           </p>

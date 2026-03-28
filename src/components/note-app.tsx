@@ -11,6 +11,7 @@ import { DeleteCategoryModal } from "@/components/delete-category-modal";
 import { DeleteNoteModal } from "@/components/delete-note-modal";
 import { Button, Card, Input, Textarea, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { captureAnalytics } from "@/lib/analytics";
 import { sanitizeGeneratedNoteTitle } from "@/lib/sanitize-note-title";
 import { NOTE_IMPORT_FILE_ACCEPT, SLIDES_ANALYZE_FILE_ACCEPT } from "@/lib/note-import-utils";
 import {
@@ -20,10 +21,10 @@ import {
   noteContentPreview,
 } from "@/lib/note-content-html";
 import type { ConceptMapData } from "@/lib/concept-map-types";
-import { conceptMapToNotePlainText } from "@/lib/concept-map-types";
+import { conceptMapToNotePlainText, parseConceptMapPayload } from "@/lib/concept-map-types";
 import { ConceptMapModal } from "@/components/concept-map-modal";
 import { studyGuideMarkdownToHtml } from "@/lib/study-guide-markdown";
-import { TutorMarkdown } from "@/components/tutor-markdown";
+import { TutorMarkdown, summaryMarkdownLayoutClassName } from "@/components/tutor-markdown";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { NoteRichTextEditor } from "@/components/note-rich-text-editor";
 import { GuidedOnboarding } from "@/components/guided-onboarding";
@@ -62,6 +63,7 @@ import {
   Sparkles,
   ChevronRight,
   ChevronLeft,
+  FlipHorizontal,
   ChevronDown,
   Cloud,
   X,
@@ -87,6 +89,8 @@ import {
   Presentation,
   Network,
   MoreVertical,
+  Zap,
+  Share2,
 } from "lucide-react";
 
 type StudaraUserStats = {
@@ -233,6 +237,7 @@ export function NoteApp({
           if (json?.study_guide?.trim()) {
             setStudyGuideText(json.study_guide);
             consumeStreakJson(json);
+            captureAnalytics("study_guide_generated", { category_id: categoryId });
           } else {
             setStudyGuideError("Empty response");
           }
@@ -350,6 +355,7 @@ export function NoteApp({
   const [flashcardReviewDueTotal, setFlashcardReviewDueTotal] = React.useState<number | null>(null);
   const [flashcardSessionReviewed, setFlashcardSessionReviewed] = React.useState(0);
   const [flashcardsSessionComplete, setFlashcardsSessionComplete] = React.useState(false);
+  const [flashcardSessionRatings, setFlashcardSessionRatings] = React.useState<FlashcardRating[]>([]);
   const [flashcardRatingLoading, setFlashcardRatingLoading] = React.useState(false);
   const [studySetLoadError, setStudySetLoadError] = React.useState<string | null>(null);
   const [suggestBanner, setSuggestBanner] = React.useState<{ categoryId: string; name: string } | null>(null);
@@ -364,14 +370,32 @@ export function NoteApp({
   const [improveLoading, setImproveLoading] = React.useState(false);
   const [conceptMapModalOpen, setConceptMapModalOpen] = React.useState(false);
   const [conceptMapGraph, setConceptMapGraph] = React.useState<ConceptMapData | null>(null);
+  const [conceptMapModalTitle, setConceptMapModalTitle] = React.useState("");
+  /** When non-null, the map is already stored in `study_sets` (hide “Save Concept Map”). */
+  const [conceptMapSavedSetId, setConceptMapSavedSetId] = React.useState<string | null>(null);
+  /** Opened from Study Sets / deep link — no in-editor note context for “Save as Note”. */
+  const [conceptMapFromLibrary, setConceptMapFromLibrary] = React.useState(false);
   const [conceptMapLoading, setConceptMapLoading] = React.useState(false);
   const [conceptMapSaveNoteLoading, setConceptMapSaveNoteLoading] = React.useState(false);
+  const [conceptMapSaveStudyLoading, setConceptMapSaveStudyLoading] = React.useState(false);
   const [titleLoading, setTitleLoading] = React.useState(false);
+  /** Bumps when auto-generated title is applied — triggers a brief highlight on the title field. */
+  const [titleAutoRevealTick, setTitleAutoRevealTick] = React.useState(0);
+  const titleUserEditedRef = React.useRef(false);
+  const autoTitleTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tagsLoading, setTagsLoading] = React.useState(false);
   const [suggestTagsChips, setSuggestTagsChips] = React.useState<string[] | null>(null);
   const [toolbarError, setToolbarError] = React.useState<string | null>(null);
   const [improveToast, setImproveToast] = React.useState(false);
   const [shareNoteModalNoteId, setShareNoteModalNoteId] = React.useState<string | null>(null);
+  /** Summary shown after Summarize from a grid card (no need to open the note first). */
+  const [cardSummaryModal, setCardSummaryModal] = React.useState<{
+    noteId: string;
+    title: string;
+    summary: string | null;
+    error: string | null;
+  } | null>(null);
+  const [noteCardSummarizeLoadingId, setNoteCardSummarizeLoadingId] = React.useState<string | null>(null);
   const [linkCopiedToast, setLinkCopiedToast] = React.useState(false);
   const [createCategoryModalOpen, setCreateCategoryModalOpen] = React.useState(false);
   const [createCategoryLoading, setCreateCategoryLoading] = React.useState(false);
@@ -418,6 +442,7 @@ export function NoteApp({
       setFlashcardReviewDueTotal(opts?.reviewDueTotal ?? null);
       setFlashcardSessionReviewed(0);
       setFlashcardsSessionComplete(false);
+      setFlashcardSessionRatings([]);
       setCardIndex(0);
       setCardFlipped(false);
     },
@@ -522,6 +547,8 @@ export function NoteApp({
   const [editorContentRevision, setEditorContentRevision] = React.useState(0);
   /** Local “last saved” time for the open note (autosave + server `updated_at` on switch). */
   const [editorLastSavedAt, setEditorLastSavedAt] = React.useState<number | null>(null);
+  /** While fetching full note from API after opening from the grid (avoids stale/wrong body flash). */
+  const [noteOpenLoadingId, setNoteOpenLoadingId] = React.useState<string | null>(null);
 
   const requestConceptMap = React.useCallback(async () => {
     if (plan !== "pro") {
@@ -555,14 +582,18 @@ export function NoteApp({
         return;
       }
       consumeStreakJson(json);
+      setConceptMapSavedSetId(null);
+      setConceptMapFromLibrary(false);
+      setConceptMapModalTitle((editTitleRef.current || "Untitled").trim() || "Untitled");
       setConceptMapGraph(json.graph);
       setConceptMapModalOpen(true);
+      captureAnalytics("concept_map_generated", { note_id: selectedNote?.id });
     } catch {
       setToolbarError("Something went wrong. Try again.");
     } finally {
       setConceptMapLoading(false);
     }
-  }, [plan, editContent, consumeStreakJson, setUpgradeModal]);
+  }, [plan, editContent, consumeStreakJson, setUpgradeModal, selectedNote?.id]);
 
   const saveConceptMapAsNote = React.useCallback(
     async (data: ConceptMapData) => {
@@ -596,6 +627,49 @@ export function NoteApp({
     },
     [selectedNote, actions, setSelectedCategoryId, setSelectedNoteId]
   );
+
+  const saveConceptMapToStudySets = React.useCallback(
+    async (data: ConceptMapData) => {
+      const noteId = selectedNote?.id;
+      if (!noteId || noteId.startsWith("draft-")) {
+        setToolbarError("Open a saved note to save this concept map to Study sets.");
+        return;
+      }
+      setConceptMapSaveStudyLoading(true);
+      setToolbarError(null);
+      try {
+        const title = (editTitleRef.current || conceptMapModalTitle || "Untitled").trim() || "Concept map";
+        const res = await fetch("/api/study-sets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "concept_map",
+            title,
+            note_id: noteId,
+            note_ids: [noteId],
+            payload: { nodes: data.nodes, edges: data.edges },
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; error?: string; code?: string } | null;
+        if (json?.code === "PRO_REQUIRED_STUDY" && res.status === 402) {
+          setUpgradeModal({ show: true, feature: "study" });
+          return;
+        }
+        if (!res.ok || !json?.ok || !json.id) {
+          setToolbarError(json?.error ?? "Could not save concept map.");
+          return;
+        }
+        setConceptMapSavedSetId(json.id);
+        void refreshStudySets();
+      } catch {
+        setToolbarError("Could not save concept map.");
+      } finally {
+        setConceptMapSaveStudyLoading(false);
+      }
+    },
+    [selectedNote?.id, conceptMapModalTitle, refreshStudySets, setUpgradeModal]
+  );
+
   const editTitleRef = React.useRef(editTitle);
   const editContentRef = React.useRef(editContent);
   const skipSyncRef = React.useRef(false);
@@ -608,7 +682,7 @@ export function NoteApp({
     setEditorContentRevision(0);
   }, [selectedNoteId]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (skipSyncRef.current) {
       skipSyncRef.current = false;
       return;
@@ -620,15 +694,22 @@ export function NoteApp({
     if (!selectedNote) return;
     const id = selectedNote.id;
     if (lastLoadedEditorNoteIdRef.current === id) {
-      // Same note: do not reset title from `selectedNote` — list refetches after autosave would fight the input.
+      // Same note: do not reset title/content from `selectedNote` — list refetches after autosave would fight the input.
       return;
     }
     lastLoadedEditorNoteIdRef.current = id;
     const nextTitle = selectedNote.title;
+    const nextHtml = ensureEditorHtml(selectedNote.content);
     setEditTitle(nextTitle);
     editTitleRef.current = nextTitle;
-    setEditContent(ensureEditorHtml(selectedNote.content));
+    setTitleSyncKey((k) => k + 1);
+    setEditContent(nextHtml);
+    editContentRef.current = nextHtml;
   }, [selectedNoteId, selectedNote, draftNote]);
+
+  React.useEffect(() => {
+    if (!selectedNoteId) setNoteOpenLoadingId(null);
+  }, [selectedNoteId]);
 
   const [onboardingGate, setOnboardingGate] = React.useState<"unknown" | "needs" | "done">("unknown");
   const [guidedOnboarding, setGuidedOnboarding] = React.useState<{
@@ -699,7 +780,8 @@ export function NoteApp({
 
   const skipOrCompleteGuidedOnboarding = React.useCallback(async () => {
     try {
-      await fetch("/api/me/onboarding/complete", { method: "POST", credentials: "include" });
+      const r = await fetch("/api/me/onboarding/complete", { method: "POST", credentials: "include" });
+      if (r.ok) captureAnalytics("onboarding_completed", { flow: "skip_or_complete" });
     } catch {
       /* ignore */
     }
@@ -711,6 +793,7 @@ export function NoteApp({
     setStudyModal(null);
     setStudyMode("menu");
     setFlashcards([]);
+    setFlashcardSessionRatings([]);
     setCardIndex(0);
     setCardFlipped(false);
     setStudyLoading(null);
@@ -723,7 +806,8 @@ export function NoteApp({
   const finishGuidedOnboardingDashboard = React.useCallback(async () => {
     setGuidedFinishLoading(true);
     try {
-      await fetch("/api/me/onboarding/complete", { method: "POST", credentials: "include" });
+      const r = await fetch("/api/me/onboarding/complete", { method: "POST", credentials: "include" });
+      if (r.ok) captureAnalytics("onboarding_completed", { flow: "dashboard_finish" });
     } catch {
       /* ignore */
     }
@@ -772,6 +856,7 @@ export function NoteApp({
         persona: j.persona ?? persona,
         sampleNoteId: j.noteId,
       });
+      captureAnalytics("note_created", { source: "onboarding_sample", note_id: j.noteId });
       setSelectedCategoryId("all");
       setDraftNote(null);
       setSelectedNoteId(j.noteId);
@@ -889,12 +974,18 @@ export function NoteApp({
         if (!cards?.length && persona) {
           cards = getOnboardingDemoFlashcards(persona);
         }
-        primeFlashcardSession(cards ?? []);
+        const deck = cards ?? [];
+        primeFlashcardSession(deck);
+        if (deck.length) captureAnalytics("flashcards_generated", { source: "onboarding" });
         setStudyMode("flashcards");
         void refreshStudySets();
       } catch {
         const p = guidedOnboardingRef.current?.persona;
-        if (p) primeFlashcardSession(getOnboardingDemoFlashcards(p));
+        if (p) {
+          const demo = getOnboardingDemoFlashcards(p);
+          primeFlashcardSession(demo);
+          if (demo.length) captureAnalytics("flashcards_generated", { source: "onboarding_fallback" });
+        }
         setStudyMode("flashcards");
       } finally {
         setStudyLoading(null);
@@ -912,6 +1003,7 @@ export function NoteApp({
       setFlashcards([]);
       setFlashcardOriginalIndices([]);
       setFlashcardReviewDueTotal(null);
+      setFlashcardSessionRatings([]);
       setCardIndex(0);
       setCardFlipped(false);
       setStudyLoading(null);
@@ -932,6 +1024,7 @@ export function NoteApp({
       setFlashcards([]);
       setFlashcardOriginalIndices([]);
       setFlashcardReviewDueTotal(null);
+      setFlashcardSessionRatings([]);
       setCardIndex(0);
       setCardFlipped(false);
       setStudyLoading(null);
@@ -1032,6 +1125,11 @@ export function NoteApp({
   }, [selectedNoteId]);
 
   React.useEffect(() => {
+    if (!selectedNoteId || selectedNoteId.startsWith("draft-")) return;
+    captureAnalytics("note_opened", { note_id: selectedNoteId });
+  }, [selectedNoteId]);
+
+  React.useEffect(() => {
     if (!selectedNoteId || selectedNoteId.startsWith("draft-")) {
       setEditorLastSavedAt(null);
       return;
@@ -1074,6 +1172,137 @@ export function NoteApp({
 
   const selectedNoteIdRef = React.useRef(selectedNoteId);
   selectedNoteIdRef.current = selectedNoteId;
+
+  React.useEffect(() => {
+    titleUserEditedRef.current = false;
+  }, [selectedNoteId]);
+
+  const openNoteFromList = React.useCallback(
+    (note: Note) => {
+      if (note.id.startsWith("draft-")) return;
+      const snapshotHtml = ensureEditorHtml(note.content ?? "");
+      const snapshotTitle = note.title ?? "";
+      lastLoadedEditorNoteIdRef.current = note.id;
+      editTitleRef.current = snapshotTitle;
+      editContentRef.current = snapshotHtml;
+      setEditTitle(snapshotTitle);
+      setTitleSyncKey((k) => k + 1);
+      setEditContent(snapshotHtml);
+      setSelectedNoteId(note.id);
+      setMobileSidebarOpen(false);
+      setNoteOpenLoadingId(note.id);
+      const id = note.id;
+      void (async () => {
+        try {
+          const fresh = await actions.fetchNoteById(id);
+          if (selectedNoteIdRef.current !== id) return;
+          if (fresh) {
+            const nextHtml = ensureEditorHtml(fresh.content ?? "");
+            if (editContentRef.current === snapshotHtml) {
+              editContentRef.current = nextHtml;
+              setEditContent(nextHtml);
+            }
+            if (editTitleRef.current === snapshotTitle) {
+              const t = fresh.title ?? "";
+              editTitleRef.current = t;
+              setEditTitle(t);
+              setTitleSyncKey((k) => k + 1);
+            }
+          }
+        } finally {
+          if (selectedNoteIdRef.current === id) setNoteOpenLoadingId(null);
+        }
+      })();
+    },
+    [actions]
+  );
+
+  const handleSummarizeFromNoteCard = React.useCallback(
+    async (note: Note) => {
+      if (note.id.startsWith("draft-")) return;
+      const plain = htmlToPlainText(note.content || "").trim();
+      if (!plain) {
+        setCardSummaryModal({
+          noteId: note.id,
+          title: note.title || "Untitled",
+          summary: null,
+          error: "Add some note content before summarizing.",
+        });
+        return;
+      }
+      captureAnalytics("summarize_clicked", { context: "note_card", note_id: note.id });
+      setNoteCardSummarizeLoadingId(note.id);
+      try {
+        const res = await fetch("/api/ai/anthropic/summarize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: plain }),
+        });
+        const json = (await res.json()) as { summary?: string; code?: string; error?: string };
+        if (json.code && res.status === 402) {
+          setUpgradeModal({ show: true, message: json.error ?? "Upgrade to Pro" });
+          return;
+        }
+        if (json.summary) {
+          consumeStreakJson(json);
+          void loadUserStats();
+          void actions.update(note.id, { record_summarization: true });
+          setCardSummaryModal({
+            noteId: note.id,
+            title: note.title || "Untitled",
+            summary: json.summary,
+            error: null,
+          });
+        } else if (json.error) {
+          setCardSummaryModal({
+            noteId: note.id,
+            title: note.title || "Untitled",
+            summary: null,
+            error: json.error,
+          });
+        } else {
+          setCardSummaryModal({
+            noteId: note.id,
+            title: note.title || "Untitled",
+            summary: null,
+            error: "Could not summarize this note.",
+          });
+        }
+      } catch {
+        setCardSummaryModal({
+          noteId: note.id,
+          title: note.title || "Untitled",
+          summary: null,
+          error: "Something went wrong. Try again.",
+        });
+      } finally {
+        setNoteCardSummarizeLoadingId((cur) => (cur === note.id ? null : cur));
+      }
+    },
+    [actions, consumeStreakJson, loadUserStats]
+  );
+
+  const handleStudyFromNoteCard = React.useCallback(
+    (noteId: string) => {
+      if (noteId.startsWith("draft-")) return;
+      if (
+        onboardingGate === "needs" &&
+        guidedOnboarding &&
+        guidedOnboarding.step >= 2 &&
+        guidedOnboarding.step <= 4
+      ) {
+        return;
+      }
+      if (plan !== "pro") {
+        setUpgradeModal({ show: true, feature: "study" });
+        return;
+      }
+      setStudyModal({ kind: "single", noteId });
+      setStudyMode("menu");
+    },
+    [onboardingGate, guidedOnboarding, plan]
+  );
+
   const selectedNoteRef = React.useRef(selectedNote);
   selectedNoteRef.current = selectedNote;
   const draftNoteRef = React.useRef(draftNote);
@@ -1139,6 +1368,11 @@ export function NoteApp({
   }, []);
 
   const onTitleDraftChange = React.useCallback((v: string) => {
+    titleUserEditedRef.current = true;
+    if (autoTitleTimerRef.current) {
+      clearTimeout(autoTitleTimerRef.current);
+      autoTitleTimerRef.current = null;
+    }
     editTitleRef.current = v;
     if (draftNoteRef.current && selectedNoteIdRef.current === draftNoteRef.current.id) {
       setDraftNote((d) => (d ? { ...d, title: v } : null));
@@ -1160,6 +1394,82 @@ export function NoteApp({
 
     queueNoteAutosave();
   }, [queueNoteAutosave]);
+
+  const runAutoTitleForNote = React.useCallback(
+    async (noteIdAtSchedule: string) => {
+      if (titleUserEditedRef.current) return;
+      if (selectedNoteIdRef.current !== noteIdAtSchedule) return;
+      const titleNow = (editTitleRef.current || "").trim();
+      if (titleNow !== "" && !/^untitled$/i.test(titleNow)) return;
+      const plain = htmlToPlainText(editContentRef.current).trim();
+      const words = plain ? plain.split(/\s+/).filter(Boolean).length : 0;
+      if (words < 50) return;
+
+      setTitleLoading(true);
+      setToolbarError(null);
+      try {
+        const res = await fetch("/api/ai/anthropic/generate-title", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: plain.slice(0, 8000) }),
+        });
+        const json = (await res.json()) as { title?: string; error?: string };
+        if (titleUserEditedRef.current) return;
+        if (selectedNoteIdRef.current !== noteIdAtSchedule) return;
+        const t2 = (editTitleRef.current || "").trim();
+        if (t2 !== "" && !/^untitled$/i.test(t2)) return;
+        if (!json.title) return;
+        const title = sanitizeGeneratedNoteTitle(json.title);
+        if (!title || /^untitled$/i.test(title)) return;
+
+        consumeStreakJson(json);
+        setEditTitle(title);
+        editTitleRef.current = title;
+        setTitleSyncKey((k) => k + 1);
+        setTitleAutoRevealTick((x) => x + 1);
+
+        if (noteIdAtSchedule.startsWith("draft-")) {
+          setDraftNote((d) => (d && d.id === noteIdAtSchedule ? { ...d, title } : d));
+        } else {
+          void actionsRef.current.update(noteIdAtSchedule, { title });
+        }
+        void loadUserStats();
+      } catch {
+        /* auto-title failures stay quiet */
+      } finally {
+        setTitleLoading(false);
+      }
+    },
+    [consumeStreakJson, loadUserStats]
+  );
+
+  React.useEffect(() => {
+    if (autoTitleTimerRef.current) {
+      clearTimeout(autoTitleTimerRef.current);
+      autoTitleTimerRef.current = null;
+    }
+    if (!selectedNoteId) return;
+    if (!selectedNoteId.startsWith("draft-") && noteOpenLoadingId === selectedNoteId) return;
+
+    const titleTrim = (editTitle || "").trim();
+    const isPlaceholder = titleTrim === "" || /^untitled$/i.test(titleTrim);
+    const plain = htmlToPlainText(editContent).trim();
+    const words = plain ? plain.split(/\s+/).filter(Boolean).length : 0;
+    if (!isPlaceholder || titleUserEditedRef.current || words < 50) return;
+
+    const noteIdAtSchedule = selectedNoteId;
+    autoTitleTimerRef.current = setTimeout(() => {
+      autoTitleTimerRef.current = null;
+      void runAutoTitleForNote(noteIdAtSchedule);
+    }, 30_000);
+
+    return () => {
+      if (autoTitleTimerRef.current) {
+        clearTimeout(autoTitleTimerRef.current);
+        autoTitleTimerRef.current = null;
+      }
+    };
+  }, [selectedNoteId, editContent, editTitle, noteOpenLoadingId, runAutoTitleForNote]);
 
   React.useEffect(() => {
     return () => {
@@ -1341,6 +1651,7 @@ export function NoteApp({
       setStudyModal(null);
       exitGridSelection();
       setNewNoteIds((prev) => new Set(prev).add(json.id));
+      captureAnalytics("note_created", { source: "analyze_slides", note_id: json.id });
       setMobileSidebarOpen(false);
     } catch {
       setSlidesAnalyzeError("Something went wrong. Please try again.");
@@ -1422,6 +1733,7 @@ export function NoteApp({
       setStudyModal(null);
       exitGridSelection();
       setNewNoteIds((prev) => new Set(prev).add(json.id));
+      captureAnalytics("note_created", { source: "import_google_doc", note_id: json.id });
       setMobileSidebarOpen(false);
     } catch {
       setImportDocError("Something went wrong while importing. Try again.");
@@ -1439,6 +1751,10 @@ export function NoteApp({
         title: json.title,
         category_id: json.category_id,
         contentLength: typeof json.content === "string" ? json.content.length : 0,
+      });
+      captureAnalytics("voice_transcription_used", {
+        draft_append: json.draft_append === true,
+        appended: json.appended === true,
       });
       consumeStreakJson(json);
       setVoiceNotesError(null);
@@ -1490,6 +1806,7 @@ export function NoteApp({
 
       if (typeof json.id !== "string") return;
 
+      captureAnalytics("note_created", { source: "voice", note_id: json.id });
       lastLoadedEditorNoteIdRef.current = null;
       setSelectedNoteId(json.id);
       const voiceTitleB = json.title ?? "Untitled";
@@ -1651,10 +1968,14 @@ export function NoteApp({
       }
       consumeStreakJson(json);
       if (kind === "flashcards") {
-        primeFlashcardSession(json.cards ?? []);
+        const cards = json.cards ?? [];
+        if (cards.length) captureAnalytics("flashcards_generated", { source: "multi", note_count: ids.length });
+        primeFlashcardSession(cards);
         setStudyMode("flashcards");
       } else {
-        setQuizQuestions(json.questions ?? []);
+        const questions = json.questions ?? [];
+        if (questions.length) captureAnalytics("quiz_generated", { source: "multi", note_count: ids.length });
+        setQuizQuestions(questions);
         setStudyMode("quiz");
         setQuizIndex(0);
         setQuizScore(null);
@@ -1676,24 +1997,43 @@ export function NoteApp({
       const res = await fetch(`/api/study-sets/${setId}`);
       const data = (await res.json().catch(() => null)) as {
         error?: string;
-        kind?: "flashcards" | "quiz";
+        kind?: "flashcards" | "quiz" | "concept_map";
         title?: string;
-        payload?: { cards?: { front: string; back: string }[]; questions?: { question: string; options: string[]; correctIndex: number }[] };
+        payload?: unknown;
       } | null;
       if (!res.ok) {
         const msg = data && typeof data.error === "string" ? data.error : "Could not open study set";
         setStudySetLoadError(msg);
         return;
       }
-      if (!data || (data.kind !== "flashcards" && data.kind !== "quiz")) {
+      if (!data || (data.kind !== "flashcards" && data.kind !== "quiz" && data.kind !== "concept_map")) {
         setStudySetLoadError("Invalid study set data");
         return;
       }
+      if (data.kind === "concept_map") {
+        const graph = parseConceptMapPayload(data.payload);
+        if (!graph) {
+          setStudySetLoadError("Invalid concept map data");
+          return;
+        }
+        setConceptMapSavedSetId(setId);
+        setConceptMapFromLibrary(true);
+        setConceptMapModalTitle((data.title ?? titleFallback ?? "Concept map").trim() || "Concept map");
+        setConceptMapGraph(graph);
+        setConceptMapModalOpen(true);
+        return;
+      }
       if (data.kind === "flashcards") {
-        primeFlashcardSession(data.payload?.cards ?? []);
+        primeFlashcardSession(
+          (data.payload as { cards?: { front: string; back: string }[] })?.cards ?? []
+        );
         setStudyMode("flashcards");
       } else {
-        setQuizQuestions(data.payload?.questions ?? []);
+        setQuizQuestions(
+          (data.payload as {
+            questions?: { question: string; options: string[]; correctIndex: number }[];
+          })?.questions ?? []
+        );
         setStudyMode("quiz");
         setQuizIndex(0);
         setQuizScore(null);
@@ -1792,6 +2132,7 @@ export function NoteApp({
       }
     }
 
+    setFlashcardSessionRatings((prev) => [...prev, rating]);
     setFlashcardSessionReviewed((r) => r + 1);
     if (ci >= len - 1) {
       setFlashcardsSessionComplete(true);
@@ -1845,6 +2186,7 @@ export function NoteApp({
     minimalChromeUntilStudyOpen &&
     (initialOpenStudySetId || initialReviewDueSetId) &&
     !studyModal &&
+    !conceptMapModalOpen &&
     !studySetLoadError &&
     onboardingGate !== "needs" &&
     !studyEmbedDismissed;
@@ -1866,7 +2208,7 @@ export function NoteApp({
   ) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-5 bg-[var(--bg)] px-6 text-center">
-        <p className="max-w-sm text-sm text-red-100/95">{studySetLoadError}</p>
+        <p className="max-w-sm text-sm text-[var(--status-danger-fg)]">{studySetLoadError}</p>
         <Button
           type="button"
           className="border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)]"
@@ -1915,7 +2257,7 @@ export function NoteApp({
           <div
             role="menu"
             className={cn(
-              "absolute z-[80] min-w-[15rem] rounded-xl border border-[var(--border)] bg-[var(--surface-mid)] py-1 shadow-xl shadow-black/50",
+              "absolute z-[80] min-w-[15rem] rounded-xl border border-[var(--border)] bg-[var(--surface-mid)] py-1 shadow-[var(--shadow-brand-lg)]",
               isHero ? "left-0 right-0 mt-2" : "right-0 top-[calc(100%+6px)]"
             )}
           >
@@ -1986,8 +2328,8 @@ export function NoteApp({
                 : "Importing document"
           }
         >
-          <div className="max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-xl shadow-purple-950/40">
-            <Loader2 className="mx-auto h-9 w-9 animate-spin text-purple-400" aria-hidden />
+          <div className="max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-[var(--shadow-brand-lg)]">
+            <Loader2 className="mx-auto h-9 w-9 animate-spin text-[var(--accent)]" aria-hidden />
             <p className="mt-4 text-sm font-medium text-[var(--text)]">
               {slidesAnalyzeLoading
                 ? "Analyzing your slides…"
@@ -2028,7 +2370,7 @@ export function NoteApp({
           "flex h-dvh shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] backdrop-blur-xl",
           "w-[min(18rem,92vw)] sm:w-72",
           "fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:relative md:z-20 md:translate-x-0",
-          mobileSidebarOpen ? "translate-x-0 shadow-2xl shadow-black/50" : "-translate-x-full md:translate-x-0"
+          mobileSidebarOpen ? "translate-x-0 shadow-[var(--shadow-brand-lg)]" : "-translate-x-full md:translate-x-0"
         )}
       >
         <div className="shrink-0 px-4 pt-5">
@@ -2042,7 +2384,7 @@ export function NoteApp({
           <button
             type="button"
             onClick={openNewNotePicker}
-            className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
+            className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] transition duration-200 hover:from-purple-500 hover:to-blue-500"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             New Note
@@ -2057,18 +2399,18 @@ export function NoteApp({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search notes…"
-              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--input-bg)] py-2.5 pl-10 pr-3 text-sm text-[var(--text)] shadow-inner outline-none transition duration-200 placeholder:text-[var(--placeholder)] focus:border-purple-500/35 focus:ring-2 focus:ring-purple-500/20"
+              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--input-bg)] py-2.5 pl-10 pr-3 text-sm text-[var(--text)] shadow-inner outline-none transition duration-200 placeholder:text-[var(--placeholder)] focus:border-[var(--accent)]/40 focus:ring-2 focus:ring-[var(--accent)]/20"
             />
           </div>
         </div>
         <nav className="app-sidebar-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-6">
           {importDocError && (
-            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-3 py-2.5 text-xs text-[var(--status-danger-fg)]">
               <span>{importDocError}</span>
               <button
                 type="button"
                 onClick={() => setImportDocError(null)}
-                className="shrink-0 text-red-300 transition hover:text-[var(--text)]"
+                className="shrink-0 text-[var(--status-danger-fg-strong)] transition hover:text-[var(--text)]"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
@@ -2076,12 +2418,12 @@ export function NoteApp({
             </div>
           )}
           {slidesAnalyzeError && (
-            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-3 py-2.5 text-xs text-[var(--status-danger-fg)]">
               <span>{slidesAnalyzeError}</span>
               <button
                 type="button"
                 onClick={() => setSlidesAnalyzeError(null)}
-                className="shrink-0 text-red-300 transition hover:text-[var(--text)]"
+                className="shrink-0 text-[var(--status-danger-fg-strong)] transition hover:text-[var(--text)]"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
@@ -2089,12 +2431,12 @@ export function NoteApp({
             </div>
           )}
           {voiceNotesError && (
-            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-3 py-2.5 text-xs text-[var(--status-danger-fg)]">
               <span>{voiceNotesError}</span>
               <button
                 type="button"
                 onClick={() => setVoiceNotesError(null)}
-                className="shrink-0 text-red-300 transition hover:text-[var(--text)]"
+                className="shrink-0 text-[var(--status-danger-fg-strong)] transition hover:text-[var(--text)]"
                 aria-label="Dismiss"
               >
                 <X className="h-3.5 w-3.5" />
@@ -2102,12 +2444,12 @@ export function NoteApp({
             </div>
           )}
           {categoryError && (
-            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
+            <div className="mb-3 flex items-start justify-between gap-2 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-3 py-2.5 text-xs text-[var(--status-danger-fg)]">
               <span>{categoryError}</span>
               <button
                 type="button"
                 onClick={clearCategoryError}
-                className="shrink-0 text-red-300 transition hover:text-[var(--text)]"
+                className="shrink-0 text-[var(--status-danger-fg-strong)] transition hover:text-[var(--text)]"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -2149,7 +2491,7 @@ export function NoteApp({
                 }}
                 className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
               >
-                <FolderPlus className="h-4 w-4 shrink-0 text-[var(--faint)]" />
+                <FolderPlus className="h-4 w-4 shrink-0 text-[var(--muted)]" />
                 Add category
               </button>
             </div>
@@ -2165,7 +2507,7 @@ export function NoteApp({
                 onClick={() => setMobileSidebarOpen(false)}
                 className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] touch-manipulation"
               >
-                <GraduationCap className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+                <GraduationCap className="h-4 w-4 shrink-0 text-[var(--accent-icon)]" />
                 AI Tutor
               </Link>
               <Link
@@ -2173,7 +2515,7 @@ export function NoteApp({
                 onClick={() => setMobileSidebarOpen(false)}
                 className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] touch-manipulation"
               >
-                <FilePenLine className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+                <FilePenLine className="h-4 w-4 shrink-0 text-[var(--accent-icon)]" />
                 Essay Feedback
               </Link>
               <Link
@@ -2181,7 +2523,7 @@ export function NoteApp({
                 onClick={() => setMobileSidebarOpen(false)}
                 className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)] touch-manipulation"
               >
-                <Quote className="h-4 w-4 shrink-0 text-[var(--muted)]" strokeWidth={2} />
+                <Quote className="h-4 w-4 shrink-0 text-[var(--accent-icon)]" strokeWidth={2} />
                 Citations
               </Link>
             </div>
@@ -2206,8 +2548,11 @@ export function NoteApp({
           {plan !== "pro" ? (
             <Link
               href="/billing"
-              onClick={() => setMobileSidebarOpen(false)}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-md shadow-purple-900/20 transition duration-200 hover:from-purple-500 hover:to-blue-500 touch-manipulation"
+              onClick={() => {
+                captureAnalytics("pro_upgrade_clicked", { placement: "sidebar" });
+                setMobileSidebarOpen(false);
+              }}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] transition duration-200 hover:from-purple-500 hover:to-blue-500 touch-manipulation"
             >
               <Sparkles className="h-4 w-4" />
               Upgrade to Pro
@@ -2238,7 +2583,7 @@ export function NoteApp({
               </p>
               <div className="mt-1">
                 {plan === "pro" ? (
-                  <span className="inline-flex rounded-md border border-purple-500/35 bg-purple-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-200/95">
+                  <span className="inline-flex rounded-md border border-[var(--pro-badge-border)] bg-[var(--pro-badge-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--pro-badge-fg)]">
                     Pro
                   </span>
                 ) : (
@@ -2289,7 +2634,7 @@ export function NoteApp({
         {plan === "pro" && proHeavyUsage ? (
           <div
             role="status"
-            className="shrink-0 border-b border-amber-400/25 bg-amber-500/15 px-4 py-2.5 text-center text-sm text-amber-50/95"
+            className="shrink-0 border-b border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] px-4 py-2.5 text-center text-sm text-[var(--status-warning-fg)]"
           >
             You&apos;re a heavy user this month — you may experience slightly slower responses as we manage server load.
           </div>
@@ -2301,7 +2646,7 @@ export function NoteApp({
         userStats.recent_study_set_id ? (
           <div
             role="status"
-            className="flex shrink-0 flex-col gap-2 border-b border-violet-500/20 bg-violet-500/10 px-4 py-3 text-sm text-violet-100/95 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+            className="flex shrink-0 flex-col gap-2 border-b border-[var(--accent-nudge-border)] bg-[var(--accent-nudge-bg)] px-4 py-3 text-sm text-[var(--accent-nudge-fg)] sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
             <p className="min-w-0 leading-snug">
               <span className="font-medium text-[var(--text)]">Keep your streak alive!</span>{" "}
@@ -2315,7 +2660,7 @@ export function NoteApp({
                   userStats.recent_study_set_title ?? undefined
                 )
               }
-              className="shrink-0 rounded-lg border border-violet-400/35 bg-violet-500/20 px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-violet-500/30"
+              className="shrink-0 rounded-lg border border-[var(--accent-nudge-border)] bg-[var(--accent-nudge-bg)] px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--hover-bg)]"
             >
               Open {userStats.recent_study_set_title ? `“${userStats.recent_study_set_title.slice(0, 32)}${userStats.recent_study_set_title.length > 32 ? "…" : ""}”` : "latest set"}
             </button>
@@ -2324,13 +2669,13 @@ export function NoteApp({
         {studySetLoadError ? (
           <div
             role="alert"
-            className="flex shrink-0 items-center justify-between gap-3 border-b border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+            className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]"
           >
             <span className="min-w-0">{studySetLoadError}</span>
             <button
               type="button"
               onClick={() => setStudySetLoadError(null)}
-              className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20 hover:text-[var(--text)]"
+              className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-[var(--status-danger-fg)] transition hover:bg-[var(--status-danger-bg-elevated)] hover:text-[var(--text)]"
             >
               Dismiss
             </button>
@@ -2373,6 +2718,7 @@ export function NoteApp({
             }}
             onSuggestDismiss={() => setSuggestBanner(null)}
             onImprove={async () => {
+              captureAnalytics("improve_clicked", {});
               setToolbarError(null);
               const guided = guidedOnboardingRef.current;
               const onboardingImproveId =
@@ -2443,38 +2789,7 @@ export function NoteApp({
                 if (onboardingImproveId) guidedImproveInFlightRef.current = false;
               }
             }}
-            onGenerateTitle={async () => {
-              setToolbarError(null);
-              setTitleLoading(true);
-              try {
-                const res = await fetch("/api/ai/anthropic/generate-title", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ content: htmlToPlainText(editContent) }),
-                });
-                const json = (await res.json()) as { title?: string; error?: string };
-                if (json.title) {
-                  consumeStreakJson(json);
-                  const title = sanitizeGeneratedNoteTitle(json.title);
-                  setEditTitle(title);
-                  editTitleRef.current = title;
-                  setTitleSyncKey((k) => k + 1);
-                  if (selectedNote && (draftNote?.id === selectedNote.id || !draftNote)) {
-                    if (draftNote && selectedNote.id === draftNote.id) {
-                      setDraftNote((d) => (d ? { ...d, title } : null));
-                    } else {
-                      actions.update(selectedNote.id, { title });
-                    }
-                  }
-                } else {
-                  setToolbarError(json.error ?? "Failed to generate title");
-                }
-              } catch {
-                setToolbarError("Something went wrong. Please try again.");
-              } finally {
-                setTitleLoading(false);
-              }
-            }}
+            titleAutoRevealTick={titleAutoRevealTick}
             onSuggestTags={async () => {
               setToolbarError(null);
               setTagsLoading(true);
@@ -2518,6 +2833,7 @@ export function NoteApp({
               setStudyMode("menu");
             }}
             onClaudeSummarize={async () => {
+              captureAnalytics("summarize_clicked", { context: "editor" });
               setSummarizeLoading(true);
               setSummaryBelow(null);
               try {
@@ -2665,6 +2981,11 @@ export function NoteApp({
               hasSummaryInSession: !!summaryBelow,
               hasSavedStudySet: noteHasSavedStudySet(selectedNote!.id, savedStudySets),
             })}
+            noteContentLoading={
+              !!selectedNoteId &&
+              !selectedNoteId.startsWith("draft-") &&
+              noteOpenLoadingId === selectedNoteId
+            }
             onDeleteRequest={() => {
               if (selectedNote) {
                 setDeleteNoteModal({
@@ -2696,7 +3017,7 @@ export function NoteApp({
                     size="sm"
                     onClick={openMultiStudyMenu}
                     disabled={gridSelectedIds.size === 0}
-                    className="gap-1.5 border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-md shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
+                    className="gap-1.5 border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] hover:from-violet-500 hover:to-indigo-500"
                   >
                     <GraduationCap className="h-3.5 w-3.5" />
                     Continue to study mode
@@ -2754,7 +3075,7 @@ export function NoteApp({
                   </div>
                   <div className="h-5 w-px shrink-0 bg-[var(--border)] opacity-60" aria-hidden />
                   <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
-                    <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-400/90" strokeWidth={2} aria-hidden />
+                    <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" strokeWidth={2} aria-hidden />
                     <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
                       {userStats.summarizations_this_month}
                     </span>
@@ -2762,7 +3083,7 @@ export function NoteApp({
                   </div>
                   <div className="h-5 w-px shrink-0 bg-[var(--border)] opacity-60" aria-hidden />
                   <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
-                    <Layers className="h-3.5 w-3.5 shrink-0 text-cyan-400/85" strokeWidth={2} aria-hidden />
+                    <Layers className="h-3.5 w-3.5 shrink-0 text-[var(--accent-icon)]" strokeWidth={2} aria-hidden />
                     <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
                       {userStats.flashcard_sets_studied_this_week}
                     </span>
@@ -2770,7 +3091,7 @@ export function NoteApp({
                   </div>
                   <div className="h-5 w-px shrink-0 bg-[var(--border)] opacity-60" aria-hidden />
                   <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 pr-3 sm:pr-4">
-                    <HelpCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400/85" strokeWidth={2} aria-hidden />
+                    <HelpCircle className="h-3.5 w-3.5 shrink-0 text-[var(--accent2)]" strokeWidth={2} aria-hidden />
                     <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{userStats.quizzes_this_week}</span>
                     <span className="text-xs font-medium text-[var(--muted)]">Quizzes</span>
                   </div>
@@ -2778,11 +3099,11 @@ export function NoteApp({
               </div>
             ) : null}
             {multiStudyError && (
-              <p className="mb-3 text-sm text-red-400">{multiStudyError}</p>
+              <p className="mb-3 text-sm text-[var(--status-danger-fg-strong)]">{multiStudyError}</p>
             )}
             {notesLoadError ? (
-              <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-red-500/25 bg-red-500/10 p-12 text-center">
-                <p className="max-w-md text-sm text-red-100">{notesLoadError}</p>
+              <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] p-12 text-center">
+                <p className="max-w-md text-sm text-[var(--status-danger-fg)]">{notesLoadError}</p>
                 <Button className="mt-6" onClick={() => void actions.refresh()}>
                   Try again
                 </Button>
@@ -2825,14 +3146,14 @@ export function NoteApp({
                       selectMode={gridSelectMode}
                       selected={gridSelectedIds.has(note.id)}
                       onToggleSelect={() => toggleGridNoteSelected(note.id)}
-                      onSelect={() => {
-                        setSelectedNoteId(note.id);
-                        setMobileSidebarOpen(false);
-                      }}
+                      onSelect={() => openNoteFromList(note)}
                       onRequestDelete={() =>
                         setDeleteNoteModal({ id: note.id, title: note.title || "Untitled" })
                       }
                       onShare={() => setShareNoteModalNoteId(note.id)}
+                      onSummarizeFromCard={() => void handleSummarizeFromNoteCard(note)}
+                      onStudyFromCard={() => handleStudyFromNoteCard(note.id)}
+                      summarizeLoading={noteCardSummarizeLoadingId === note.id}
                     />
                   ))}
                 </div>
@@ -2872,6 +3193,7 @@ export function NoteApp({
             setFlashcardReviewDueTotal(null);
             setFlashcardSessionReviewed(0);
             setFlashcardsSessionComplete(false);
+            setFlashcardSessionRatings([]);
             setFlashcardRatingLoading(false);
             setQuizQuestions([]);
             setCardIndex(0);
@@ -2914,6 +3236,7 @@ export function NoteApp({
               const payload = json?.flashcards;
               const cards = (payload && typeof payload === "object" && "cards" in payload ? payload.cards : null) ?? null;
               if (cards?.length) {
+                captureAnalytics("flashcards_generated", { source: "single", mode: "cached", note_id: nid });
                 primeFlashcardSession(cards);
                 setStudyMode("flashcards");
               } else {
@@ -2934,7 +3257,9 @@ export function NoteApp({
                 }
                 if (j.error) setStudyError(j.error);
                 consumeStreakJson(j);
-                primeFlashcardSession(j.cards ?? []);
+                const genCards = j.cards ?? [];
+                if (genCards.length) captureAnalytics("flashcards_generated", { source: "single", mode: "generated", note_id: nid });
+                primeFlashcardSession(genCards);
                 setStudyMode("flashcards");
                 void refreshStudySets();
               }
@@ -2963,6 +3288,7 @@ export function NoteApp({
               const payload = json?.quiz;
               const qs = (payload && typeof payload === "object" && "questions" in payload ? payload.questions : null) ?? null;
               if (qs?.length) {
+                captureAnalytics("quiz_generated", { source: "single", mode: "cached", note_id: nid });
                 setQuizQuestions(qs);
                 setStudyMode("quiz");
               } else {
@@ -2983,7 +3309,9 @@ export function NoteApp({
                 }
                 if (j.error) setStudyError(j.error);
                 consumeStreakJson(j);
-                setQuizQuestions(j.questions ?? []);
+                const genQs = j.questions ?? [];
+                if (genQs.length) captureAnalytics("quiz_generated", { source: "single", mode: "generated", note_id: nid });
+                setQuizQuestions(genQs);
                 setStudyMode("quiz");
                 void refreshStudySets();
               }
@@ -2996,8 +3324,33 @@ export function NoteApp({
           flashcardReviewDueTotal={flashcardReviewDueTotal}
           flashcardSessionReviewed={flashcardSessionReviewed}
           flashcardsSessionComplete={flashcardsSessionComplete}
+          flashcardSessionRatings={flashcardSessionRatings}
           flashcardRatingLoading={flashcardRatingLoading}
           onFlashcardRate={(r) => void handleFlashcardRate(r)}
+          onFlashcardsStudyAgain={() => {
+            primeFlashcardSession(flashcards, {
+              originalIndices: flashcardOriginalIndices,
+              reviewDueTotal: flashcardReviewDueTotal,
+            });
+          }}
+          onFlashcardsStudyMissedOnly={() => {
+            const missedCards: { front: string; back: string }[] = [];
+            const missedOrig: number[] = [];
+            flashcardSessionRatings.forEach((r, i) => {
+              if (r === "hard") {
+                const c = flashcards[i];
+                if (c) {
+                  missedCards.push(c);
+                  missedOrig.push(flashcardOriginalIndices[i] ?? i);
+                }
+              }
+            });
+            if (missedCards.length === 0) return;
+            primeFlashcardSession(missedCards, {
+              originalIndices: missedOrig,
+              reviewDueTotal: null,
+            });
+          }}
           onCardPrev={() => {
             setCardIndex((i) => Math.max(0, i - 1));
             setCardFlipped(false);
@@ -3040,7 +3393,7 @@ export function NoteApp({
         >
           <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--chrome-40)] px-4 py-3 backdrop-blur-xl sm:px-6">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300/80">Study guide</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent-label)]">Study guide</p>
               <h2 id="study-guide-title" className="truncate text-lg font-semibold text-[var(--text)] sm:text-xl">
                 {studyGuideModal.categoryName}
               </h2>
@@ -3084,12 +3437,12 @@ export function NoteApp({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
             {studyGuideLoading ? (
               <div className="flex flex-col items-center justify-center gap-4 py-24">
-                <Loader2 className="h-10 w-10 animate-spin text-violet-400" />
+                <Loader2 className="h-10 w-10 animate-spin text-[var(--accent)]" />
                 <p className="text-sm text-[var(--muted)]">Generating your study guide…</p>
               </div>
             ) : studyGuideError ? (
-              <div className="mx-auto max-w-md rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-center">
-                <p className="text-sm text-red-100">{studyGuideError}</p>
+              <div className="mx-auto max-w-md rounded-2xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] p-6 text-center">
+                <p className="text-sm text-[var(--status-danger-fg)]">{studyGuideError}</p>
                 <Button type="button" className="mt-4" variant="ghost" onClick={closeStudyGuideModal}>
                   Close
                 </Button>
@@ -3120,7 +3473,10 @@ export function NoteApp({
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href="/billing"
-                onClick={() => setUpgradeModal({ show: false })}
+                onClick={() => {
+                  captureAnalytics("pro_upgrade_clicked", { placement: "upgrade_modal" });
+                  setUpgradeModal({ show: false });
+                }}
                 className="flex flex-1 min-w-[140px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-lg transition hover:from-purple-500 hover:to-blue-500"
               >
                 <Sparkles className="h-4 w-4" />
@@ -3156,28 +3512,72 @@ export function NoteApp({
         />
       ) : null}
 
+      {cardSummaryModal ? (
+        <div
+          role="dialog"
+          aria-modal
+          aria-labelledby="card-summary-title"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-scrim)] p-4 backdrop-blur-sm"
+          onClick={() => setCardSummaryModal(null)}
+        >
+          <div
+            className="max-h-[min(72dvh,34rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-5 shadow-[var(--shadow-brand-lg)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="card-summary-title" className="text-lg font-semibold text-[var(--text)]">
+              {cardSummaryModal.title}
+            </h2>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">Summary</p>
+            {cardSummaryModal.error ? (
+              <p className="mt-3 text-sm text-[var(--status-danger-fg-strong)]">{cardSummaryModal.error}</p>
+            ) : cardSummaryModal.summary ? (
+              <div className="mt-3 text-sm leading-relaxed text-[var(--text)]">
+                <TutorMarkdown content={cardSummaryModal.summary} className={summaryMarkdownLayoutClassName} />
+              </div>
+            ) : null}
+            <div className="mt-5 flex justify-end">
+              <Button type="button" variant="ghost" onClick={() => setCardSummaryModal(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <ConceptMapModal
         open={conceptMapModalOpen}
         onClose={() => {
           setConceptMapModalOpen(false);
           setConceptMapGraph(null);
+          setConceptMapSavedSetId(null);
+          setConceptMapFromLibrary(false);
         }}
         graph={conceptMapGraph}
-        sourceTitle={editTitleRef.current || editTitle || "Untitled"}
+        sourceTitle={
+          conceptMapModalTitle.trim() ||
+          (editTitleRef.current || editTitle || "Untitled").trim() ||
+          "Untitled"
+        }
         onSaveAsNote={saveConceptMapAsNote}
         saveNoteLoading={conceptMapSaveNoteLoading}
+        showSaveAsNote={
+          !!selectedNote && !selectedNote.id.startsWith("draft-") && !conceptMapFromLibrary
+        }
+        onSaveToStudySets={saveConceptMapToStudySets}
+        saveStudySetsLoading={conceptMapSaveStudyLoading}
+        showSaveToStudySets={!conceptMapSavedSetId}
       />
 
       {saveErrorMessage ? (
         <div
           role="alert"
-          className="fixed bottom-6 left-1/2 z-50 flex max-w-[min(100vw-2rem,24rem)] -translate-x-1/2 items-start gap-3 rounded-lg border border-red-500/35 bg-[#1a0a0f]/95 px-4 py-3 text-sm text-red-100 shadow-lg backdrop-blur"
+          className="fixed bottom-6 left-1/2 z-50 flex max-w-[min(100vw-2rem,24rem)] -translate-x-1/2 items-start gap-3 rounded-lg border border-[var(--status-danger-border)] bg-[var(--modal-surface)] px-4 py-3 text-sm text-[var(--status-danger-fg)] shadow-[var(--shadow-brand-lg)] backdrop-blur-xl"
         >
           <span className="min-w-0 flex-1 leading-snug">{saveErrorMessage}</span>
           <button
             type="button"
             onClick={() => clearSaveErrorMessage()}
-            className="shrink-0 rounded-md p-1 text-red-300 transition hover:bg-red-500/20 hover:text-[var(--text)]"
+            className="shrink-0 rounded-md p-1 text-[var(--status-danger-fg-strong)] transition hover:bg-[var(--status-danger-bg-elevated)] hover:text-[var(--text)]"
             aria-label="Dismiss"
           >
             <X className="h-4 w-4" />
@@ -3283,6 +3683,7 @@ function EditorPanel({
   conceptMapLoading,
   conceptMapDisabled,
   titleLoading,
+  titleAutoRevealTick,
   tagsLoading,
   suggestTagsChips,
   toolbarError,
@@ -3292,7 +3693,6 @@ function EditorPanel({
   onSuggestDismiss,
   onImprove,
   improveButtonRef,
-  onGenerateTitle,
   onSuggestTags,
   onStudy,
   onClaudeSummarize,
@@ -3307,6 +3707,7 @@ function EditorPanel({
   isDraftNote,
   voiceToNotesToolbar,
   studyProgressCompletion,
+  noteContentLoading,
   onDeleteRequest,
 }: {
   selectedNote: Note;
@@ -3327,6 +3728,7 @@ function EditorPanel({
   conceptMapLoading: boolean;
   conceptMapDisabled: boolean;
   titleLoading: boolean;
+  titleAutoRevealTick: number;
   tagsLoading: boolean;
   suggestTagsChips: string[] | null;
   toolbarError: string | null;
@@ -3336,7 +3738,6 @@ function EditorPanel({
   onSuggestDismiss: () => void;
   onImprove: () => void;
   improveButtonRef?: React.RefObject<HTMLElement | null>;
-  onGenerateTitle: () => void;
   onSuggestTags: () => void;
   onStudy: () => void;
   onClaudeSummarize: () => void;
@@ -3351,6 +3752,7 @@ function EditorPanel({
   isDraftNote: boolean;
   voiceToNotesToolbar?: React.ReactNode;
   studyProgressCompletion: StudyProgressCompletion;
+  noteContentLoading?: boolean;
   onDeleteRequest: () => void;
 }) {
   const [localTitle, setLocalTitle] = React.useState(editTitle);
@@ -3364,6 +3766,14 @@ function EditorPanel({
       setLocalTitle(editTitle);
     }
   }, [selectedNote.id, titleSyncKey, editTitle]);
+
+  const [titleRevealActive, setTitleRevealActive] = React.useState(false);
+  React.useEffect(() => {
+    if (titleAutoRevealTick === 0) return;
+    setTitleRevealActive(true);
+    const t = window.setTimeout(() => setTitleRevealActive(false), 1300);
+    return () => window.clearTimeout(t);
+  }, [titleAutoRevealTick]);
 
   function handleStudyProgressStep(step: StudyProgressStepId) {
     switch (step) {
@@ -3435,7 +3845,7 @@ function EditorPanel({
     "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-1 text-xs font-medium text-[var(--text)] transition-colors hover:bg-[var(--btn-default-bg)] disabled:pointer-events-none disabled:opacity-45";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--chrome-20)] backdrop-blur-xl md:rounded-2xl md:border">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--bg)] md:rounded-2xl md:border">
       <NoteStudyProgressTrail
         completion={studyProgressCompletion}
         onStepPress={handleStudyProgressStep}
@@ -3462,17 +3872,31 @@ function EditorPanel({
           <span className="hidden sm:inline">Back</span>
         </button>
 
-        <input
-          value={localTitle}
-          onChange={(e) => {
-            const v = e.target.value;
-            setLocalTitle(v);
-            onTitleDraftChange(v);
-          }}
-          className="min-w-0 flex-1 bg-transparent text-lg font-semibold tracking-tight text-[var(--text)] outline-none placeholder:text-[var(--placeholder)] md:text-xl"
-          placeholder="Untitled note"
-          aria-label="Note title"
-        />
+        <div
+          className={cn(
+            "min-w-0 flex-1 rounded-lg px-0.5 transition-opacity duration-300",
+            titleRevealActive && "studara-title-auto-reveal",
+            titleLoading && "opacity-[0.88]"
+          )}
+        >
+          <input
+            value={localTitle}
+            onChange={(e) => {
+              const v = e.target.value;
+              setLocalTitle(v);
+              onTitleDraftChange(v);
+            }}
+            className="w-full min-w-0 bg-transparent text-lg font-semibold tracking-tight text-[var(--text)] outline-none placeholder:text-[var(--placeholder)] md:text-xl"
+            placeholder="Untitled note"
+            aria-label="Note title"
+          />
+        </div>
+
+        {titleLoading ? (
+          <span className="inline-flex shrink-0" aria-label="Generating title">
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--muted)]" aria-hidden />
+          </span>
+        ) : null}
 
         <div className="relative shrink-0" ref={categoryMenuRef}>
           <button
@@ -3498,7 +3922,7 @@ function EditorPanel({
           {categoryMenuOpen ? (
             <div
               role="listbox"
-              className="absolute right-0 top-full z-50 mt-1 max-h-60 min-w-[11rem] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl app-sidebar-scrollbar"
+              className="absolute right-0 top-full z-50 mt-1 max-h-60 min-w-[11rem] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-[var(--shadow-brand-md)] app-sidebar-scrollbar"
             >
               <button
                 type="button"
@@ -3567,7 +3991,7 @@ function EditorPanel({
           {editorMenuOpen ? (
             <div
               role="menu"
-              className="absolute right-0 top-full z-50 mt-1 min-w-[11rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl"
+              className="absolute right-0 top-full z-50 mt-1 min-w-[11rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-[var(--shadow-brand-md)]"
               onPointerDown={(e) => e.stopPropagation()}
             >
               <button
@@ -3629,7 +4053,7 @@ function EditorPanel({
               <button
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--status-danger-fg-strong)] hover:bg-[var(--status-danger-bg)]"
                 onClick={() => {
                   setEditorMenuOpen(false);
                   onDeleteRequest();
@@ -3644,7 +4068,7 @@ function EditorPanel({
       </div>
 
       {suggestBanner ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-purple-500/10 px-4 py-2.5 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-[color:color-mix(in_oklab,var(--accent)_10%,transparent)] px-4 py-2.5 text-sm">
           <span className="text-[var(--text)]">
             Suggested category: <strong>{suggestBanner.name}</strong>
           </span>
@@ -3659,7 +4083,20 @@ function EditorPanel({
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:px-4 md:pb-4 md:pt-3">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:pb-4 md:pt-3">
+        {noteContentLoading ? (
+          <div
+            className="absolute inset-0 z-20 flex items-start justify-center bg-[color-mix(in_oklab,var(--bg)_82%,transparent)] px-4 pt-20 backdrop-blur-[2px]"
+            role="status"
+            aria-live="polite"
+            aria-label="Loading note"
+          >
+            <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--chrome-90)] px-4 py-2.5 text-sm text-[var(--text)] shadow-lg">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--muted)]" aria-hidden />
+              Loading note…
+            </div>
+          </div>
+        ) : null}
         <NoteRichTextEditor
           key={richEditorKey}
           noteId={selectedNote.id}
@@ -3667,7 +4104,7 @@ function EditorPanel({
           onHtmlChange={setEditContent}
           className="min-h-0 flex-1"
           aiToolbar={
-            <div className="flex flex-wrap items-center gap-2 px-2 py-2 md:gap-2.5 md:px-3 md:py-2.5">
+            <div className="flex flex-wrap items-center gap-2 px-6 py-2 md:gap-2.5 md:py-2.5">
               <Sparkles className="h-4 w-4 shrink-0 text-[var(--accent)]" strokeWidth={2} aria-hidden />
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                 <button
@@ -3680,7 +4117,7 @@ function EditorPanel({
                   {summaryLoading ? (
                     <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
                   ) : (
-                    <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-400/90" strokeWidth={2} />
+                    <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" strokeWidth={2} />
                   )}
                   Summarize
                 </button>
@@ -3696,16 +4133,6 @@ function EditorPanel({
                     Improve
                   </button>
                 </span>
-                <button
-                  type="button"
-                  className={aiPillClass}
-                  disabled={titleLoading}
-                  title="Generate a title from your note"
-                  onClick={() => void onGenerateTitle()}
-                >
-                  {titleLoading ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
-                  Generate title
-                </button>
                 <button
                   type="button"
                   className={aiPillClass}
@@ -3752,26 +4179,28 @@ function EditorPanel({
         />
 
         {summaryBelow ? (
-          <div className="mt-3 rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-300/95">Summary</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-[var(--text)]">{summaryBelow}</p>
+          <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--input-bg)] px-6 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent-label)]">Summary</p>
+            <div className="mt-1.5 text-sm leading-relaxed text-[var(--text)]">
+              <TutorMarkdown content={summaryBelow} className={summaryMarkdownLayoutClassName} />
+            </div>
           </div>
         ) : null}
         {toolbarError ? (
-          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-            <p className="text-sm text-red-200">{toolbarError}</p>
-            <button type="button" onClick={onToolbarErrorDismiss} className="shrink-0 text-red-300 hover:text-[var(--text)]">
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-6 py-3">
+            <p className="text-sm text-[var(--status-danger-fg)]">{toolbarError}</p>
+            <button type="button" onClick={onToolbarErrorDismiss} className="shrink-0 text-[var(--status-danger-fg-strong)] hover:text-[var(--text)]">
               <X className="h-4 w-4" />
             </button>
           </div>
         ) : null}
         {suggestTagsChips && suggestTagsChips.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2 px-6">
             <span className="text-xs text-[var(--muted)]">Suggested tags:</span>
             {suggestTagsChips.map((tag) => (
               <Badge
                 key={tag}
-                className="cursor-pointer text-xs transition hover:bg-purple-500/40"
+                className="cursor-pointer text-xs transition hover:bg-[var(--hover-bg)]"
                 onClick={() => onSuggestTagAccept(tag)}
               >
                 + {tag}
@@ -3800,6 +4229,9 @@ function NoteCard({
   onSelect,
   onRequestDelete,
   onShare,
+  onSummarizeFromCard,
+  onStudyFromCard,
+  summarizeLoading = false,
 }: {
   note: Note;
   categories: Category[];
@@ -3809,6 +4241,9 @@ function NoteCard({
   onSelect: () => void;
   onRequestDelete: () => void;
   onShare: () => void;
+  onSummarizeFromCard: () => void;
+  onStudyFromCard: () => void;
+  summarizeLoading?: boolean;
 }) {
   const category = note.category_id ? categories.find((c) => c.id === note.category_id) : null;
   const categoryName = category?.name ?? "Uncategorized";
@@ -3926,14 +4361,16 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "note-dashboard-card group relative box-border flex h-[180px] w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--border)] border-l-[3px] bg-[var(--panel)] p-4 text-left shadow-sm outline-none backdrop-blur transition duration-200",
-        "hover:bg-[var(--badge-free-bg)] hover:shadow-md",
+        "note-dashboard-card group relative box-border flex w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--border)] border-l-[3px] bg-[var(--chrome-20)] p-4 text-left outline-none backdrop-blur-xl transition duration-200",
+        "hover:bg-[var(--hover-bg-subtle)]",
         "focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
         selectMode && "cursor-default",
-        selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30"
+        selected &&
+          selectMode &&
+          "border-[color:color-mix(in_oklab,var(--accent)_42%,transparent)] bg-[color:color-mix(in_oklab,var(--accent)_12%,transparent)] ring-1 ring-[color:color-mix(in_oklab,var(--accent)_26%,transparent)]"
       )}
     >
-      <div className="flex min-h-0 min-w-0 flex-1 items-start gap-3">
+      <div className="flex min-w-0 items-start gap-3">
         {selectMode ? (
           <input
             type="checkbox"
@@ -3943,11 +4380,11 @@ function NoteCard({
               onToggleSelect?.();
             }}
             onClick={(e) => e.stopPropagation()}
-            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--border)] bg-[var(--btn-default-bg)] text-purple-500 focus:ring-purple-500"
+            className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--accent)] focus:ring-[var(--accent)]"
             aria-label={selected ? "Deselect note" : "Select note"}
           />
         ) : null}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
             <h3 className="min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-[var(--text)]">
               {note.title || "Untitled"}
@@ -3970,7 +4407,7 @@ function NoteCard({
                 {menuOpen ? (
                   <div
                     role="menu"
-                    className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl"
+                    className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-[var(--shadow-brand-md)]"
                     onPointerDown={(e) => e.stopPropagation()}
                   >
                     <button
@@ -3998,7 +4435,7 @@ function NoteCard({
                     <button
                       type="button"
                       role="menuitem"
-                      className="block w-full px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10 dark:text-red-400"
+                      className="block w-full px-3 py-2 text-left text-sm text-[var(--status-danger-fg-strong)] transition-colors hover:bg-[var(--status-danger-bg)]"
                       onClick={(e) => {
                         e.stopPropagation();
                         runDelete();
@@ -4011,24 +4448,79 @@ function NoteCard({
               </div>
             ) : null}
           </div>
-          <p className="mt-2 line-clamp-2 text-sm leading-snug text-[var(--muted)]">{preview || "No content"}</p>
-          <div className="min-h-0 flex-1" aria-hidden />
-          <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
-            <span
-              className={cn(
-                "inline-flex min-w-0 max-w-[58%] items-center gap-1.5 truncate rounded-full px-2.5 py-0.5 text-xs font-medium",
-                !categoryColor && categoryName === "Uncategorized" && "bg-[var(--btn-default-bg)] text-[var(--muted)]",
-                !categoryColor && categoryName !== "Uncategorized" && "bg-purple-500/20 text-purple-400"
-              )}
-              style={categoryColor ? { backgroundColor: `${categoryColor}30`, color: categoryColor } : undefined}
-              title={categoryName}
-            >
-              {categoryColor ? (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: categoryColor }} aria-hidden />
-              ) : null}
-              {categoryName}
-            </span>
-            <span className="shrink-0 text-xs tabular-nums text-[var(--muted)]">{formattedDate}</span>
+          <p className="line-clamp-2 text-sm leading-snug text-[var(--muted)]">{preview || "No content"}</p>
+          <div className="flex shrink-0 flex-col gap-2">
+            <div className="flex shrink-0 items-center justify-between gap-2">
+              <span
+                className={cn(
+                  "inline-flex min-w-0 max-w-[58%] items-center gap-1.5 truncate rounded-full px-2.5 py-0.5 text-xs font-medium",
+                  !categoryColor && categoryName === "Uncategorized" && "bg-[var(--btn-default-bg)] text-[var(--muted)]",
+                  !categoryColor &&
+                    categoryName !== "Uncategorized" &&
+                    "bg-[color:color-mix(in_oklab,var(--accent)_18%,transparent)] text-[var(--accent-fg)]"
+                )}
+                style={categoryColor ? { backgroundColor: `${categoryColor}30`, color: categoryColor } : undefined}
+                title={categoryName}
+              >
+                {categoryColor ? (
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: categoryColor }} aria-hidden />
+                ) : null}
+                {categoryName}
+              </span>
+              <span className="shrink-0 text-xs tabular-nums text-[var(--muted)]">{formattedDate}</span>
+            </div>
+            {!selectMode ? (
+              <div
+                className="flex shrink-0 items-center justify-center gap-0.5 border-t border-[var(--border-subtle)] pt-2"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  title="Summarize"
+                  aria-label="Summarize note"
+                  disabled={summarizeLoading}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSummarizeFromCard();
+                  }}
+                  className={cn(
+                    "rounded-md p-1.5 text-[var(--muted)] transition-[opacity,background-color,color] hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] max-md:opacity-90 md:opacity-45 md:group-hover:opacity-100 md:group-focus-within:opacity-100",
+                    summarizeLoading && "pointer-events-none opacity-100"
+                  )}
+                >
+                  {summarizeLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <Zap className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  title="Study"
+                  aria-label="Open study mode for this note"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStudyFromCard();
+                  }}
+                  className="rounded-md p-1.5 text-[var(--muted)] transition-[opacity,background-color,color] hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] max-md:opacity-90 md:opacity-45 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                >
+                  <GraduationCap className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  title="Share"
+                  aria-label="Share note"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShare();
+                  }}
+                  className="rounded-md p-1.5 text-[var(--muted)] transition-[opacity,background-color,color] hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] max-md:opacity-90 md:opacity-45 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                >
+                  <Share2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -4041,7 +4533,7 @@ function NoteCard({
       {ctxMenu && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed z-[80] min-w-[9.5rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl"
+              className="fixed z-[80] min-w-[9.5rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-[var(--shadow-brand-md)]"
               style={{ left: ctxMenu.x, top: ctxMenu.y }}
               onPointerDown={(e) => e.stopPropagation()}
               role="menu"
@@ -4066,7 +4558,7 @@ function NoteCard({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10 dark:text-red-400"
+                className="block w-full px-3 py-2 text-left text-sm text-[var(--status-danger-fg-strong)] transition-colors hover:bg-[var(--status-danger-bg)]"
                 onClick={() => runDelete()}
               >
                 Delete
@@ -4112,7 +4604,7 @@ function CategoryTab({
         className={cn(
           "flex min-h-11 min-w-0 flex-1 touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition duration-200",
           selected
-            ? "bg-gradient-to-r from-purple-500/18 to-blue-500/10 text-[var(--text)] shadow-[inset_0_0_0_1px_rgba(168,85,247,0.25)]"
+            ? "bg-gradient-to-r from-purple-500/18 to-blue-500/10 text-[var(--text)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent)_28%,transparent)]"
             : "text-[var(--muted)] hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
         )}
       >
@@ -4125,7 +4617,10 @@ function CategoryTab({
             aria-hidden
           />
         ) : (
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-white/25 ring-2 ring-[var(--border)]" aria-hidden />
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--category-dot-fallback)] ring-2 ring-[var(--border)]"
+            aria-hidden
+          />
         )}
         <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
         {count !== undefined ? (
@@ -4167,7 +4662,7 @@ function CategoryTab({
         </button>
       ) : null}
       {menu && !isAll && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[8rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl">
+        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[8rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-[var(--shadow-brand-md)]">
           {onRename && (
             <button
               type="button"
@@ -4187,7 +4682,7 @@ function CategoryTab({
                 onDelete();
                 setMenu(false);
               }}
-              className="block w-full px-3 py-2 text-left text-sm text-red-400 transition hover:bg-[var(--btn-default-bg)]"
+              className="block w-full px-3 py-2 text-left text-sm text-[var(--status-danger-fg-strong)] transition hover:bg-[var(--btn-default-bg)]"
             >
               Delete
             </button>
@@ -4218,7 +4713,7 @@ function StreakMilestoneModal({
       aria-modal
       aria-labelledby="streak-milestone-title"
     >
-      <Card className="studara-streak-milestone-enter relative w-full max-w-sm overflow-hidden border border-violet-400/25 bg-[var(--modal-surface)] p-8 text-center shadow-2xl shadow-violet-900/20">
+      <Card className="studara-streak-milestone-enter relative w-full max-w-sm overflow-hidden border border-[var(--border-subtle)] bg-[var(--modal-surface)] p-8 text-center shadow-[var(--shadow-brand-lg)]">
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
           {[...Array(12)].map((_, i) => (
             <span
@@ -4233,15 +4728,15 @@ function StreakMilestoneModal({
             />
           ))}
         </div>
-        <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/40 via-orange-500/35 to-rose-500/30 ring-2 ring-amber-300/30">
-          <Flame className="h-11 w-11 text-amber-100" strokeWidth={1.5} aria-hidden />
+        <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/40 via-orange-500/35 to-rose-500/30 ring-2 ring-[color:color-mix(in_oklab,var(--status-warning-border)_55%,transparent)]">
+          <Flame className="h-11 w-11 text-[var(--inverse-text)]" strokeWidth={1.5} aria-hidden />
         </div>
-        <p className="relative mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-violet-300/90">Milestone</p>
+        <p className="relative mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-label)]">Milestone</p>
         <h2 id="streak-milestone-title" className="relative mt-2 text-2xl font-bold text-[var(--text)]">
           {title}
         </h2>
         <p className="relative mt-1 text-sm text-[var(--muted)]">{subtitle}</p>
-        <p className="relative mt-4 text-5xl font-black tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-orange-200 to-rose-200">
+        <p className="relative mt-4 text-5xl font-black tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-[var(--headline-stat-from)] via-[var(--headline-stat-via)] to-[var(--headline-stat-to)]">
           {milestone}
         </p>
         <Button
@@ -4264,6 +4759,16 @@ function quizEncouragementMessage(score: number, total: number): string {
   if (pct >= 60) return "Solid effort — review the tricky ones and you'll nail it.";
   if (pct >= 40) return "Keep going — every attempt builds stronger recall.";
   return "Don't give up — try again and watch your score climb.";
+}
+
+function flashcardEncouragementMessage(gotIt: number, almost: number, missed: number, total: number): string {
+  if (total <= 0) return "Nice work finishing the deck!";
+  const pct = Math.round(((gotIt + almost) / total) * 100);
+  if (missed === 0 && almost === 0) return "Flawless — every answer was solid recall.";
+  if (pct >= 90) return "Outstanding — you're in great shape on this material.";
+  if (pct >= 75) return "Strong session — a quick pass on the harder ones and you're set.";
+  if (pct >= 50) return "Good progress — review what you missed while it's fresh.";
+  return "Keep going — spaced repetition turns weak spots into strengths.";
 }
 
 function StudyModal({
@@ -4290,8 +4795,11 @@ function StudyModal({
   flashcardReviewDueTotal,
   flashcardSessionReviewed,
   flashcardsSessionComplete,
+  flashcardSessionRatings,
   flashcardRatingLoading,
   onFlashcardRate,
+  onFlashcardsStudyAgain,
+  onFlashcardsStudyMissedOnly,
   onQuizSelect,
   onQuizNext,
   onQuizTryAgain,
@@ -4329,8 +4837,11 @@ function StudyModal({
   flashcardReviewDueTotal: number | null;
   flashcardSessionReviewed: number;
   flashcardsSessionComplete: boolean;
+  flashcardSessionRatings: FlashcardRating[];
   flashcardRatingLoading: boolean;
   onFlashcardRate: (rating: FlashcardRating) => void;
+  onFlashcardsStudyAgain: () => void;
+  onFlashcardsStudyMissedOnly: () => void;
   onQuizSelect: (i: number) => void;
   onQuizNext: () => void;
   onQuizTryAgain: () => void;
@@ -4356,10 +4867,10 @@ function StudyModal({
   if (mode === "menu") {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim)] p-4 backdrop-blur-md">
-        <Card className="studara-study-modal-enter relative mx-auto w-full max-w-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+        <Card className="studara-study-modal-enter relative mx-auto w-full max-w-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-[var(--shadow-brand-lg)] backdrop-blur-xl sm:p-8">
           <div className="flex flex-col items-center text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/30 to-cyan-500/20 ring-1 ring-[var(--border)]">
-              <GraduationCap className="h-8 w-8 text-violet-200" strokeWidth={1.5} />
+              <GraduationCap className="h-8 w-8 text-[var(--accent-icon)]" strokeWidth={1.5} />
             </div>
             <h2 className="mt-5 text-2xl font-semibold tracking-tight text-[var(--text)]">Study Mode</h2>
             <p className="mt-1.5 max-w-md text-sm text-[var(--muted)]">
@@ -4377,11 +4888,11 @@ function StudyModal({
             </button>
           </div>
 
-          {error && <p className="mt-4 text-center text-sm text-red-400">{error}</p>}
+          {error && <p className="mt-4 text-center text-sm text-[var(--status-danger-fg-strong)]">{error}</p>}
 
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             <div className="flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--modal-surface)] p-5 shadow-inner sm:min-h-[220px]">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15 text-violet-200">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:color-mix(in_oklab,var(--accent)_14%,transparent)] text-[var(--accent-icon)]">
                 <SquareStack className="h-6 w-6" strokeWidth={1.75} />
               </div>
               <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">Flashcards</h3>
@@ -4392,7 +4903,7 @@ function StudyModal({
                 type="button"
                 onClick={onLoadFlashcards}
                 disabled={!!loading}
-                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
+                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-[var(--shadow-brand-lg)] hover:from-violet-500 hover:to-indigo-500"
               >
                 {loading === "flashcards" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -4404,7 +4915,7 @@ function StudyModal({
             </div>
 
             <div className="flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--modal-surface)] p-5 shadow-inner sm:min-h-[220px]">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-200">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--status-info-bg)] text-[var(--status-info-fg)]">
                 <HelpCircle className="h-6 w-6" strokeWidth={1.75} />
               </div>
               <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">Quiz</h3>
@@ -4415,7 +4926,7 @@ function StudyModal({
                 type="button"
                 onClick={onLoadQuiz}
                 disabled={!!loading}
-                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:to-indigo-500"
+                className="mt-5 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-[var(--shadow-brand-lg)] hover:from-violet-500 hover:to-indigo-500"
               >
                 {loading === "quiz" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -4435,22 +4946,88 @@ function StudyModal({
     const totalCards = flashcards.length;
 
     if (flashcardsSessionComplete) {
+      let gotIt = 0;
+      let almost = 0;
+      let missed = 0;
+      for (const r of flashcardSessionRatings) {
+        if (r === "easy") gotIt += 1;
+        else if (r === "good") almost += 1;
+        else missed += 1;
+      }
+      const recallPct =
+        totalCards > 0 ? Math.round(((gotIt + almost) / totalCards) * 100) : 0;
+      const missedCount = flashcardSessionRatings.filter((r) => r === "hard").length;
+
       return (
         <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-[var(--scrim)] p-0 backdrop-blur-md sm:items-center sm:p-4">
-          <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-2xl backdrop-blur-sm sm:rounded-2xl sm:border max-sm:flex-1">
-            <div className="flex flex-1 flex-col items-center justify-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/35 to-violet-500/25 ring-1 ring-[var(--border)]">
-                <SquareStack className="h-8 w-8 text-emerald-200" strokeWidth={1.5} />
+          <Card className="relative flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-y-auto rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-[var(--shadow-brand-lg)] backdrop-blur-sm sm:max-h-[min(92dvh,880px)] sm:rounded-2xl sm:border sm:p-8 max-sm:flex-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-3 top-3 rounded-lg p-2 text-[var(--muted)] transition hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] sm:right-5 sm:top-5"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="flex flex-col items-center pt-2 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/35 via-purple-500/25 to-indigo-500/30 shadow-[var(--accent-glow)] ring-1 ring-[color-mix(in_oklab,var(--accent)_35%,transparent)]">
+                <SquareStack className="h-9 w-9 text-[var(--accent-icon)]" strokeWidth={1.5} />
               </div>
-              <h3 className="mt-5 text-xl font-semibold text-[var(--text)]">Session complete</h3>
-              <p className="mt-2 max-w-xs text-sm text-[var(--muted)]">
+              <h3 className="mt-6 text-2xl font-semibold tracking-tight text-[var(--text)]">Deck complete</h3>
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 {reviewDueOnly
-                  ? `You reviewed all ${totalCards} due card${totalCards === 1 ? "" : "s"}. Great work — spaced repetition will surface them again when it’s time.`
-                  : "Nice work. Keep rating cards when you flip them to build your personal review schedule."}
+                  ? `You finished all ${totalCards} due card${totalCards === 1 ? "" : "s"} for today.`
+                  : `You worked through ${totalCards} card${totalCards === 1 ? "" : "s"}.`}
               </p>
-              <Button type="button" className="mt-8 w-full max-w-xs border-0 bg-gradient-to-r from-violet-600 to-indigo-600" onClick={onClose}>
-                Done
-              </Button>
+              <p className="mt-6 text-5xl font-bold tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent)] via-[var(--stats-label-from)] to-[var(--accent2)]">
+                {recallPct}%
+              </p>
+              <p className="mt-1 text-sm font-medium text-[var(--text)]">recall score</p>
+              <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm tabular-nums text-[var(--muted)]">
+                <span>
+                  <span className="font-semibold text-[var(--status-success-fg)]">{gotIt}</span> got it
+                </span>
+                <span className="text-[var(--faint)]">·</span>
+                <span>
+                  <span className="font-semibold text-[var(--status-warning-fg)]">{almost}</span> almost
+                </span>
+                <span className="text-[var(--faint)]">·</span>
+                <span>
+                  <span className="font-semibold text-[var(--status-danger-fg)]">{missed}</span> missed
+                </span>
+              </div>
+              <p className="mt-5 max-w-sm text-sm leading-relaxed text-[var(--muted)]">
+                {flashcardEncouragementMessage(gotIt, almost, missed, totalCards)}
+              </p>
+              <div className="mt-8 flex w-full max-w-sm flex-col gap-3">
+                <Button
+                  type="button"
+                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] hover:from-violet-500 hover:to-indigo-500"
+                  onClick={onFlashcardsStudyAgain}
+                >
+                  Study again
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={missedCount === 0}
+                  className="w-full border border-[var(--border)] bg-[var(--input-bg)] py-3 text-sm font-semibold text-[var(--text)] hover:bg-[var(--btn-default-bg)] disabled:pointer-events-none disabled:opacity-40"
+                  onClick={onFlashcardsStudyMissedOnly}
+                >
+                  Study missed cards only
+                  {missedCount > 0 ? (
+                    <span className="ml-1.5 tabular-nums text-[var(--muted)]">({missedCount})</span>
+                  ) : null}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onClose}
+                  className="w-full border border-[var(--border-subtle)] bg-transparent py-3 text-sm font-medium text-[var(--muted)] hover:bg-[var(--surface-ghost)] hover:text-[var(--text)]"
+                >
+                  {studyLeaveButtonLabel}
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
@@ -4458,20 +5035,24 @@ function StudyModal({
     }
 
     const card = flashcards[cardIndex];
+    const deckProgressPct = totalCards > 0 ? ((cardIndex + 1) / totalCards) * 100 : 0;
+    const faceShell =
+      "absolute inset-0 flex h-[280px] w-full flex-col rounded-3xl border border-[color-mix(in_oklab,var(--accent)_38%,var(--border))] bg-[var(--surface-mid)] shadow-[0_0_40px_-8px_color-mix(in_oklab,var(--accent)_42%,transparent),inset_0_1px_0_var(--inset-shine)] [backface-visibility:hidden]";
+
     return (
       <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-[var(--scrim)] p-0 backdrop-blur-md sm:items-center sm:p-4">
-        <Card className="flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] shadow-2xl backdrop-blur-sm sm:max-h-[min(90dvh,880px)] sm:rounded-2xl sm:border sm:p-6 max-sm:flex-1">
+        <Card className="flex max-h-dvh min-h-0 w-full max-w-[min(100%,680px)] flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] shadow-[var(--shadow-brand-lg)] backdrop-blur-sm sm:max-h-[min(92dvh,900px)] sm:rounded-2xl sm:border sm:p-6 max-sm:flex-1">
           <div className="flex shrink-0 items-start justify-between gap-3 px-4 pb-2 pt-4 sm:px-0 sm:pb-0 sm:pt-0">
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-semibold tracking-tight text-[var(--text)] sm:text-sm">Flashcards</h3>
               {studyScope === "multi" && (
-                <p className="mt-1 text-xs text-violet-300/90">From multiple notes</p>
+                <p className="mt-1 text-xs text-[var(--accent-label-muted)]">From multiple notes</p>
               )}
               {studyScope === "saved" && savedSetTitle && (
-                <p className="mt-1 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
+                <p className="mt-1 line-clamp-2 text-xs text-[var(--status-success-fg)]">{savedSetTitle}</p>
               )}
               {reviewDueOnly && (
-                <p className="mt-1 text-xs font-medium text-amber-200/90">Due for review today</p>
+                <p className="mt-1 text-xs font-medium text-[var(--status-warning-fg)]">Due for review today</p>
               )}
             </div>
             <button
@@ -4485,152 +5066,162 @@ function StudyModal({
           </div>
 
           {error && (
-            <p className="mx-4 mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-200 sm:mx-0">
+            <p className="mx-4 mt-2 rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-3 py-2 text-center text-xs text-[var(--status-danger-fg)] sm:mx-0">
               {error}
             </p>
           )}
 
-          {flashcardReviewDueTotal != null && flashcardReviewDueTotal > 0 ? (
-            <div className="mt-3 px-4 sm:px-0">
-              <div className="mb-1 flex justify-between text-xs text-[var(--muted)]">
-                <span>Due today</span>
-                <span className="tabular-nums">
-                  {flashcardSessionReviewed} / {flashcardReviewDueTotal} reviewed
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-0">
+            {flashcardReviewDueTotal != null && flashcardReviewDueTotal > 0 ? (
+              <p className="mb-2 text-center text-[11px] text-[var(--faint)]">
+                Due today:{" "}
+                <span className="tabular-nums text-[var(--muted)]">
+                  {flashcardSessionReviewed} / {flashcardReviewDueTotal}
+                </span>{" "}
+                reviewed
+              </p>
+            ) : null}
+
+            <div className="mx-auto w-full max-w-[600px]">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <span className="text-xs font-medium uppercase tracking-wider text-[var(--muted)]">Progress</span>
+                <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
+                  {cardIndex + 1} of {totalCards}
                 </span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--btn-default-bg)]">
+              <div className="h-2 overflow-hidden rounded-full bg-[var(--btn-default-bg)] ring-1 ring-[var(--border-subtle)]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-emerald-400 transition-[width] duration-300"
-                  style={{
-                    width: `${Math.min(100, (flashcardSessionReviewed / flashcardReviewDueTotal) * 100)}%`,
-                  }}
+                  className="h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-500 transition-[width] duration-500 ease-out"
+                  style={{ width: `${deckProgressPct}%` }}
                 />
               </div>
             </div>
-          ) : null}
 
-          <p className="mt-3 px-4 text-center text-sm text-[var(--muted)] sm:px-0">Tap the card to flip</p>
-
-          {/* Fixed-size flip card: full width, taller on mobile for easy tapping */}
-          <div className="mt-3 min-h-0 flex-1 px-3 sm:px-0">
-            <div className="rounded-2xl bg-gradient-to-br from-violet-500/50 via-indigo-500/35 to-cyan-500/40 p-[1px] shadow-[0_0_40px_-12px_rgba(139,92,246,0.35)]">
-              <div className="perspective-[1400px] w-full">
+            <div className="mx-auto mt-5 w-full max-w-[600px] [perspective:1400px]">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={onCardFlip}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onCardFlip();
+                  }
+                }}
+                className={cn(
+                  "relative h-[280px] w-full cursor-pointer transition-transform duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] [transform-style:preserve-3d]",
+                  cardFlipped && "[transform:rotateY(180deg)]"
+                )}
+                style={{ transformOrigin: "center center" }}
+                aria-label={cardFlipped ? "Show question (front)" : "Show answer (back)"}
+              >
                 <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={onCardFlip}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onCardFlip();
-                    }
-                  }}
                   className={cn(
-                    "relative min-h-[min(48dvh,320px)] w-full cursor-pointer transition-transform duration-500 ease-out [transform-style:preserve-3d] sm:min-h-[220px]",
-                    cardFlipped && "[transform:rotateY(180deg)]"
+                    faceShell,
+                    "items-stretch justify-between px-5 py-5 text-center [transform:rotateY(0deg)]"
                   )}
-                  aria-label={cardFlipped ? "Show question (front)" : "Show answer (back)"}
                 >
-                  {/* Front — term / question */}
-                  <div
-                    className="absolute inset-0 flex min-h-[min(48dvh,320px)] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-[var(--border-subtle)] bg-[var(--modal-surface)] px-5 py-8 text-center [backface-visibility:hidden] [transform:rotateY(0deg)] sm:min-h-[220px] sm:py-6"
-                  >
-                    <span className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-indigo-300">
-                      Question
-                    </span>
-                    <p className="max-w-full text-lg font-medium leading-relaxed text-[var(--text)] [overflow-wrap:anywhere] sm:text-base">
+                  <div className="min-h-0 flex flex-1 flex-col items-center justify-center overflow-y-auto">
+                    <p className="max-w-full text-lg font-bold leading-snug text-[var(--text)] [overflow-wrap:anywhere] sm:text-xl">
                       {card.front}
                     </p>
                   </div>
-                  {/* Back — definition / answer */}
-                  <div
-                    className="absolute inset-0 flex min-h-[min(48dvh,320px)] flex-col items-center justify-center overflow-y-auto rounded-[15px] border border-[var(--border-subtle)] bg-[var(--modal-surface)] px-5 py-8 text-center [backface-visibility:hidden] [transform:rotateY(180deg)] sm:min-h-[220px] sm:py-6"
-                  >
-                    <span className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-violet-300">
-                      Answer
-                    </span>
-                    <p className="max-w-full text-lg leading-relaxed text-[var(--text)] [overflow-wrap:anywhere] sm:text-base">
-                      {card.back}
-                    </p>
-                  </div>
+                  <p className="shrink-0 pt-2 text-center text-[11px] text-[var(--faint)]">Click to flip</p>
+                </div>
+                <div
+                  className={cn(
+                    faceShell,
+                    "items-center justify-center overflow-y-auto px-6 py-6 text-center [transform:rotateY(180deg)]"
+                  )}
+                >
+                  <p className="max-w-full text-base font-medium leading-relaxed text-[var(--text)] [overflow-wrap:anywhere] sm:text-lg">
+                    {card.back}
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
 
-          <p className="mt-4 px-4 text-center text-base font-medium tabular-nums text-[var(--muted)] sm:px-0 sm:text-sm">
-            {cardIndex + 1} of {totalCards}
-          </p>
-
-          {cardFlipped ? (
-            <div className="mt-4 space-y-2 px-4 sm:px-0">
-              <p className="text-center text-xs text-[var(--muted)]">How well did you recall this?</p>
-              <div className="flex gap-2 sm:gap-3">
-                <button
-                  type="button"
-                  disabled={flashcardRatingLoading}
-                  onClick={() => onFlashcardRate("hard")}
-                  className="min-h-12 flex-1 rounded-xl border border-red-500/40 bg-red-500/15 px-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/25 disabled:opacity-50 touch-manipulation"
-                >
-                  Hard
-                </button>
-                <button
-                  type="button"
-                  disabled={flashcardRatingLoading}
-                  onClick={() => onFlashcardRate("good")}
-                  className="min-h-12 flex-1 rounded-xl border border-amber-500/45 bg-amber-500/15 px-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-50 touch-manipulation"
-                >
-                  Good
-                </button>
-                <button
-                  type="button"
-                  disabled={flashcardRatingLoading}
-                  onClick={() => onFlashcardRate("easy")}
-                  className="min-h-12 flex-1 rounded-xl border border-emerald-500/45 bg-emerald-500/15 px-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/25 disabled:opacity-50 touch-manipulation"
-                >
-                  Easy
-                </button>
-              </div>
+            <div className="mx-auto mt-5 flex w-full max-w-[600px] items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={onCardPrev}
+                disabled={cardIndex === 0}
+                className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] shadow-sm transition hover:bg-[var(--btn-default-bg)] disabled:pointer-events-none disabled:opacity-35 sm:min-h-11 sm:min-w-11"
+                aria-label="Previous card"
+              >
+                <ChevronLeft className="h-5 w-5" strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onCardFlip();
+                }}
+                className="flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border-0 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-4 text-sm font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] transition hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500"
+              >
+                <FlipHorizontal className="h-4 w-4 opacity-90" strokeWidth={2} />
+                Flip
+              </button>
+              <button
+                type="button"
+                onClick={onCardNext}
+                disabled={cardIndex === totalCards - 1}
+                className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] shadow-sm transition hover:bg-[var(--btn-default-bg)] disabled:pointer-events-none disabled:opacity-35 sm:min-h-11 sm:min-w-11"
+                aria-label="Next card"
+              >
+                <ChevronRight className="h-5 w-5" strokeWidth={2} />
+              </button>
             </div>
-          ) : null}
 
-          {canPersistStudy && (
-            <Button
-              type="button"
-              className="mx-4 mt-3 w-[calc(100%-2rem)] border-0 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-base font-medium text-[var(--inverse-text)] shadow-md shadow-violet-500/20 disabled:opacity-50 sm:mx-0 sm:w-full sm:py-2 sm:text-sm"
-              onClick={() => void onSaveFlashcards()}
-              disabled={studySaveLoading === "flashcards"}
-            >
-              {studySaveLoading === "flashcards" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Save to Study Sets
-            </Button>
-          )}
+            {canPersistStudy && (
+              <Button
+                type="button"
+                className="mx-auto mt-4 w-full max-w-[600px] border border-[var(--border)] bg-[var(--chrome-35)] py-2.5 text-sm font-medium text-[var(--text)] shadow-none hover:bg-[var(--btn-default-bg)] disabled:opacity-50"
+                onClick={() => void onSaveFlashcards()}
+                disabled={studySaveLoading === "flashcards"}
+              >
+                {studySaveLoading === "flashcards" ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save to Study Sets
+              </Button>
+            )}
 
-          <div className="mt-3 flex w-full shrink-0 items-stretch justify-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pb-0">
-            <Button
-              type="button"
-              variant="ghost"
-              className="min-h-12 min-w-0 flex-1 gap-2 border border-[var(--border)] bg-[var(--input-bg)] px-4 text-base text-[var(--text)] hover:bg-[var(--btn-default-bg)] touch-manipulation sm:min-h-10 sm:min-w-[7.5rem] sm:flex-initial sm:text-sm"
-              onClick={onCardPrev}
-              disabled={cardIndex === 0}
-            >
-              <ChevronLeft className="h-5 w-5 shrink-0 opacity-80 sm:mr-1 sm:h-4 sm:w-4" />
-              Previous
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="min-h-12 min-w-0 flex-1 gap-2 border border-[var(--border)] bg-[var(--input-bg)] px-4 text-base text-[var(--text)] hover:bg-[var(--btn-default-bg)] touch-manipulation sm:min-h-10 sm:min-w-[7.5rem] sm:flex-initial sm:text-sm"
-              onClick={onCardNext}
-              disabled={cardIndex === totalCards - 1}
-            >
-              Next
-              <ChevronRight className="h-5 w-5 shrink-0 opacity-80 sm:ml-1 sm:h-4 sm:w-4" />
-            </Button>
+            {cardFlipped ? (
+              <div className="mx-auto mt-4 w-full max-w-[600px] space-y-2">
+                <p className="text-center text-[11px] font-medium uppercase tracking-wider text-[var(--faint)]">
+                  How well did you know it?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={flashcardRatingLoading}
+                    onClick={() => onFlashcardRate("easy")}
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--status-success-border)] bg-[var(--status-success-bg)] px-2 text-xs font-semibold text-[var(--status-success-fg)] transition hover:brightness-110 disabled:opacity-50 sm:text-sm"
+                  >
+                    Got it
+                  </button>
+                  <button
+                    type="button"
+                    disabled={flashcardRatingLoading}
+                    onClick={() => onFlashcardRate("good")}
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] px-2 text-xs font-semibold text-[var(--status-warning-fg)] transition hover:brightness-110 disabled:opacity-50 sm:text-sm"
+                  >
+                    Almost
+                  </button>
+                  <button
+                    type="button"
+                    disabled={flashcardRatingLoading}
+                    onClick={() => onFlashcardRate("hard")}
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-2 text-xs font-semibold text-[var(--status-danger-fg)] transition hover:brightness-110 disabled:opacity-50 sm:text-sm"
+                  >
+                    Missed it
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -4647,24 +5238,24 @@ function StudyModal({
     if (done) {
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim)] p-4 backdrop-blur-md">
-          <Card className="studara-study-modal-enter mx-auto w-full max-w-md border border-[var(--border)] bg-[var(--modal-surface)] p-6 text-center shadow-2xl backdrop-blur-xl sm:p-8">
+          <Card className="studara-study-modal-enter mx-auto w-full max-w-md border border-[var(--border)] bg-[var(--modal-surface)] p-6 text-center shadow-[var(--shadow-brand-lg)] backdrop-blur-xl sm:p-8">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/35 to-cyan-500/25 ring-1 ring-[var(--border)]">
-              <GraduationCap className="h-8 w-8 text-violet-100" strokeWidth={1.5} />
+              <GraduationCap className="h-8 w-8 text-[var(--accent-icon)]" strokeWidth={1.5} />
             </div>
             <h2 className="mt-5 text-2xl font-semibold text-[var(--text)]">Quiz complete</h2>
-            <p className="mt-2 text-5xl font-bold tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-cyan-300">
+            <p className="mt-2 text-5xl font-bold tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-[var(--stats-label-from)] to-[var(--stats-label-to)]">
               {finalScore}/{total}
             </p>
             <p className="mt-1 text-lg font-medium text-[var(--text)]">{pct}% correct</p>
             <p className="mt-4 text-sm leading-relaxed text-[var(--muted)]">{quizEncouragementMessage(finalScore, total)}</p>
             {error && (
-              <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">{error}</p>
+              <p className="mt-4 rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-3 py-2 text-xs text-[var(--status-danger-fg)]">{error}</p>
             )}
             <div className="mt-8 flex flex-col gap-3">
               {canPersistStudy && (
                 <Button
                   type="button"
-                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-lg shadow-violet-500/25"
+                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-[var(--shadow-brand-lg)]"
                   onClick={() => void onSaveQuiz()}
                   disabled={studySaveLoading === "quiz"}
                 >
@@ -4680,7 +5271,7 @@ function StudyModal({
                 <Button
                   type="button"
                   onClick={onQuizTryAgain}
-                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-md shadow-violet-500/20 sm:w-auto sm:min-w-[140px]"
+                  className="w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 font-medium text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] sm:w-auto sm:min-w-[140px]"
                 >
                   Try again
                 </Button>
@@ -4710,7 +5301,7 @@ function StudyModal({
 
     return (
       <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-[var(--scrim)] p-0 backdrop-blur-md sm:items-center sm:p-4">
-        <Card className="mx-auto flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-y-auto overflow-x-hidden rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] shadow-2xl backdrop-blur-sm sm:max-h-[min(92dvh,900px)] sm:rounded-2xl sm:border sm:p-6">
+        <Card className="mx-auto flex max-h-dvh min-h-0 w-full max-w-lg flex-col overflow-y-auto overflow-x-hidden rounded-none border-0 border-[var(--border)] bg-[var(--modal-surface)] shadow-[var(--shadow-brand-lg)] backdrop-blur-sm sm:max-h-[min(92dvh,900px)] sm:rounded-2xl sm:border sm:p-6">
           <div className="flex shrink-0 items-start justify-between gap-3 px-4 pt-4 sm:px-0 sm:pt-0">
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--faint)]">Quiz</p>
@@ -4718,17 +5309,17 @@ function StudyModal({
                 Question {quizIndex + 1} of {total}
               </p>
               {studyScope === "multi" && (
-                <p className="mt-1 text-xs text-violet-300/90">From multiple notes</p>
+                <p className="mt-1 text-xs text-[var(--accent-label-muted)]">From multiple notes</p>
               )}
               {studyScope === "saved" && savedSetTitle && (
-                <p className="mt-1 line-clamp-2 text-xs text-emerald-300/90">{savedSetTitle}</p>
+                <p className="mt-1 line-clamp-2 text-xs text-[var(--status-success-fg)]">{savedSetTitle}</p>
               )}
               {error && (
-                <p className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-200">{error}</p>
+                <p className="mt-2 rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-2 py-1.5 text-xs text-[var(--status-danger-fg)]">{error}</p>
               )}
               <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--btn-default-bg)]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 transition-[width] duration-300 ease-out"
+                  className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] via-[color-mix(in_oklab,var(--accent)_60%,var(--accent2))] to-[var(--accent2)] transition-[width] duration-300 ease-out"
                   style={{ width: `${((quizIndex + 1) / total) * 100}%` }}
                 />
               </div>
@@ -4744,7 +5335,7 @@ function StudyModal({
           </div>
 
           <div className="mt-5 w-full flex-1 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pb-0">
-            <div className="rounded-2xl bg-gradient-to-br from-violet-500/50 via-indigo-500/35 to-cyan-500/40 p-[1px] shadow-[0_0_40px_-12px_rgba(139,92,246,0.35)]">
+            <div className="rounded-2xl bg-gradient-to-br from-violet-500/50 via-indigo-500/35 to-cyan-500/40 p-[1px] shadow-[var(--accent-glow)]">
               <div className="flex min-h-[min(52dvh,360px)] flex-col rounded-[15px] border border-[var(--border-subtle)] bg-[var(--modal-surface)] p-4 sm:min-h-[340px] sm:p-6">
                 <h3 className="text-center text-lg font-bold leading-snug text-[var(--text)] [overflow-wrap:anywhere] sm:text-lg">
                   {q.question}
@@ -4762,10 +5353,17 @@ function StudyModal({
                         disabled={revealed || !String(opt).trim()}
                         className={cn(
                           "flex min-h-14 w-full touch-manipulation items-start gap-3 rounded-xl border px-4 py-4 text-left text-base leading-snug transition sm:min-h-0 sm:py-3 sm:text-sm",
-                          !revealed && String(opt).trim() && "border-[var(--border)] bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/10",
+                          !revealed &&
+                            String(opt).trim() &&
+                            "border-[var(--border)] bg-[var(--surface-ghost)] hover:border-[color:color-mix(in_oklab,var(--accent)_35%,transparent)] hover:bg-[var(--surface-ghost-hover)]",
                           !String(opt).trim() && "cursor-not-allowed border-dashed border-[var(--border-subtle)] bg-[var(--input-bg)] opacity-40",
-                          revealed && isCorrect && "border-emerald-500/70 bg-emerald-500/15 text-emerald-100",
-                          revealed && !isCorrect && isPicked && "border-red-500/80 bg-red-500/15 text-red-100",
+                          revealed &&
+                            isCorrect &&
+                            "border-[var(--status-success-border)] bg-[var(--status-success-bg)] text-[var(--status-success-fg)]",
+                          revealed &&
+                            !isCorrect &&
+                            isPicked &&
+                            "border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]",
                           revealed && !isCorrect && !isPicked && "border-[var(--sidebar-border)] opacity-50"
                         )}
                       >
@@ -4773,8 +5371,8 @@ function StudyModal({
                           className={cn(
                             "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold sm:h-7 sm:w-7 sm:text-xs",
                             !revealed && "bg-[var(--btn-default-bg)] text-[var(--text)]",
-                            revealed && isCorrect && "bg-emerald-500/30 text-emerald-100",
-                            revealed && !isCorrect && isPicked && "bg-red-500/30 text-red-100",
+                            revealed && isCorrect && "bg-[color:color-mix(in_oklab,var(--status-success-bg)_90%,var(--text))] text-[var(--status-success-fg)]",
+                            revealed && !isCorrect && isPicked && "bg-[var(--status-danger-bg-elevated)] text-[var(--status-danger-fg)]",
                             revealed && !isCorrect && !isPicked && "bg-[var(--input-bg)] text-[var(--faint)]"
                           )}
                         >
@@ -4798,7 +5396,7 @@ function StudyModal({
                   <div className="mt-auto pt-4">
                     <Button
                       type="button"
-                      className="min-h-12 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-base font-medium text-[var(--inverse-text)] shadow-md shadow-violet-500/20 touch-manipulation sm:min-h-10 sm:text-sm"
+                      className="min-h-12 w-full border-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-base font-medium text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] touch-manipulation sm:min-h-10 sm:text-sm"
                       onClick={onQuizNext}
                     >
                       {quizIndex < total - 1 ? (

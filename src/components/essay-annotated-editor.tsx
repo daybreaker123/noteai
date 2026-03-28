@@ -6,7 +6,7 @@ import { resolveAnnotationSpans } from "@/lib/essay-annotations";
 import { cn } from "@/lib/cn";
 
 const TEXTAREA_CLASS =
-  "min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-2xl border border-[var(--border)] bg-transparent p-4 text-sm leading-relaxed text-transparent caret-white shadow-inner [scrollbar-width:none] placeholder:text-[var(--placeholder)] focus:border-purple-500/45 focus:outline-none focus:ring-2 focus:ring-purple-500/25 disabled:opacity-50 [&::-webkit-scrollbar]:[display:none]";
+  "min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-2xl border border-[var(--border)] bg-transparent p-4 text-sm leading-relaxed text-transparent caret-[var(--editor-caret)] shadow-inner [scrollbar-width:none] placeholder:text-[var(--placeholder)] focus:border-[var(--accent)]/45 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 disabled:opacity-50 [&::-webkit-scrollbar]:[display:none]";
 
 function highlightClass(type: EssayAnnotationIssueType): string {
   switch (type) {
@@ -20,7 +20,7 @@ function highlightClass(type: EssayAnnotationIssueType): string {
     case "structure":
       return "underline decoration-2 decoration-orange-400/95 underline-offset-[4px]";
     default:
-      return "underline decoration-2 decoration-white/40 underline-offset-[4px]";
+      return "underline decoration-2 underline-offset-[4px] [text-decoration-color:var(--annotation-unknown-decoration)]";
   }
 }
 

@@ -54,7 +54,7 @@ export function DeleteAccountModal({
             aria-modal="true"
             aria-labelledby="delete-account-title"
           >
-            <Card className="overflow-hidden border-[var(--border)] bg-[var(--chrome-40)] p-6 shadow-2xl backdrop-blur-xl">
+            <Card className="overflow-hidden border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-[var(--shadow-brand-lg)] backdrop-blur-xl">
               <div className="flex items-center justify-between">
                 <h3 id="delete-account-title" className="text-lg font-semibold text-[var(--text)]">
                   Delete account

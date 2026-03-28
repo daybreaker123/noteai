@@ -87,7 +87,7 @@ create table if not exists public.study_sets (
   id uuid primary key default gen_random_uuid(),
   user_id text not null,
   note_id uuid,
-  kind text not null check (kind in ('flashcards', 'quiz')),
+  kind text not null check (kind in ('flashcards', 'quiz', 'concept_map')),
   title text not null default 'Study set',
   note_ids jsonb not null default '[]'::jsonb,
   payload jsonb not null,

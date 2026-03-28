@@ -35,7 +35,10 @@ function BillingPageInner() {
   return (
     <main className="min-h-dvh bg-[var(--bg)] text-[var(--text)] antialiased">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-purple-500/[0.07] blur-[100px]" />
+        <div
+          className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full blur-[100px]"
+          style={{ background: `radial-gradient(circle, var(--page-glow-from), transparent 65%)` }}
+        />
         <div className="absolute top-1/3 right-0 h-[280px] w-[420px] translate-x-1/4 rounded-full bg-blue-500/[0.05] blur-[90px]" />
       </div>
 
@@ -64,7 +67,7 @@ function BillingPageInner() {
           </p>
 
           {error && (
-            <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200/95">
+            <div className="mt-6 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]">
               {error}
             </div>
           )}

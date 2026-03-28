@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
+import { Suspense } from "react";
 import "./globals.css";
+import { GoogleAnalytics } from "@/components/google-analytics";
 import { Providers } from "@/components/providers";
 import { STUDARA_THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme-constants";
+
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? "";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -32,6 +36,23 @@ export default function RootLayout({
         <Script id="studara-theme-init" strategy="beforeInteractive">
           {STUDARA_THEME_BOOTSTRAP_SCRIPT}
         </Script>
+        {gaMeasurementId ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(gaMeasurementId)}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics-init" strategy="afterInteractive">
+              {`window.dataLayer=window.dataLayer||[];
+function gtag(){dataLayer.push(arguments);}
+gtag('js',new Date());
+gtag('config',${JSON.stringify(gaMeasurementId)},{send_page_view:false});`}
+            </Script>
+            <Suspense fallback={null}>
+              <GoogleAnalytics measurementId={gaMeasurementId} />
+            </Suspense>
+          </>
+        ) : null}
         <Providers>{children}</Providers>
       </body>
     </html>

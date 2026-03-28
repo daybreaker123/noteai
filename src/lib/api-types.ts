@@ -28,7 +28,7 @@ export interface ApiError {
   code?: string;
 }
 
-export type StudySetKind = "flashcards" | "quiz";
+export type StudySetKind = "flashcards" | "quiz" | "concept_map";
 
 export interface StudySetSummary {
   id: string;

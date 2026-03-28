@@ -52,7 +52,10 @@ const tutorComponents: Components = {
   ),
   ul: ({ node: _n, className, ...props }) => (
     <ul
-      className={cn("my-2 list-disc space-y-1.5 pl-5 text-[0.9375rem] text-[var(--text)] marker:text-emerald-400/90", className)}
+      className={cn(
+        "my-2 list-disc space-y-1.5 pl-5 text-[0.9375rem] text-[var(--text)] marker:text-[var(--accent2)]",
+        className
+      )}
       {...props}
     />
   ),
@@ -67,7 +70,10 @@ const tutorComponents: Components = {
   ),
   blockquote: ({ node: _n, className, ...props }) => (
     <blockquote
-      className={cn("my-2 border-l-2 border-purple-400/50 pl-3 text-[var(--text)] italic", className)}
+      className={cn(
+        "my-2 border-l-2 border-[color:color-mix(in_oklab,var(--accent)_50%,transparent)] pl-3 text-[var(--text)] italic",
+        className
+      )}
       {...props}
     />
   ),
@@ -76,7 +82,10 @@ const tutorComponents: Components = {
   ),
   a: ({ node: _n, className, ...props }) => (
     <a
-      className={cn("font-medium text-blue-400 underline decoration-blue-400/50 underline-offset-2 hover:text-blue-300", className)}
+      className={cn(
+        "font-medium text-[var(--accent)] underline underline-offset-2 [text-decoration-color:color-mix(in_oklab,var(--accent)_50%,transparent)] hover:opacity-90",
+        className
+      )}
       target="_blank"
       rel="noopener noreferrer"
       {...props}
@@ -89,7 +98,7 @@ const tutorComponents: Components = {
       return (
         <code
           className={cn(
-            "rounded bg-[var(--btn-default-bg)] px-1.5 py-0.5 font-mono text-[0.8125rem] text-emerald-200/95",
+            "rounded bg-[var(--btn-default-bg)] px-1.5 py-0.5 font-mono text-[0.8125rem] text-[var(--accent2)]",
             className
           )}
           {...props}
@@ -100,7 +109,7 @@ const tutorComponents: Components = {
     }
     return (
       <code
-        className={cn("block font-mono text-[0.8125rem] leading-relaxed text-emerald-200/95", className)}
+        className={cn("block font-mono text-[0.8125rem] leading-relaxed text-[var(--accent2)]", className)}
         {...props}
       >
         {children}
@@ -130,6 +139,10 @@ const tutorComponents: Components = {
     <td className={cn("border-b border-[var(--border)] px-2 py-1.5 text-[var(--text)]", className)} {...props} />
   ),
 };
+
+/** Compact typography when reusing `TutorMarkdown` for AI summaries (note editor strip + grid card modal). */
+export const summaryMarkdownLayoutClassName =
+  "[&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_li]:text-sm [&_p]:text-sm [&_p]:leading-relaxed [&_ul]:text-sm";
 
 export function TutorMarkdown({
   content,
@@ -196,7 +209,7 @@ export function TutorMarkdown({
         "[&_.katex]:text-[0.98em] [&_.katex]:text-[var(--text)]",
         "[&_.katex-display]:my-3 [&_.katex-display]:block [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto",
         "[&_.katex-display]:rounded-md [&_.katex-display]:px-1 [&_.katex-display]:py-0.5",
-        "[&_.katex-error]:text-red-400",
+        "[&_.katex-error]:text-[var(--status-danger-fg-strong)]",
         className
       )}
     >

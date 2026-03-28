@@ -7,6 +7,14 @@ import { recordStudyActivity, streakJson } from "@/lib/user-study-stats";
 
 const FREE_SUMMARY_LIMIT = 10;
 
+function stripOptionalMarkdownFence(text: string): string {
+  let s = text.trim();
+  if (!s.startsWith("```")) return s;
+  s = s.replace(/^```[a-zA-Z]*\s*\n?/, "");
+  if (s.endsWith("```")) s = s.slice(0, -3).trimEnd();
+  return s.trim();
+}
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -53,7 +61,10 @@ export async function POST(req: Request) {
     }
   }
 
-  const system = "Summarize the following note in 3-5 sentences. Be concise and capture the main points.";
+  const system =
+    "Summarize the following note in 3-5 sentences. Be concise and capture the main points.\n\n" +
+    "Do not use markdown formatting, hashtags (#) for headers, or asterisks for bold or italic. " +
+    "Return plain text with clean line breaks. For bullet points, use lines starting with a dash and space (- item) only.";
   const userMessage = content.slice(0, 8000);
 
   try {
@@ -88,7 +99,7 @@ export async function POST(req: Request) {
     }
 
     const streak = await recordStudyActivity(session.user.id);
-    return NextResponse.json({ summary: text, ...streakJson(streak) });
+    return NextResponse.json({ summary: stripOptionalMarkdownFence(text), ...streakJson(streak) });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Summarization failed" },

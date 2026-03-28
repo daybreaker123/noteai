@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui";
 import { StudaraWordmark, StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { cn } from "@/lib/cn";
+import { captureAnalytics } from "@/lib/analytics";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TutorImageLightbox } from "@/components/tutor-image-lightbox";
 import { TutorMarkdown } from "@/components/tutor-markdown";
@@ -564,6 +565,12 @@ export function TutorPage() {
         return;
       }
 
+      captureAnalytics("ai_tutor_message_sent", {
+        use_my_notes: useMyNotes,
+        has_image: Boolean(imagePayload),
+        has_document: Boolean(documentContext),
+      });
+
       const reader = res.body?.getReader();
       if (!reader) {
         setMessages((m) => m.filter((x) => x.id !== optimisticUser.id));
@@ -676,7 +683,12 @@ export function TutorPage() {
   return (
     <div className="relative flex h-dvh max-w-[100vw] flex-col overflow-x-hidden overflow-y-hidden bg-[var(--bg)] text-[var(--text)]">
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute -top-32 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-gradient-to-r from-purple-600/12 via-blue-500/8 to-fuchsia-500/8 blur-3xl" />
+        <div
+          className="absolute -top-32 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full blur-3xl"
+          style={{
+            background: `linear-gradient(to right, var(--page-glow-from), var(--page-glow-via), var(--page-glow-to))`,
+          }}
+        />
       </div>
 
       <header className="relative z-10 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--header-bar)] backdrop-blur-xl backdrop-saturate-150">
@@ -697,8 +709,13 @@ export function TutorPage() {
             />
             <span className="hidden h-5 w-px shrink-0 bg-[var(--divider-fade)] sm:block" aria-hidden />
             <div className="flex min-w-0 items-center gap-2">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-gradient-to-br from-purple-500/35 to-blue-500/25 shadow-sm shadow-purple-900/20">
-                <GraduationCap className="h-3.5 w-3.5 text-[var(--accent-fg)]" strokeWidth={2} />
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] shadow-sm shadow-[var(--tutor-header-icon-shadow)]"
+                style={{
+                  background: `linear-gradient(to bottom right, var(--header-icon-surface-from), var(--header-icon-surface-to))`,
+                }}
+              >
+                <GraduationCap className="h-3.5 w-3.5 text-[var(--accent-icon)]" strokeWidth={2} />
               </div>
               <h1 className="truncate text-[0.9375rem] font-semibold tracking-tight text-[var(--text)] sm:text-base">
                 AI Tutor
@@ -740,14 +757,16 @@ export function TutorPage() {
           className={cn(
             "flex w-[min(17rem,92vw)] shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] backdrop-blur-xl md:w-72",
             "fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:relative md:z-10 md:translate-x-0",
-            mobileTutorSidebarOpen ? "translate-x-0 shadow-2xl shadow-black/40" : "-translate-x-full md:translate-x-0"
+            mobileTutorSidebarOpen
+              ? "translate-x-0 shadow-[var(--tutor-mobile-sidebar-shadow)]"
+              : "-translate-x-full md:translate-x-0"
           )}
         >
           <div className="shrink-0 px-4 pb-3 pt-5">
             <button
               type="button"
               onClick={newChat}
-              className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-lg shadow-purple-900/25 transition duration-200 hover:from-purple-500 hover:to-blue-500"
+              className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/85 to-blue-500/85 px-4 py-3 text-sm font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] transition duration-200 hover:from-purple-500 hover:to-blue-500"
             >
               <Plus className="h-4 w-4" strokeWidth={2.5} />
               New chat
@@ -771,7 +790,7 @@ export function TutorPage() {
                       className={cn(
                         "min-h-11 min-w-0 flex-1 touch-manipulation truncate rounded-xl border border-transparent px-3 py-2.5 text-left text-sm transition duration-200",
                         c.id === activeConversationId
-                          ? "border-purple-500/35 bg-gradient-to-r from-purple-500/15 to-blue-500/10 text-[var(--text)] shadow-sm shadow-purple-900/10"
+                          ? "border-[var(--tutor-sidebar-active-border)] bg-gradient-to-r from-[var(--tutor-sidebar-active-from)] to-[var(--tutor-sidebar-active-to)] text-[var(--text)] shadow-sm shadow-[0_1px_2px_var(--tutor-sidebar-active-shadow)]"
                           : "text-[var(--muted)] hover:border-[var(--sidebar-border)] hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
                       )}
                     >
@@ -786,7 +805,7 @@ export function TutorPage() {
                         setConversationToDelete({ id: c.id, title: c.title || "Chat" });
                       }}
                       className={cn(
-                        "flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-[var(--placeholder)] transition hover:bg-red-500/12 hover:text-red-300/95",
+                        "flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-[var(--placeholder)] transition hover:bg-[var(--status-danger-bg)] hover:text-[var(--status-danger-fg)]",
                         c.id === activeConversationId && "text-[var(--muted)]"
                       )}
                     >
@@ -839,7 +858,7 @@ export function TutorPage() {
           }}
         >
           {isDraggingFile ? (
-            <div className="studara-overlay-85 pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-purple-400/70 backdrop-blur-sm">
+            <div className="studara-overlay-85 pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--tutor-dropzone-border)] backdrop-blur-sm">
               <p className="rounded-xl border border-[var(--border)] bg-[var(--chrome-50)] px-4 py-3 text-sm font-medium text-[var(--text)]">
                 Drop image, PDF, or Word file to attach
               </p>
@@ -857,8 +876,13 @@ export function TutorPage() {
               <div className="flex min-h-[min(60vh,520px)] flex-col items-center justify-center px-4 text-center">
                 <div className="mb-6 flex flex-col items-center gap-3">
                   <StudaraWordmark className="text-3xl sm:text-4xl" />
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-gradient-to-br from-purple-500/20 to-blue-500/15 shadow-lg shadow-purple-900/20">
-                    <GraduationCap className="h-8 w-8 text-[var(--accent-fg)]" />
+                  <div
+                    className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] shadow-lg shadow-[var(--tutor-header-icon-shadow)]"
+                    style={{
+                      background: `linear-gradient(to bottom right, var(--header-icon-surface-from), var(--header-icon-surface-to))`,
+                    }}
+                  >
+                    <GraduationCap className="h-8 w-8 text-[var(--accent-icon)]" />
                   </div>
                 </div>
                 <h2 className="text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
@@ -879,7 +903,7 @@ export function TutorPage() {
                       key={label}
                       type="button"
                       onClick={() => applySuggestion(`${label} — `)}
-                      className="rounded-full border border-[var(--border-subtle)] bg-[var(--input-bg)] px-4 py-2.5 text-sm text-[var(--text)] backdrop-blur-sm transition hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-[var(--text)]"
+                      className="rounded-full border border-[var(--border-subtle)] bg-[var(--input-bg)] px-4 py-2.5 text-sm text-[var(--text)] backdrop-blur-sm transition hover:border-[var(--tutor-input-hover-border)] hover:bg-[var(--tutor-input-hover-bg)] hover:text-[var(--text)]"
                     >
                       {label}
                     </button>
@@ -894,12 +918,14 @@ export function TutorPage() {
                     className={cn("flex gap-3", m.role === "user" ? "flex-row-reverse" : "flex-row")}
                   >
                     {m.role === "assistant" ? (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-emerald-500/30 to-blue-600/30">
-                        <GraduationCap className="h-4 w-4 text-emerald-200" />
+                      <div
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-[var(--tutor-avatar-assistant-from)] to-[var(--tutor-avatar-assistant-to)]"
+                      >
+                        <GraduationCap className="h-4 w-4 text-[var(--tutor-avatar-assistant-icon)]" />
                       </div>
                     ) : (
                       <div
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-purple-500/45 to-blue-500/35 text-[0.65rem] font-semibold uppercase leading-none tracking-tight text-[var(--text)] shadow-sm"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-[var(--tutor-user-avatar-from)] to-[var(--tutor-user-avatar-to)] text-[0.65rem] font-semibold uppercase leading-none tracking-tight text-[var(--text)] shadow-sm"
                         aria-label="You"
                       >
                         {userChatInitials}
@@ -909,8 +935,8 @@ export function TutorPage() {
                       className={cn(
                         "max-w-[88%] rounded-[1.35rem] px-5 py-4 text-[0.9375rem] leading-relaxed shadow-sm",
                         m.role === "user"
-                          ? "border border-[var(--border)] bg-gradient-to-br from-purple-500/35 via-purple-500/22 to-blue-500/28 text-[var(--text)] shadow-purple-900/10"
-                          : "border border-[var(--border-subtle)] bg-[var(--surface-mid)] text-[var(--text)]/[0.94] shadow-black/20"
+                          ? "border border-[var(--border)] bg-gradient-to-br from-[var(--tutor-user-bubble-from)] via-[var(--tutor-user-bubble-mid)] to-[var(--tutor-user-bubble-to)] text-[var(--text)] shadow-[0_1px_2px_var(--tutor-user-bubble-shadow)]"
+                          : "border border-[var(--border-subtle)] bg-[var(--surface-mid)] text-[var(--text)]/[0.94] shadow-[0_1px_2px_var(--tutor-assistant-bubble-shadow)]"
                       )}
                     >
                       {m.role === "user" ? (
@@ -961,14 +987,14 @@ export function TutorPage() {
 
                 {showTyping ? (
                   <div className="flex gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-emerald-500/30 to-blue-600/30">
-                      <GraduationCap className="h-4 w-4 text-emerald-200" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-gradient-to-br from-[var(--tutor-avatar-assistant-from)] to-[var(--tutor-avatar-assistant-to)]">
+                      <GraduationCap className="h-4 w-4 text-[var(--tutor-avatar-assistant-icon)]" />
                     </div>
                     <div className="flex items-center gap-2 rounded-[1.35rem] border border-[var(--border-subtle)] bg-[var(--surface-mid)] px-5 py-4 text-sm text-[var(--muted)] shadow-sm">
                       <span className="flex gap-1">
-                        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-white/50 [animation-delay:-0.3s]" />
-                        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-white/50 [animation-delay:-0.15s]" />
-                        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-white/50" />
+                        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--tutor-typing-dot)] [animation-delay:-0.3s]" />
+                        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--tutor-typing-dot)] [animation-delay:-0.15s]" />
+                        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--tutor-typing-dot)]" />
                       </span>
                       Tutor is typing…
                     </div>
@@ -983,7 +1009,7 @@ export function TutorPage() {
               e.preventDefault();
               void sendMessage();
             }}
-            className="shrink-0 border-t border-[var(--sidebar-border)] bg-[var(--footer-bar)] px-4 py-3 shadow-[0_-12px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl backdrop-saturate-150 sm:px-6 sm:py-5 md:static max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            className="shrink-0 border-t border-[var(--sidebar-border)] bg-[var(--footer-bar)] px-4 py-3 shadow-[var(--tutor-composer-footer-shadow)] backdrop-blur-xl backdrop-saturate-150 sm:px-6 sm:py-5 md:static max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
             <div className="mx-auto max-w-3xl space-y-3">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -995,8 +1021,8 @@ export function TutorPage() {
                   className={cn(
                     "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition sm:text-[13px]",
                     useMyNotes
-                      ? "border-purple-500/45 bg-gradient-to-r from-purple-500/30 to-blue-500/25 text-[var(--text)] shadow-[0_0_20px_rgba(139,92,246,0.22)] ring-1 ring-purple-400/20"
-                      : "border-[var(--border)] bg-[var(--input-bg)] text-[var(--muted)] hover:border-[var(--border)] hover:bg-white/[0.07] hover:text-[var(--text)]"
+                      ? "border-[var(--tutor-sidebar-active-border)] bg-gradient-to-r from-[var(--tutor-sidebar-active-from)] to-[var(--tutor-sidebar-active-to)] text-[var(--text)] shadow-[var(--tutor-notes-toggle-shadow)] ring-1 ring-[var(--tutor-notes-toggle-ring)]"
+                      : "border-[var(--border)] bg-[var(--input-bg)] text-[var(--muted)] hover:border-[var(--border)] hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
                   )}
                 >
                   <FileStack className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
@@ -1062,7 +1088,7 @@ export function TutorPage() {
                   </button>
                 </div>
               ) : null}
-              <div className="flex items-end gap-0 rounded-full border border-[var(--border)] bg-[var(--chrome-40)] py-1.5 pl-2 pr-1.5 shadow-inner shadow-black/25 transition focus-within:border-purple-500/40 focus-within:ring-2 focus-within:ring-purple-500/20">
+              <div className="flex items-end gap-0 rounded-full border border-[var(--border)] bg-[var(--chrome-40)] py-1.5 pl-2 pr-1.5 shadow-[inset_0_2px_8px_var(--shadow-composer-inset)] transition focus-within:border-[var(--focus-border-color)] focus-within:ring-2 focus-within:ring-[var(--focus-ring-color)]">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1111,13 +1137,13 @@ export function TutorPage() {
                 <button
                   type="submit"
                   disabled={sending || extractingDocument || (!input.trim() && !pendingAttachment)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 text-[var(--inverse-text)] shadow-lg shadow-purple-900/35 transition duration-200 hover:brightness-110 disabled:pointer-events-none disabled:opacity-35"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 text-[var(--inverse-text)] shadow-[var(--tutor-send-btn-shadow)] transition duration-200 hover:brightness-110 disabled:pointer-events-none disabled:opacity-35"
                   aria-label="Send message"
                 >
                   {sending ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[var(--text)]" />
+                    <Loader2 className="h-5 w-5 animate-spin text-[var(--inverse-text)]" />
                   ) : (
-                    <Send className="h-5 w-5 translate-x-px text-[var(--text)]" strokeWidth={2} />
+                    <Send className="h-5 w-5 translate-x-px text-[var(--inverse-text)]" strokeWidth={2} />
                   )}
                 </button>
               </div>
@@ -1141,7 +1167,7 @@ export function TutorPage() {
 
       {conversationToDelete ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--scrim-heavy)] p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-5 shadow-xl">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-5 shadow-[var(--shadow-brand-lg)]">
             <h3 className="text-lg font-semibold text-[var(--text)]">Delete this conversation?</h3>
             <p className="mt-2 line-clamp-2 text-sm text-[var(--muted)]">
               &ldquo;{conversationToDelete.title}&rdquo; and all messages will be removed. This cannot be undone.
@@ -1177,7 +1203,7 @@ export function TutorPage() {
 
       {upgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim-heavy)] p-4">
-          <div className="max-w-md rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-xl">
+          <div className="max-w-md rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-[var(--shadow-brand-lg)]">
             <h3 className="text-lg font-semibold text-[var(--text)]">
               {upgradeModal === "images" ? "Image upload limit reached" : "Monthly tutor limit reached"}
             </h3>

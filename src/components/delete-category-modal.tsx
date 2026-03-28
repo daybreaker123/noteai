@@ -51,7 +51,7 @@ export function DeleteCategoryModal({
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="relative w-full max-w-sm"
           >
-            <Card className="overflow-hidden border-[var(--border)] bg-[var(--chrome-40)] p-6 shadow-2xl backdrop-blur-xl">
+            <Card className="overflow-hidden border-[var(--border)] bg-[var(--modal-surface)] p-6 shadow-[var(--shadow-brand-lg)] backdrop-blur-xl">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-[var(--text)]">Delete Category</h3>
                 <button

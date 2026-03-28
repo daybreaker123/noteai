@@ -75,7 +75,7 @@ export function NoteTemplatePickerModal({
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="relative max-h-[min(90dvh,720px)] w-full max-w-3xl overflow-hidden"
           >
-            <Card className="flex max-h-[min(90dvh,720px)] flex-col overflow-hidden border-[var(--border)] bg-[var(--modal-surface)] p-0 shadow-2xl backdrop-blur-xl">
+            <Card className="flex max-h-[min(90dvh,720px)] flex-col overflow-hidden border-[var(--border)] bg-[var(--modal-surface)] p-0 shadow-[var(--shadow-brand-lg)] backdrop-blur-xl">
               <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4 md:px-6">
                 <div>
                   <h2
@@ -105,7 +105,7 @@ export function NoteTemplatePickerModal({
                     onBlankNote();
                     onClose();
                   }}
-                  className="mb-6 flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-gradient-to-r from-purple-500/25 to-blue-500/20 px-4 py-3.5 text-sm font-semibold text-[var(--text)] shadow-inner shadow-black/20 transition hover:from-purple-500/35 hover:to-blue-500/30"
+                  className="mb-6 flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-gradient-to-r from-[var(--tutor-sidebar-active-from)] to-[var(--tutor-sidebar-active-to)] px-4 py-3.5 text-sm font-semibold text-[var(--text)] shadow-[inset_0_2px_8px_var(--shadow-composer-inset)] transition hover:from-[color-mix(in_oklab,var(--accent)_18%,transparent)] hover:to-[color-mix(in_oklab,var(--accent)_12%,transparent)]"
                 >
                   Blank note
                 </button>
@@ -123,9 +123,9 @@ export function NoteTemplatePickerModal({
                           onPickTemplate(id);
                           onClose();
                         }}
-                        className="group flex touch-manipulation flex-col rounded-xl border border-[var(--border-subtle)] bg-white/[0.03] p-3 text-left transition hover:border-purple-500/35 hover:bg-[var(--badge-free-bg)]"
+                        className="group flex touch-manipulation flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-ghost)] p-3 text-left transition hover:border-[var(--accent-nudge-border)] hover:bg-[var(--badge-free-bg)]"
                       >
-                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/15 text-purple-200 ring-1 ring-purple-500/20 transition group-hover:bg-purple-500/25">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--accent-nudge-bg)] text-[var(--accent-icon)] ring-1 ring-[var(--accent-nudge-border)] transition group-hover:bg-[color-mix(in_oklab,var(--accent)_18%,transparent)]">
                           <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
                         </span>
                         <span className="mt-2.5 text-sm font-semibold text-[var(--text)]">{name}</span>

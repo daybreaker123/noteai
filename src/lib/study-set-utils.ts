@@ -12,9 +12,10 @@ export function buildStudySetTitleFromNoteTitles(titles: (string | null | undefi
 
 export function studySetItemCount(kind: StudySetKind, payload: unknown): number {
   if (!payload || typeof payload !== "object") return 0;
-  const p = payload as { cards?: unknown[]; questions?: unknown[] };
+  const p = payload as { cards?: unknown[]; questions?: unknown[]; nodes?: unknown[] };
   if (kind === "flashcards") return Array.isArray(p.cards) ? p.cards.length : 0;
-  return Array.isArray(p.questions) ? p.questions.length : 0;
+  if (kind === "quiz") return Array.isArray(p.questions) ? p.questions.length : 0;
+  return Array.isArray(p.nodes) ? p.nodes.length : 0;
 }
 
 /** Latest cached set for single-note study: only sets generated from this note alone. */

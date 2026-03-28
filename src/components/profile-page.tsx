@@ -291,7 +291,10 @@ export function ProfilePage() {
       />
     <main className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-purple-500/[0.07] blur-[100px]" />
+        <div
+          className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full blur-[100px]"
+          style={{ background: `radial-gradient(circle, var(--page-glow-from), transparent 65%)` }}
+        />
       </div>
 
       <div className="relative mx-auto max-w-3xl px-5 py-12 sm:px-8">
@@ -327,7 +330,9 @@ export function ProfilePage() {
                     className="h-[88px] w-[88px] rounded-2xl border border-[var(--border)] object-cover"
                   />
                 ) : (
-                  <div className="flex h-[88px] w-[88px] items-center justify-center rounded-2xl border border-[var(--border)] bg-gradient-to-br from-purple-500/30 to-blue-500/20 text-2xl font-semibold text-[var(--text)]">
+                  <div
+                    className="flex h-[88px] w-[88px] items-center justify-center rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--header-icon-surface-from)] to-[var(--header-icon-surface-to)] text-2xl font-semibold text-[var(--text)]"
+                  >
                     {initialsFromUser(user.name, user.email)}
                   </div>
                 )}
@@ -354,7 +359,7 @@ export function ProfilePage() {
                       Save
                     </Button>
                   </div>
-                  {saveMsg ? <p className="text-xs text-emerald-400/90">{saveMsg}</p> : null}
+                  {saveMsg ? <p className="text-xs text-[var(--status-success-fg)]">{saveMsg}</p> : null}
                 </div>
               </div>
             </div>
@@ -376,7 +381,9 @@ export function ProfilePage() {
                   Pro
                 </Badge>
               ) : (
-                <Badge className="border-zinc-500/35 bg-zinc-500/15 text-zinc-300">Free</Badge>
+                <Badge className="border-[var(--badge-free-border)] bg-[var(--badge-free-bg)] text-[var(--badge-free-text)]">
+                  Free
+                </Badge>
               )}
             </div>
             {plan.tier === "pro" ? (
@@ -392,7 +399,7 @@ export function ProfilePage() {
                 )}
                 <Button
                   type="button"
-                  className="border-red-500/40 bg-transparent text-red-200 hover:bg-red-500/10 disabled:opacity-50"
+                  className="border-[var(--status-danger-border)] bg-transparent text-[var(--status-danger-fg)] hover:bg-[var(--status-danger-bg)] disabled:opacity-50"
                   disabled={cancelLoading || plan.cancelAtPeriodEnd || !plan.stripeSubscriptionId}
                   onClick={cancelSubscription}
                   title={
@@ -409,14 +416,14 @@ export function ProfilePage() {
                     If this stays disabled, confirm the Stripe webhook ran and stored your subscription id.
                   </p>
                 ) : null}
-                {cancelErr ? <p className="text-xs text-red-300">{cancelErr}</p> : null}
-                {cancelMsg ? <p className="text-xs text-emerald-400/90">{cancelMsg}</p> : null}
+                {cancelErr ? <p className="text-xs text-[var(--status-danger-fg)]">{cancelErr}</p> : null}
+                {cancelMsg ? <p className="text-xs text-[var(--status-success-fg)]">{cancelMsg}</p> : null}
               </div>
             ) : (
               <div className="mt-4">
                 <Link
                   href="/billing"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-4 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] transition hover:from-purple-500 hover:to-blue-500"
                 >
                   <Sparkles className="h-4 w-4" />
                   Upgrade to Pro

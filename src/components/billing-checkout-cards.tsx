@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui";
+import { captureAnalytics } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
 import { startProCheckout } from "@/lib/pro-checkout";
 import {
@@ -36,6 +37,7 @@ export function BillingCheckoutCards({
 
   async function checkout(interval: "month" | "year") {
     setBusy(interval);
+    captureAnalytics("pro_upgrade_clicked", { interval });
     try {
       const result = await startProCheckout({ interval });
       if (result.ok === false) {

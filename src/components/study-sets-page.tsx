@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Bookmark, Loader2, Trash2, BookOpen, X, Link2 } from "lucide-react";
+import { ArrowLeft, Bookmark, Loader2, Trash2, BookOpen, X, Link2, Network } from "lucide-react";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button, Badge } from "@/components/ui";
@@ -123,12 +123,17 @@ export function StudySetsPage() {
             <div className="hidden h-8 w-px bg-[var(--input-bg)] sm:block" aria-hidden />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-gradient-to-br from-purple-500/25 to-indigo-500/15">
-                  <Bookmark className="h-4 w-4 text-[var(--accent-fg)]" />
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)]"
+                  style={{
+                    background: `linear-gradient(to bottom right, var(--header-icon-surface-from), var(--header-icon-surface-to))`,
+                  }}
+                >
+                  <Bookmark className="h-4 w-4 text-[var(--accent-icon)]" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Study sets</h1>
-                  <p className="mt-0.5 text-sm text-[var(--muted)]">Saved flashcards and quizzes</p>
+                  <p className="mt-0.5 text-sm text-[var(--muted)]">Saved flashcards, quizzes, and concept maps</p>
                 </div>
               </div>
             </div>
@@ -144,13 +149,13 @@ export function StudySetsPage() {
         {deleteError ? (
           <div
             role="alert"
-            className="mb-6 flex items-start justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+            className="mb-6 flex items-start justify-between gap-3 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-4 py-3 text-sm text-[var(--status-danger-fg)]"
           >
             <span className="min-w-0">{deleteError}</span>
             <button
               type="button"
               onClick={() => setDeleteError(null)}
-              className="shrink-0 rounded-lg p-1 text-red-300 transition hover:bg-red-500/20 hover:text-[var(--text)]"
+              className="shrink-0 rounded-lg p-1 text-[var(--status-danger-fg)] transition hover:bg-[var(--status-danger-bg-elevated)] hover:text-[var(--status-danger-fg-strong)]"
               aria-label="Dismiss"
             >
               <X className="h-4 w-4" />
@@ -164,7 +169,7 @@ export function StudySetsPage() {
         ) : (
           <>
             {dueItems.length > 0 ? (
-              <section className="mb-10 rounded-2xl border border-amber-500/25 bg-amber-500/[0.07] p-5 sm:p-6">
+              <section className="mb-10 rounded-2xl border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] p-5 sm:p-6">
                 <h2 className="text-lg font-semibold text-[var(--text)]">Due for review</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Flashcards scheduled for today (SM-2 spaced repetition). Review only what&apos;s due — not the full set.
@@ -196,17 +201,22 @@ export function StudySetsPage() {
             ) : null}
 
             {sets.length === 0 ? (
-          <div className="mx-auto flex max-w-md flex-col items-center rounded-2xl border border-[var(--sidebar-border)] bg-white/[0.03] px-8 py-16 text-center backdrop-blur-sm">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border)] bg-gradient-to-br from-purple-500/15 to-blue-500/10">
+          <div className="mx-auto flex max-w-md flex-col items-center rounded-2xl border border-[var(--sidebar-border)] bg-[var(--surface-ghost)] px-8 py-16 text-center backdrop-blur-sm">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border)]"
+              style={{
+                background: `linear-gradient(to bottom right, var(--tutor-sidebar-active-from), var(--tutor-sidebar-active-to))`,
+              }}
+            >
               <Bookmark className="h-8 w-8 text-[var(--placeholder)]" />
             </div>
             <p className="mt-6 text-lg font-medium text-[var(--text)]">No saved sets yet</p>
             <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-              Generate flashcards or a quiz from a note, then save from study mode.
+              Generate flashcards, a quiz, or a concept map from a note, then save from the study or map view.
             </p>
             <Link
               href="/notes"
-              className="mt-8 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-5 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-lg transition hover:from-purple-500 hover:to-blue-500"
+              className="mt-8 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-500/80 to-blue-500/80 px-5 py-2.5 text-sm font-semibold text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] transition hover:from-purple-500 hover:to-blue-500"
             >
               Back to notes
             </Link>
@@ -216,26 +226,30 @@ export function StudySetsPage() {
             {sets.map((s) => (
               <div
                 key={s.id}
-                className="group flex min-h-[200px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-5 shadow-sm transition duration-200 hover:border-purple-500/25 hover:bg-[var(--badge-free-bg)]"
+                className="group flex min-h-[200px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-5 shadow-sm transition duration-200 hover:border-[var(--accent-nudge-border)] hover:bg-[var(--badge-free-bg)]"
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                   <h2 className="line-clamp-2 text-base font-semibold leading-snug text-[var(--text)]">{s.title}</h2>
                   <Badge
                     className={cn(
-                      "w-fit border-0 text-xs font-medium",
+                      "flex w-fit items-center gap-1 border-0 text-xs font-medium",
                       s.kind === "flashcards"
-                        ? "bg-violet-500/20 text-[var(--accent-fg)]"
-                        : "bg-cyan-500/15 text-[var(--accent2)]"
+                        ? "bg-[var(--accent-nudge-bg)] text-[var(--accent-label)]"
+                        : s.kind === "quiz"
+                          ? "bg-[var(--status-info-bg)] text-[var(--status-info-fg)]"
+                          : "bg-[color-mix(in_oklab,var(--wordmark-to)_16%,transparent)] text-[var(--accent-label-muted)]"
                     )}
                   >
-                    {s.kind === "flashcards" ? "Flashcards" : "Quiz"}
+                    {s.kind === "concept_map" ? <Network className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden /> : null}
+                    {s.kind === "flashcards" ? "Flashcards" : s.kind === "quiz" ? "Quiz" : "Concept map"}
                   </Badge>
                   <p className="text-xs leading-relaxed text-[var(--muted)]">
                     <span className="text-[var(--placeholder)]">Source · </span>
                     {sourceLabel(s)}
                   </p>
                   <p className="text-xs text-[var(--placeholder)]">
-                    {s.item_count} {s.kind === "flashcards" ? "cards" : "questions"} ·{" "}
+                    {s.item_count}{" "}
+                    {s.kind === "flashcards" ? "cards" : s.kind === "quiz" ? "questions" : "concepts"} ·{" "}
                     {new Date(s.created_at).toLocaleDateString(undefined, {
                       month: "short",
                       day: "numeric",
@@ -247,31 +261,37 @@ export function StudySetsPage() {
                   <Button
                     type="button"
                     size="sm"
-                    className="min-h-12 flex-1 gap-1.5 bg-gradient-to-r from-violet-600/90 to-indigo-600/90 text-base font-medium text-[var(--inverse-text)] shadow-md shadow-violet-900/20 transition hover:from-violet-500 hover:to-indigo-500 sm:min-h-10 sm:text-sm"
+                    className="min-h-12 flex-1 gap-1.5 bg-gradient-to-r from-violet-600/90 to-indigo-600/90 text-base font-medium text-[var(--inverse-text)] shadow-[var(--shadow-brand-md)] transition hover:from-violet-500 hover:to-indigo-500 sm:min-h-10 sm:text-sm"
                     onClick={() => router.push(`/study-sets/set/${encodeURIComponent(s.id)}`)}
                   >
-                    <BookOpen className="h-3.5 w-3.5" />
+                    {s.kind === "concept_map" ? (
+                      <Network className="h-3.5 w-3.5" />
+                    ) : (
+                      <BookOpen className="h-3.5 w-3.5" />
+                    )}
                     Open
                   </Button>
+                  {s.kind !== "concept_map" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-12 min-w-12 shrink-0 border border-[var(--border)] px-0 text-[var(--text)] hover:border-[var(--tutor-input-hover-border)] hover:bg-[var(--tutor-input-hover-bg)] hover:text-[var(--text)] sm:min-h-10 sm:min-w-12 sm:px-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShareStudySetId(s.id);
+                      }}
+                      aria-label="Share study set"
+                      title="Share"
+                    >
+                      <Link2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="min-h-12 min-w-12 shrink-0 border border-[var(--border)] px-0 text-[var(--text)] hover:border-purple-500/35 hover:bg-purple-500/10 hover:text-[var(--text)] sm:min-h-10 sm:min-w-12 sm:px-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShareStudySetId(s.id);
-                    }}
-                    aria-label="Share study set"
-                    title="Share"
-                  >
-                    <Link2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="min-h-12 min-w-12 shrink-0 border border-[var(--border)] px-0 text-[var(--muted)] hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200 sm:min-h-10 sm:min-w-10 sm:px-3"
+                    className="min-h-12 min-w-12 shrink-0 border border-[var(--border)] px-0 text-[var(--muted)] hover:border-[var(--status-danger-border)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--status-danger-fg)] sm:min-h-10 sm:min-w-10 sm:px-3"
                     disabled={deletingId === s.id}
                     onClick={(e) => void handleDelete(s.id, e)}
                     aria-label="Delete study set"
