@@ -520,6 +520,8 @@ export function NoteApp({
   const [editContent, setEditContent] = React.useState("");
   /** Bumps when AI replaces full body so Tiptap remounts with new HTML. */
   const [editorContentRevision, setEditorContentRevision] = React.useState(0);
+  /** Local “last saved” time for the open note (autosave + server `updated_at` on switch). */
+  const [editorLastSavedAt, setEditorLastSavedAt] = React.useState<number | null>(null);
 
   const requestConceptMap = React.useCallback(async () => {
     if (plan !== "pro") {
@@ -1029,6 +1031,15 @@ export function NoteApp({
     setSummaryBelow(null);
   }, [selectedNoteId]);
 
+  React.useEffect(() => {
+    if (!selectedNoteId || selectedNoteId.startsWith("draft-")) {
+      setEditorLastSavedAt(null);
+      return;
+    }
+    const n = notes.find((x) => x.id === selectedNoteId);
+    if (n?.updated_at) setEditorLastSavedAt(new Date(n.updated_at).getTime());
+  }, [selectedNoteId, notes]);
+
   /** Latest editor snapshot for flushing when leaving a note (avoids losing debounced edits). */
   const editorFlushRef = React.useRef<{ id: string | null; title: string; content: string }>({
     id: null,
@@ -1091,6 +1102,7 @@ export function NoteApp({
       const title = editTitleRef.current;
       const content = editContentRef.current;
       void actionsRef.current.update(idNow, { title, content });
+      setEditorLastSavedAt(Date.now());
 
       const plain = htmlToPlainText(content).trim();
       const nids = newNoteIdsRef.current;
@@ -2624,22 +2636,13 @@ export function NoteApp({
             }}
             onSuggestTagDismiss={() => setSuggestTagsChips(null)}
             onToolbarErrorDismiss={() => setToolbarError(null)}
-            shareToolbarSlot={
-              selectedNote && !selectedNote.id.startsWith("draft-") ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="shrink-0 gap-1.5 border border-[var(--border)] text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
-                  title="Share note"
-                  aria-label="Share note"
-                  onClick={() => setShareNoteModalNoteId(selectedNote.id)}
-                >
-                  <Link2 className="h-3.5 w-3.5" />
-                  Share
-                </Button>
-              ) : null
+            onShareNote={
+              selectedNote && !selectedNote.id.startsWith("draft-")
+                ? () => setShareNoteModalNoteId(selectedNote.id)
+                : undefined
             }
+            lastSavedAt={editorLastSavedAt}
+            isDraftNote={!!draftNote && draftNote.id === selectedNote.id}
             voiceToNotesToolbar={
               <VoiceToNotesControl
                 layout="editor"
@@ -3299,7 +3302,9 @@ function EditorPanel({
   onSuggestTagAccept,
   onSuggestTagDismiss,
   onToolbarErrorDismiss,
-  shareToolbarSlot,
+  onShareNote,
+  lastSavedAt,
+  isDraftNote,
   voiceToNotesToolbar,
   studyProgressCompletion,
   onDeleteRequest,
@@ -3341,7 +3346,9 @@ function EditorPanel({
   onSuggestTagAccept: (tag: string) => void;
   onSuggestTagDismiss: () => void;
   onToolbarErrorDismiss: () => void;
-  shareToolbarSlot?: React.ReactNode;
+  onShareNote?: () => void;
+  lastSavedAt: number | null;
+  isDraftNote: boolean;
   voiceToNotesToolbar?: React.ReactNode;
   studyProgressCompletion: StudyProgressCompletion;
   onDeleteRequest: () => void;
@@ -3379,6 +3386,54 @@ function EditorPanel({
     }
   }
 
+  const [categoryMenuOpen, setCategoryMenuOpen] = React.useState(false);
+  const [editorMenuOpen, setEditorMenuOpen] = React.useState(false);
+  const categoryMenuRef = React.useRef<HTMLDivElement>(null);
+  const editorMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!categoryMenuOpen && !editorMenuOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      const t = e.target;
+      if (!(t instanceof Node)) return;
+      if (categoryMenuOpen && categoryMenuRef.current?.contains(t)) return;
+      if (editorMenuOpen && editorMenuRef.current?.contains(t)) return;
+      setCategoryMenuOpen(false);
+      setEditorMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [categoryMenuOpen, editorMenuOpen]);
+
+  const categoryLabel = React.useMemo(() => {
+    if (selectedNote.category_id === "pending" && !categories.some((c) => c.id === "pending")) {
+      return "General (creating…)";
+    }
+    if (!selectedNote.category_id) return "Uncategorized";
+    const c = categories.find((x) => x.id === selectedNote.category_id);
+    return c?.name ?? "Uncategorized";
+  }, [selectedNote.category_id, categories]);
+
+  const categoryDotColor =
+    selectedNote.category_id && selectedNote.category_id !== "pending"
+      ? categories.find((c) => c.id === selectedNote.category_id)?.color
+      : undefined;
+
+  const plainStats = htmlToPlainText(editContent);
+  const wordCount = plainStats.trim() ? plainStats.trim().split(/\s+/).filter(Boolean).length : 0;
+  const charCount = plainStats.length;
+
+  function formatSavedLine() {
+    if (isDraftNote) return "Draft — saves when the note is created";
+    if (lastSavedAt == null) return "Not saved yet";
+    const ago = Date.now() - lastSavedAt;
+    if (ago < 45_000) return "Saved just now";
+    return `Saved ${new Date(lastSavedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+  }
+
+  const aiPillClass =
+    "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-1 text-xs font-medium text-[var(--text)] transition-colors hover:bg-[var(--btn-default-bg)] disabled:pointer-events-none disabled:opacity-45";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 border-[var(--border)] bg-[var(--chrome-20)] backdrop-blur-xl md:rounded-2xl md:border">
       <NoteStudyProgressTrail
@@ -3386,81 +3441,214 @@ function EditorPanel({
         onStepPress={handleStudyProgressStep}
         disabled={improveLoading || summaryLoading}
       />
-      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-3 py-2 md:gap-4 md:px-4 md:py-3">
+
+      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2.5 md:gap-3 md:px-4 md:py-3">
         {onOpenMobileMenu ? (
           <button
             type="button"
             aria-label="Open menu"
             onClick={onOpenMobileMenu}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] transition hover:bg-[var(--btn-default-bg)] md:hidden touch-manipulation"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] transition hover:bg-[var(--btn-default-bg)] md:hidden touch-manipulation"
           >
-            <Menu className="h-6 w-6" strokeWidth={2} aria-hidden />
+            <Menu className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
         ) : null}
         <button
           type="button"
           onClick={onBack}
-          className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--input-bg)] hover:text-[var(--text)] touch-manipulation md:min-h-0 md:rounded-lg md:px-2 md:py-1.5"
+          className="flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm text-[var(--muted)] transition hover:bg-[var(--input-bg)] hover:text-[var(--text)] touch-manipulation md:h-9 md:px-2"
         >
           <ChevronRight className="h-4 w-4 rotate-180 shrink-0" />
           <span className="hidden sm:inline">Back</span>
         </button>
-        <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-2 overflow-x-auto overflow-y-hidden py-1 [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible md:py-0 [&::-webkit-scrollbar]:hidden">
-          <select
-            value={selectedNote.category_id ?? ""}
-            onChange={(e) => onUpdate({ category_id: e.target.value || null })}
-            className="min-h-11 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--input-bg)] px-2 py-2 text-sm text-[var(--text)] md:min-h-0 md:py-1.5"
+
+        <input
+          value={localTitle}
+          onChange={(e) => {
+            const v = e.target.value;
+            setLocalTitle(v);
+            onTitleDraftChange(v);
+          }}
+          className="min-w-0 flex-1 bg-transparent text-lg font-semibold tracking-tight text-[var(--text)] outline-none placeholder:text-[var(--placeholder)] md:text-xl"
+          placeholder="Untitled note"
+          aria-label="Note title"
+        />
+
+        <div className="relative shrink-0" ref={categoryMenuRef}>
+          <button
+            type="button"
+            aria-expanded={categoryMenuOpen}
+            aria-haspopup="listbox"
+            onClick={() => {
+              setCategoryMenuOpen((o) => !o);
+              setEditorMenuOpen(false);
+            }}
+            className="inline-flex max-w-[9.5rem] min-w-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--input-bg)] py-1 pl-2.5 pr-2 text-left text-xs font-medium text-[var(--text)] transition hover:bg-[var(--btn-default-bg)] touch-manipulation"
           >
-            {selectedNote.category_id === "pending" && !categories.some((c) => c.id === "pending") && (
-              <option value="pending">General (creating…)</option>
-            )}
-            <option value="">Uncategorized</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          {shareToolbarSlot}
-          {voiceToNotesToolbar}
-          <Button size="sm" variant="ghost" onClick={() => void onClaudeSummarize()} disabled={summaryLoading}>
-            {summaryLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-            Summarize
-          </Button>
-          {categories.length >= 2 && (
-            <Button size="sm" variant="ghost" onClick={() => void onAutoCategorize()} disabled={autoCategorizeLoading}>
-              {autoCategorizeLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tag className="mr-1.5 h-3.5 w-3.5" />}
-              Auto-categorize
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" onClick={onStudy}>
-            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
-            Study
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void onExportPdf()} className="border border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--text)] hover:bg-[var(--btn-default-hover)]">
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            PDF
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onExportMd} className="border border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--text)] hover:bg-[var(--btn-default-hover)]">
-            Markdown
-          </Button>
+            {categoryDotColor ? (
+              <span
+                className="h-2 w-2 shrink-0 rounded-full ring-1 ring-[var(--border)]"
+                style={{ backgroundColor: categoryDotColor }}
+                aria-hidden
+              />
+            ) : null}
+            <span className="min-w-0 truncate">{categoryLabel}</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden />
+          </button>
+          {categoryMenuOpen ? (
+            <div
+              role="listbox"
+              className="absolute right-0 top-full z-50 mt-1 max-h-60 min-w-[11rem] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl app-sidebar-scrollbar"
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected={!selectedNote.category_id}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
+                onClick={() => {
+                  onUpdate({ category_id: null });
+                  setCategoryMenuOpen(false);
+                }}
+              >
+                Uncategorized
+              </button>
+              {selectedNote.category_id === "pending" && !categories.some((c) => c.id === "pending") ? (
+                <button
+                  type="button"
+                  role="option"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--muted)]"
+                  disabled
+                >
+                  General (creating…)
+                </button>
+              ) : null}
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selectedNote.category_id === c.id}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
+                  onClick={() => {
+                    onUpdate({ category_id: c.id });
+                    setCategoryMenuOpen(false);
+                  }}
+                >
+                  {c.color ? (
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full ring-1 ring-[var(--border)]"
+                      style={{ backgroundColor: c.color }}
+                      aria-hidden
+                    />
+                  ) : (
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--muted)] opacity-40" aria-hidden />
+                  )}
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
-        <button
-          type="button"
-          onClick={onDeleteRequest}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--muted)] transition hover:bg-red-500/15 hover:text-red-300 touch-manipulation md:h-auto md:w-auto md:rounded-lg md:p-2"
-          title="Delete note"
-          aria-label="Delete note"
-        >
-          <Trash2 className="h-5 w-5 md:h-4 md:w-4" />
-        </button>
+
+        <div className="relative shrink-0" ref={editorMenuRef}>
+          <button
+            type="button"
+            aria-label="Note actions"
+            aria-expanded={editorMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => {
+              setEditorMenuOpen((o) => !o);
+              setCategoryMenuOpen(false);
+            }}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--input-bg)] hover:text-[var(--text)] touch-manipulation"
+          >
+            <MoreVertical className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </button>
+          {editorMenuOpen ? (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-50 mt-1 min-w-[11rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)] disabled:opacity-40"
+                disabled={!onShareNote}
+                onClick={() => {
+                  setEditorMenuOpen(false);
+                  onShareNote?.();
+                }}
+              >
+                <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
+                Share
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
+                onClick={() => {
+                  setEditorMenuOpen(false);
+                  void onExportPdf();
+                }}
+              >
+                <Download className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
+                Export PDF
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)]"
+                onClick={() => {
+                  setEditorMenuOpen(false);
+                  onExportMd();
+                }}
+              >
+                <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
+                Export Markdown
+              </button>
+              {categories.length >= 2 ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)] disabled:opacity-45"
+                  disabled={autoCategorizeLoading}
+                  onClick={() => {
+                    setEditorMenuOpen(false);
+                    void onAutoCategorize();
+                  }}
+                >
+                  {autoCategorizeLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--muted)]" />
+                  ) : (
+                    <Tag className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
+                  )}
+                  Suggest category
+                </button>
+              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
+                onClick={() => {
+                  setEditorMenuOpen(false);
+                  onDeleteRequest();
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                Delete note
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
-      {suggestBanner && (
-        <div className="flex items-center justify-between border-b border-[var(--border)] bg-purple-500/10 px-4 py-2 text-sm">
+
+      {suggestBanner ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-purple-500/10 px-4 py-2.5 text-sm">
           <span className="text-[var(--text)]">
-            We suggest: <strong>{suggestBanner.name}</strong> — Apply?
+            Suggested category: <strong>{suggestBanner.name}</strong>
           </span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={onSuggestApply}>
               Apply
             </Button>
@@ -3469,43 +3657,116 @@ function EditorPanel({
             </Button>
           </div>
         </div>
-      )}
-      <div className="border-b border-[var(--border)] px-4 py-3 md:px-6 md:py-4">
-        <input
-          value={localTitle}
-          onChange={(e) => {
-            const v = e.target.value;
-            setLocalTitle(v);
-            onTitleDraftChange(v);
-          }}
-          className="w-full min-h-11 bg-transparent text-xl font-semibold text-[var(--text)] outline-none placeholder:text-[var(--placeholder)] md:text-2xl"
-          placeholder="Note title"
-        />
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 md:pb-6">
+      ) : null}
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:px-4 md:pb-4 md:pt-3">
         <NoteRichTextEditor
           key={richEditorKey}
           noteId={selectedNote.id}
           initialHtml={editContent}
           onHtmlChange={setEditContent}
           className="min-h-0 flex-1"
+          aiToolbar={
+            <div className="flex flex-wrap items-center gap-2 px-2 py-2 md:gap-2.5 md:px-3 md:py-2.5">
+              <Sparkles className="h-4 w-4 shrink-0 text-[var(--accent)]" strokeWidth={2} aria-hidden />
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  className={aiPillClass}
+                  disabled={summaryLoading}
+                  title="Summarize with AI"
+                  onClick={() => void onClaudeSummarize()}
+                >
+                  {summaryLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-400/90" strokeWidth={2} />
+                  )}
+                  Summarize
+                </button>
+                <span ref={improveButtonRef as React.RefObject<HTMLSpanElement>} className="inline-flex">
+                  <button
+                    type="button"
+                    className={aiPillClass}
+                    disabled={improveLoading}
+                    title="Improve writing with AI"
+                    onClick={() => void onImprove()}
+                  >
+                    {improveLoading ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
+                    Improve
+                  </button>
+                </span>
+                <button
+                  type="button"
+                  className={aiPillClass}
+                  disabled={titleLoading}
+                  title="Generate a title from your note"
+                  onClick={() => void onGenerateTitle()}
+                >
+                  {titleLoading ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
+                  Generate title
+                </button>
+                <button
+                  type="button"
+                  className={aiPillClass}
+                  disabled={tagsLoading}
+                  title="Suggest tags from your note"
+                  onClick={() => void onSuggestTags()}
+                >
+                  {tagsLoading ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
+                  Suggest tags
+                </button>
+                <button
+                  type="button"
+                  className={aiPillClass}
+                  disabled={conceptMapLoading || conceptMapDisabled}
+                  title={conceptMapDisabled ? "Add note content first" : "Concept map from your note"}
+                  onClick={onConceptMap}
+                >
+                  {conceptMapLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  ) : (
+                    <Network className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                  )}
+                  Concept map
+                </button>
+                <button type="button" className={aiPillClass} title="Flashcards & quizzes" onClick={onStudy}>
+                  <BookOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                  Study
+                </button>
+                {voiceToNotesToolbar ? (
+                  <div className="inline-flex shrink-0 [&_button]:h-8 [&_button]:min-h-0 [&_button]:rounded-full [&_button]:border-[var(--border)] [&_button]:bg-[var(--input-bg)] [&_button]:px-2.5 [&_button]:py-0 [&_button]:text-xs [&_button]:font-medium">
+                    {voiceToNotesToolbar}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          }
+          statusBar={
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] tabular-nums text-[var(--muted)]">
+              <span>{wordCount.toLocaleString()} words</span>
+              <span>{charCount.toLocaleString()} characters</span>
+              <span className="min-w-0">{formatSavedLine()}</span>
+            </div>
+          }
         />
-        {summaryBelow && (
-          <div className="mt-4 rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-purple-300">Summary</p>
-            <p className="mt-1 text-sm leading-relaxed text-[var(--text)]">{summaryBelow}</p>
+
+        {summaryBelow ? (
+          <div className="mt-3 rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-300/95">Summary</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-[var(--text)]">{summaryBelow}</p>
           </div>
-        )}
-        {toolbarError && (
-          <div className="mt-4 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+        ) : null}
+        {toolbarError ? (
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
             <p className="text-sm text-red-200">{toolbarError}</p>
-            <button type="button" onClick={onToolbarErrorDismiss} className="text-red-300 hover:text-[var(--text)]">
+            <button type="button" onClick={onToolbarErrorDismiss} className="shrink-0 text-red-300 hover:text-[var(--text)]">
               <X className="h-4 w-4" />
             </button>
           </div>
-        )}
-        {suggestTagsChips && suggestTagsChips.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+        ) : null}
+        {suggestTagsChips && suggestTagsChips.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-[var(--muted)]">Suggested tags:</span>
             {suggestTagsChips.map((tag) => (
               <Badge
@@ -3524,37 +3785,7 @@ function EditorPanel({
               Dismiss
             </button>
           </div>
-        )}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span ref={improveButtonRef as React.RefObject<HTMLSpanElement>} className="inline-flex">
-            <Button size="sm" variant="ghost" onClick={() => void onImprove()} disabled={improveLoading}>
-              {improveLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-              Improve
-            </Button>
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onConceptMap}
-            disabled={conceptMapLoading || conceptMapDisabled}
-            title={conceptMapDisabled ? "Add note content to generate a concept map" : undefined}
-          >
-            {conceptMapLoading ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Network className="mr-1.5 h-3.5 w-3.5" />
-            )}
-            Concept Map
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void onGenerateTitle()} disabled={titleLoading}>
-            {titleLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-            Generate Title
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void onSuggestTags()} disabled={tagsLoading}>
-            {tagsLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-            Suggest Tags
-          </Button>
-        </div>
+        ) : null}
       </div>
     </div>
   );

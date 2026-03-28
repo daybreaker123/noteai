@@ -406,7 +406,7 @@ export function VoiceToNotesControl({
       title="Voice to notes"
     >
       <Mic className={cn(isHero ? "h-4 w-4" : "h-3.5 w-3.5")} aria-hidden />
-      {!isEditor && <span>Voice</span>}
+      <span className={cn(isEditor && "text-xs font-medium")}>Voice</span>
       <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
     </Button>
   );
