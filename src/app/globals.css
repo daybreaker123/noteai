@@ -83,21 +83,6 @@
   --tiptap-th-bg: rgba(255, 255, 255, 0.05);
   --tiptap-body: rgba(255, 255, 255, 0.9);
   --tiptap-img-border: rgba(255, 255, 255, 0.1);
-  /* Note grid cards — slightly lighter than dashboard bg */
-  --note-card-bg: color-mix(in oklab, var(--bg) 84%, white 16%);
-  --note-card-border: rgba(255, 255, 255, 0.11);
-  --note-card-title: #ffffff;
-  --note-card-preview: rgba(255, 255, 255, 0.5);
-  --note-card-date: rgba(255, 255, 255, 0.4);
-  --note-card-accent-fallback: rgba(255, 255, 255, 0.18);
-  --note-card-accent-border-fallback: rgba(255, 255, 255, 0.14);
-  --note-card-shadow: none;
-  --note-card-icon-muted: rgba(255, 255, 255, 0.45);
-  --note-card-icon-hover-bg: rgba(255, 255, 255, 0.08);
-  /* Dashboard activity status bar */
-  --dashboard-stats-bar-bg: color-mix(in oklab, var(--bg) 82%, white 18%);
-  --dashboard-stats-bar-border: rgba(255, 255, 255, 0.09);
-  --dashboard-stats-bar-divider: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="light"] {
@@ -177,19 +162,6 @@
   --tiptap-th-bg: rgba(26, 26, 46, 0.06);
   --tiptap-body: rgba(26, 26, 46, 0.92);
   --tiptap-img-border: rgba(26, 26, 46, 0.12);
-  --note-card-bg: #ffffff;
-  --note-card-border: rgba(26, 26, 46, 0.1);
-  --note-card-title: #1a1a2e;
-  --note-card-preview: rgba(26, 26, 46, 0.52);
-  --note-card-date: rgba(26, 26, 46, 0.46);
-  --note-card-accent-fallback: rgba(26, 26, 46, 0.22);
-  --note-card-accent-border-fallback: rgba(26, 26, 46, 0.16);
-  --note-card-shadow: 0 1px 2px rgba(26, 26, 46, 0.05), 0 6px 18px -4px rgba(26, 26, 46, 0.08);
-  --note-card-icon-muted: rgba(26, 26, 46, 0.45);
-  --note-card-icon-hover-bg: rgba(26, 26, 46, 0.08);
-  --dashboard-stats-bar-bg: #ebecef;
-  --dashboard-stats-bar-border: rgba(26, 26, 46, 0.1);
-  --dashboard-stats-bar-divider: rgba(26, 26, 46, 0.12);
 }
 
 /* Overlays that must blend with theme background */
@@ -232,63 +204,7 @@ body {
   }
 }
 
-/* Dashboard note cards — fixed grid; category-colored hover ring + slight lift */
-.note-dashboard-card {
-  --note-card-accent: var(--accent);
-  background-color: var(--note-card-bg);
-  border-color: var(--note-card-border);
-  box-shadow: var(--note-card-shadow);
-  transition:
-    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-    background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.25s ease,
-    border-left-color 0.25s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .note-dashboard-card {
-    transition-duration: 0.01ms;
-  }
-}
-
-.note-dashboard-card:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--note-card-accent) 32%, transparent),
-    0 5px 20px -6px color-mix(in srgb, var(--note-card-accent) 22%, transparent);
-}
-
-[data-theme="light"] .note-dashboard-card:hover {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--note-card-accent) 18%, transparent),
-    0 1px 3px rgba(26, 26, 46, 0.06),
-    0 8px 22px -6px color-mix(in srgb, var(--note-card-accent) 12%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .note-dashboard-card:hover {
-    transform: none;
-  }
-}
-
-/* Notes dashboard: slim activity status bar (below grid header) */
-.studara-dashboard-stats-bar {
-  height: 44px;
-  max-height: 48px;
-  min-height: 40px;
-  background-color: var(--dashboard-stats-bar-bg);
-  border-color: var(--dashboard-stats-bar-border);
-  transition:
-    background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-[data-theme="light"] .studara-dashboard-stats-bar {
-  box-shadow: 0 1px 2px rgba(26, 26, 46, 0.05);
-}
-
+/* Notes dashboard: hide scrollbars on stats strip */
 .studara-dashboard-stats-bar-scroll {
   scrollbar-width: none;
   -ms-overflow-style: none;

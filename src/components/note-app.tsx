@@ -2733,7 +2733,7 @@ export function NoteApp({
               <div
                 role="status"
                 aria-label="Activity summary"
-                className="studara-dashboard-stats-bar mb-3 flex w-full min-w-0 items-center rounded-lg border px-0 backdrop-blur-sm"
+                className="mb-3 flex h-11 min-h-[44px] max-h-12 w-full min-w-0 items-center rounded-2xl border border-[var(--border)] bg-[var(--chrome-40)] px-0 shadow-sm backdrop-blur-xl transition-colors duration-200"
               >
                 <div className="studara-dashboard-stats-bar-scroll flex min-h-0 min-w-0 flex-1 items-center gap-0 overflow-x-auto whitespace-nowrap px-1 sm:px-2">
                   <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
@@ -2741,35 +2741,35 @@ export function NoteApp({
                       🔥
                     </span>
                     <span className="text-sm font-semibold tabular-nums text-[var(--accent)]">{userStats.current_streak}</span>
-                    <span className="text-[11px] font-medium text-[var(--muted)]">Streak</span>
+                    <span className="text-xs font-medium text-[var(--muted)]">Streak</span>
                   </div>
-                  <div className="h-5 w-px shrink-0 bg-[var(--dashboard-stats-bar-divider)]" aria-hidden />
+                  <div className="h-5 w-px shrink-0 bg-[var(--border)] opacity-60" aria-hidden />
                   <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
                     <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--faint)]" strokeWidth={2} aria-hidden />
                     <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{userStats.total_notes}</span>
-                    <span className="text-[11px] font-medium text-[var(--muted)]">Notes</span>
+                    <span className="text-xs font-medium text-[var(--muted)]">Notes</span>
                   </div>
-                  <div className="h-5 w-px shrink-0 bg-[var(--dashboard-stats-bar-divider)]" aria-hidden />
+                  <div className="h-5 w-px shrink-0 bg-[var(--border)] opacity-60" aria-hidden />
                   <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
                     <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-400/90" strokeWidth={2} aria-hidden />
                     <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
                       {userStats.summarizations_this_month}
                     </span>
-                    <span className="text-[11px] font-medium text-[var(--muted)]">Summaries</span>
+                    <span className="text-xs font-medium text-[var(--muted)]">Summaries</span>
                   </div>
-                  <div className="h-5 w-px shrink-0 bg-[var(--dashboard-stats-bar-divider)]" aria-hidden />
+                  <div className="h-5 w-px shrink-0 bg-[var(--border)] opacity-60" aria-hidden />
                   <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
                     <Layers className="h-3.5 w-3.5 shrink-0 text-cyan-400/85" strokeWidth={2} aria-hidden />
                     <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
                       {userStats.flashcard_sets_studied_this_week}
                     </span>
-                    <span className="text-[11px] font-medium text-[var(--muted)]">Flashcards</span>
+                    <span className="text-xs font-medium text-[var(--muted)]">Flashcards</span>
                   </div>
-                  <div className="h-5 w-px shrink-0 bg-[var(--dashboard-stats-bar-divider)]" aria-hidden />
+                  <div className="h-5 w-px shrink-0 bg-[var(--border)] opacity-60" aria-hidden />
                   <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 pr-3 sm:pr-4">
                     <HelpCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400/85" strokeWidth={2} aria-hidden />
                     <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{userStats.quizzes_this_week}</span>
-                    <span className="text-[11px] font-medium text-[var(--muted)]">Quizzes</span>
+                    <span className="text-xs font-medium text-[var(--muted)]">Quizzes</span>
                   </div>
                 </div>
               </div>
@@ -3657,8 +3657,7 @@ function NoteCard({
   }
 
   const cardStyle = {
-    ...(categoryColor ? ({ "--note-card-accent": categoryColor } as React.CSSProperties) : {}),
-    borderLeftColor: categoryColor ?? "var(--note-card-accent-border-fallback)",
+    borderLeftColor: categoryColor ?? "var(--border)",
   } as React.CSSProperties;
 
   const card = (
@@ -3696,8 +3695,9 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "note-dashboard-card group relative box-border flex h-[180px] w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--note-card-border)] border-l-[3px] p-4 text-left outline-none",
-        "focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--note-card-accent)_42%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
+        "note-dashboard-card group relative box-border flex h-[180px] w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--border)] border-l-[3px] bg-[var(--panel)] p-4 text-left shadow-sm outline-none backdrop-blur transition duration-200",
+        "hover:bg-[var(--badge-free-bg)] hover:shadow-md",
+        "focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
         selectMode && "cursor-default",
         selected && selectMode && "border-purple-500/50 bg-purple-500/10 ring-1 ring-purple-500/30"
       )}
@@ -3718,7 +3718,7 @@ function NoteCard({
         ) : null}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="min-w-0 flex-1 truncate text-[15px] font-bold leading-snug text-[var(--note-card-title)]">
+            <h3 className="min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-[var(--text)]">
               {note.title || "Untitled"}
             </h3>
             {!selectMode ? (
@@ -3732,14 +3732,14 @@ function NoteCard({
                     e.stopPropagation();
                     setMenuOpen((o) => !o);
                   }}
-                  className="rounded p-1 text-[var(--note-card-icon-muted)] transition-colors hover:bg-[var(--note-card-icon-hover-bg)] hover:text-[var(--note-card-title)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                  className="rounded-lg p-1 text-[var(--muted)] transition-colors hover:bg-[var(--btn-default-bg)] hover:text-[var(--text)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
                 >
                   <MoreVertical className="h-4 w-4" strokeWidth={2} aria-hidden />
                 </button>
                 {menuOpen ? (
                   <div
                     role="menu"
-                    className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] py-1 shadow-xl"
+                    className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl"
                     onPointerDown={(e) => e.stopPropagation()}
                   >
                     <button
@@ -3780,7 +3780,7 @@ function NoteCard({
               </div>
             ) : null}
           </div>
-          <p className="mt-2 line-clamp-2 text-sm leading-snug text-[var(--note-card-preview)]">{preview || "No content"}</p>
+          <p className="mt-2 line-clamp-2 text-sm leading-snug text-[var(--muted)]">{preview || "No content"}</p>
           <div className="min-h-0 flex-1" aria-hidden />
           <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
             <span
@@ -3797,7 +3797,7 @@ function NoteCard({
               ) : null}
               {categoryName}
             </span>
-            <span className="shrink-0 text-xs tabular-nums text-[var(--note-card-date)]">{formattedDate}</span>
+            <span className="shrink-0 text-xs tabular-nums text-[var(--muted)]">{formattedDate}</span>
           </div>
         </div>
       </div>
@@ -3810,7 +3810,7 @@ function NoteCard({
       {ctxMenu && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed z-[80] min-w-[9.5rem] rounded-lg border border-[var(--border)] bg-[var(--chrome-90)] py-1 shadow-xl"
+              className="fixed z-[80] min-w-[9.5rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--chrome-90)] py-1 shadow-xl"
               style={{ left: ctxMenu.x, top: ctxMenu.y }}
               onPointerDown={(e) => e.stopPropagation()}
               role="menu"
