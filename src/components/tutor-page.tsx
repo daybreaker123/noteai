@@ -7,7 +7,6 @@ import { Button } from "@/components/ui";
 import { StudaraWordmark, StudaraWordmarkLink } from "@/components/studara-wordmark";
 import { cn } from "@/lib/cn";
 import { captureAnalytics } from "@/lib/analytics";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { TutorImageLightbox } from "@/components/tutor-image-lightbox";
 import { TutorMarkdown } from "@/components/tutor-markdown";
 import {
@@ -722,9 +721,8 @@ export function TutorPage() {
               </h1>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <ThemeToggle variant="icon" />
-          <p className="hidden shrink-0 items-center gap-1.5 text-right text-[11px] leading-tight text-[var(--faint)] sm:flex">
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+            <p className="hidden shrink-0 items-center gap-1.5 text-right text-[11px] leading-tight text-[var(--faint)] sm:flex">
             <kbd className="rounded-md border border-[var(--border)] bg-[var(--hover-bg-subtle)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--muted)]">
               Enter
             </kbd>
@@ -817,7 +815,6 @@ export function TutorPage() {
             )}
           </div>
           <div className="shrink-0 border-t border-[var(--sidebar-border)] bg-[var(--sidebar-footer-bg)] p-4 backdrop-blur-sm">
-            <ThemeToggle className="mb-3" />
             <Link
               href="/notes"
               onClick={() => setMobileTutorSidebarOpen(false)}

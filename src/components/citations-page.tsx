@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { captureAnalytics } from "@/lib/analytics";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   CITATION_STYLE_OPTIONS,
   SOURCE_TYPE_OPTIONS,
@@ -239,15 +238,14 @@ export function CitationsPage() {
             </div>
           </div>
           {plan === "free" && remaining !== null ? (
-            <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-medium text-[var(--muted)]">
+            <span className="ml-auto shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-medium text-[var(--muted)]">
               {remaining} free left this month
             </span>
           ) : plan === "pro" ? (
-            <span className="rounded-full border border-[var(--pro-badge-border)] bg-[var(--pro-badge-bg)] px-3 py-1.5 text-xs font-medium text-[var(--pro-badge-fg)]">
+            <span className="ml-auto shrink-0 rounded-full border border-[var(--pro-badge-border)] bg-[var(--pro-badge-bg)] px-3 py-1.5 text-xs font-medium text-[var(--pro-badge-fg)]">
               Pro · unlimited
             </span>
           ) : null}
-          <ThemeToggle variant="icon" className="ml-auto shrink-0" />
         </div>
       </header>
 

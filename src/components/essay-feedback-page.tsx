@@ -15,7 +15,6 @@ import {
 } from "@/lib/essay-feedback-types";
 import { cn } from "@/lib/cn";
 import { captureAnalytics } from "@/lib/analytics";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 const headerSelectClass =
   "min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--hover-bg-subtle)] py-2 pl-2.5 pr-7 text-base font-medium text-[var(--text)] outline-none transition focus:border-[var(--focus-border-color)] focus:ring-2 focus:ring-[var(--focus-ring-color)] sm:min-h-10 sm:min-w-[8.5rem] sm:flex-none sm:pl-3 sm:text-xs md:min-w-[9.5rem] md:text-sm";
@@ -268,17 +267,16 @@ export function EssayFeedbackPage() {
           </div>
           {plan === "free" && remaining !== null ? (
             <span
-              className="rounded-full border border-[var(--border-subtle)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-medium text-[var(--muted)]"
+              className="ml-auto shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-medium text-[var(--muted)]"
               title="3 free basic feedbacks per month"
             >
               {remaining} free left this month
             </span>
           ) : plan === "pro" ? (
-            <span className="rounded-full border border-[var(--pro-badge-border)] bg-[var(--pro-badge-bg)] px-3 py-1.5 text-xs font-medium text-[var(--pro-badge-fg)]">
+            <span className="ml-auto shrink-0 rounded-full border border-[var(--pro-badge-border)] bg-[var(--pro-badge-bg)] px-3 py-1.5 text-xs font-medium text-[var(--pro-badge-fg)]">
               Pro · unlimited
             </span>
           ) : null}
-          <ThemeToggle variant="icon" className="ml-auto shrink-0" />
         </div>
       </header>
 

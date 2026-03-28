@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ArrowLeft, Bookmark, Loader2, Trash2, BookOpen, X, Link2, Network } from "lucide-react";
 import { StudaraWordmarkLink } from "@/components/studara-wordmark";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Button, Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Note, StudySetSummary } from "@/lib/api-types";
@@ -139,7 +138,6 @@ export function StudySetsPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <ThemeToggle variant="icon" />
             <StudaraWordmarkLink href="/notes" />
           </div>
         </div>
