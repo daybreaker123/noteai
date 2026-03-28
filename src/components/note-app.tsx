@@ -2730,48 +2730,47 @@ export function NoteApp({
               )}
             </div>
             {userStats && !gridSelectMode ? (
-              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-br from-orange-500/15 to-rose-500/10 p-4 ring-1 ring-orange-400/15">
-                  <div className="flex items-center gap-2 text-orange-200/90">
-                    <Flame className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Streak</span>
+              <div
+                role="status"
+                aria-label="Activity summary"
+                className="studara-dashboard-stats-bar mb-3 flex w-full min-w-0 items-center rounded-lg border px-0 backdrop-blur-sm"
+              >
+                <div className="studara-dashboard-stats-bar-scroll flex min-h-0 min-w-0 flex-1 items-center gap-0 overflow-x-auto whitespace-nowrap px-1 sm:px-2">
+                  <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
+                    <span className="select-none text-[15px] leading-none" aria-hidden>
+                      🔥
+                    </span>
+                    <span className="text-sm font-semibold tabular-nums text-[var(--accent)]">{userStats.current_streak}</span>
+                    <span className="text-[11px] font-medium text-[var(--muted)]">Streak</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">{userStats.current_streak}</p>
-                  <p className="mt-0.5 text-xs text-[var(--muted)]">day{userStats.current_streak === 1 ? "" : "s"} in a row</p>
-                </div>
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-4">
-                  <div className="flex items-center gap-2 text-violet-200/85">
-                    <FileText className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Notes</span>
+                  <div className="h-5 w-px shrink-0 bg-[var(--dashboard-stats-bar-divider)]" aria-hidden />
+                  <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--faint)]" strokeWidth={2} aria-hidden />
+                    <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{userStats.total_notes}</span>
+                    <span className="text-[11px] font-medium text-[var(--muted)]">Notes</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">{userStats.total_notes}</p>
-                  <p className="mt-0.5 text-xs text-[var(--muted)]">total created</p>
-                </div>
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-4">
-                  <div className="flex items-center gap-2 text-cyan-200/85">
-                    <Layers className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Flashcards</span>
+                  <div className="h-5 w-px shrink-0 bg-[var(--dashboard-stats-bar-divider)]" aria-hidden />
+                  <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
+                    <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-400/90" strokeWidth={2} aria-hidden />
+                    <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
+                      {userStats.summarizations_this_month}
+                    </span>
+                    <span className="text-[11px] font-medium text-[var(--muted)]">Summaries</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">
-                    {userStats.flashcard_sets_studied_this_week}
-                  </p>
-                  <p className="mt-0.5 text-xs text-[var(--muted)]">sets studied this week</p>
-                </div>
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-4">
-                  <div className="flex items-center gap-2 text-emerald-200/85">
-                    <HelpCircle className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Quizzes</span>
+                  <div className="h-5 w-px shrink-0 bg-[var(--dashboard-stats-bar-divider)]" aria-hidden />
+                  <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 sm:px-3">
+                    <Layers className="h-3.5 w-3.5 shrink-0 text-cyan-400/85" strokeWidth={2} aria-hidden />
+                    <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
+                      {userStats.flashcard_sets_studied_this_week}
+                    </span>
+                    <span className="text-[11px] font-medium text-[var(--muted)]">Flashcards</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">{userStats.quizzes_this_week}</p>
-                  <p className="mt-0.5 text-xs text-[var(--muted)]">completed this week</p>
-                </div>
-                <div className="col-span-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--input-bg)] p-4 sm:col-span-1">
-                  <div className="flex items-center gap-2 text-amber-200/85">
-                    <Sparkles className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Summaries</span>
+                  <div className="h-5 w-px shrink-0 bg-[var(--dashboard-stats-bar-divider)]" aria-hidden />
+                  <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-0 pr-3 sm:pr-4">
+                    <HelpCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400/85" strokeWidth={2} aria-hidden />
+                    <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{userStats.quizzes_this_week}</span>
+                    <span className="text-[11px] font-medium text-[var(--muted)]">Quizzes</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">{userStats.summarizations_this_month}</p>
-                  <p className="mt-0.5 text-xs text-[var(--muted)]">AI summarizations this month</p>
                 </div>
               </div>
             ) : null}
@@ -3657,12 +3656,24 @@ function NoteCard({
     onShare();
   }
 
-  const categoryPillStyle = categoryColor
-    ? ({ backgroundColor: `${categoryColor}28`, color: categoryColor } as React.CSSProperties)
-    : undefined;
+  const tileAccent = categoryColor ?? "var(--note-tile-accent-fallback)";
+  const cardStyle = {
+    "--note-tile-accent": tileAccent,
+    borderLeftWidth: 4,
+    borderLeftStyle: "solid" as const,
+    borderLeftColor: "var(--note-tile-accent)",
+  } as React.CSSProperties;
+
+  const categoryPillClass = cn(
+    "min-w-0 max-w-[58%] truncate rounded-full px-2.5 py-1 text-[11px] font-medium leading-tight",
+    categoryColor && "note-tile-category-pill",
+    !categoryColor && categoryName === "Uncategorized" && "bg-[var(--note-tile-pill-muted)] text-[var(--note-tile-pill-muted-text)]",
+    !categoryColor && categoryName !== "Uncategorized" && "note-tile-category-pill"
+  );
 
   const card = (
     <div
+      style={cardStyle}
       onClick={() => {
         if (selectMode) {
           onToggleSelect?.();
@@ -3695,9 +3706,8 @@ function NoteCard({
       onTouchEnd={clearLongPress}
       onTouchCancel={clearLongPress}
       className={cn(
-        "note-dashboard-card group relative box-border flex h-[180px] w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-white/[0.06] bg-[#15151d] p-3.5 text-left shadow-sm outline-none transition-[transform,box-shadow,border-color] duration-200 ease-out",
-        "hover:-translate-y-0.5 hover:border-purple-500/55 hover:shadow-[0_0_0_1px_rgba(168,85,247,0.35),0_12px_32px_-12px_rgba(139,92,246,0.35)]",
-        "focus-visible:ring-2 focus-visible:ring-purple-500/40",
+        "note-dashboard-card group relative box-border flex h-[180px] w-[280px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--note-tile-border)] p-5 text-left outline-none",
+        "focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--note-tile-accent)_45%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
         selectMode && "cursor-default",
         selected && selectMode && "ring-2 ring-purple-500/50 ring-offset-2 ring-offset-[var(--bg)]"
       )}
@@ -3713,19 +3723,10 @@ function NoteCard({
                 onToggleSelect?.();
               }}
               onClick={(e) => e.stopPropagation()}
-              className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-white/20 bg-white/5 text-purple-500 focus:ring-purple-500"
+              className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-[var(--note-tile-border)] bg-transparent text-purple-500 focus:ring-purple-500/50"
               aria-label={selected ? "Deselect note" : "Select note"}
             />
           ) : null}
-          {categoryColor ? (
-            <span
-              className="h-2.5 w-2.5 shrink-0 rounded-[3px] ring-1 ring-white/15"
-              style={{ backgroundColor: categoryColor }}
-              aria-hidden
-            />
-          ) : (
-            <span className="h-2.5 w-2.5 shrink-0 rounded-[3px] bg-white/20 ring-1 ring-white/10" aria-hidden />
-          )}
         </div>
         {!selectMode ? (
           <div ref={menuWrapRef} className="relative shrink-0">
@@ -3738,20 +3739,20 @@ function NoteCard({
                 e.stopPropagation();
                 setMenuOpen((o) => !o);
               }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 opacity-100 transition hover:bg-white/[0.08] hover:text-zinc-200 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--note-tile-icon-muted)] transition-colors hover:bg-[var(--note-tile-icon-hover-bg)] hover:text-[var(--note-tile-title)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
             >
               <MoreVertical className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
             {menuOpen ? (
               <div
                 role="menu"
-                className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-lg border border-white/[0.08] bg-[#1c1c26] py-1 shadow-xl shadow-black/40"
+                className="absolute right-0 top-full z-30 mt-1 min-w-[9.5rem] rounded-lg border border-[var(--note-tile-menu-border)] bg-[var(--note-tile-menu-surface)] py-1 shadow-lg shadow-black/12 backdrop-blur-sm"
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 <button
                   type="button"
                   role="menuitem"
-                  className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-white/[0.06]"
+                  className="block w-full px-3 py-2 text-left text-sm text-[var(--note-tile-menu-text)] transition-colors hover:bg-[var(--note-tile-menu-hover)]"
                   onClick={(e) => {
                     e.stopPropagation();
                     runOpen();
@@ -3762,7 +3763,7 @@ function NoteCard({
                 <button
                   type="button"
                   role="menuitem"
-                  className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-white/[0.06]"
+                  className="block w-full px-3 py-2 text-left text-sm text-[var(--note-tile-menu-text)] transition-colors hover:bg-[var(--note-tile-menu-hover)]"
                   onClick={(e) => {
                     e.stopPropagation();
                     runShare();
@@ -3773,7 +3774,7 @@ function NoteCard({
                 <button
                   type="button"
                   role="menuitem"
-                  className="block w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
+                  className="block w-full px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10 dark:text-red-400"
                   onClick={(e) => {
                     e.stopPropagation();
                     runDelete();
@@ -3787,25 +3788,19 @@ function NoteCard({
         ) : null}
       </div>
 
-      <h3 className="mt-2 shrink-0 truncate text-[15px] font-bold leading-tight text-white">{note.title || "Untitled"}</h3>
+      <h3 className="mt-3 shrink-0 truncate text-[15px] font-bold leading-snug tracking-tight text-[var(--note-tile-title)]">
+        {note.title || "Untitled"}
+      </h3>
 
-      <p className="mt-1.5 min-h-0 flex-1 overflow-hidden text-[12px] leading-[1.45] text-zinc-500 line-clamp-2">
+      <p className="mt-2 min-h-0 flex-1 overflow-hidden text-[12.5px] leading-[1.5] text-[var(--note-tile-preview)] line-clamp-2">
         {preview || "No content"}
       </p>
 
-      <div className="mt-auto flex shrink-0 items-center justify-between gap-2 border-t border-white/[0.06] pt-2.5">
-        <span
-          className={cn(
-            "min-w-0 max-w-[58%] truncate rounded-full px-2 py-0.5 text-[11px] font-medium",
-            !categoryColor && categoryName === "Uncategorized" && "bg-white/[0.08] text-zinc-400",
-            !categoryColor && categoryName !== "Uncategorized" && "bg-purple-500/20 text-purple-200"
-          )}
-          style={categoryPillStyle}
-          title={categoryName}
-        >
+      <div className="mt-auto flex shrink-0 items-center justify-between gap-2 border-t border-[var(--note-tile-footer-border)] pt-3">
+        <span className={categoryPillClass} style={categoryColor ? ({ "--pill-base": categoryColor } as React.CSSProperties) : undefined} title={categoryName}>
           {categoryName}
         </span>
-        <span className="shrink-0 text-[11px] tabular-nums text-zinc-500">{formattedDate}</span>
+        <span className="shrink-0 text-[10px] font-medium tabular-nums tracking-wide text-[var(--note-tile-date)]">{formattedDate}</span>
       </div>
     </div>
   );
@@ -3816,7 +3811,7 @@ function NoteCard({
       {ctxMenu && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed z-[80] min-w-[9.5rem] rounded-lg border border-white/[0.1] bg-[#1c1c26] py-1 shadow-xl shadow-black/50"
+              className="fixed z-[80] min-w-[9.5rem] rounded-lg border border-[var(--note-tile-menu-border)] bg-[var(--note-tile-menu-surface)] py-1 shadow-xl shadow-black/15 backdrop-blur-md"
               style={{ left: ctxMenu.x, top: ctxMenu.y }}
               onPointerDown={(e) => e.stopPropagation()}
               role="menu"
@@ -3825,7 +3820,7 @@ function NoteCard({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-white/[0.06]"
+                className="block w-full px-3 py-2 text-left text-sm text-[var(--note-tile-menu-text)] transition-colors hover:bg-[var(--note-tile-menu-hover)]"
                 onClick={() => runOpen()}
               >
                 Open
@@ -3833,7 +3828,7 @@ function NoteCard({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-white/[0.06]"
+                className="block w-full px-3 py-2 text-left text-sm text-[var(--note-tile-menu-text)] transition-colors hover:bg-[var(--note-tile-menu-hover)]"
                 onClick={() => runShare()}
               >
                 Share
@@ -3841,7 +3836,7 @@ function NoteCard({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
+                className="block w-full px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10 dark:text-red-400"
                 onClick={() => runDelete()}
               >
                 Delete
