@@ -2500,51 +2500,53 @@ export function NoteApp({
                 Categories
               </span>
             </button>
-            <div
-              id="sidebar-categories-panel"
-              className={cn(
-                "grid transition-[grid-template-rows] duration-300 ease-out",
-                sidebarCategoriesCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
-              )}
-            >
-              <div className="min-h-0 overflow-hidden">
-                <div className="space-y-1 pb-0.5">
-                  <CategoryTab
-                    id="all"
-                    name="All Notes"
-                    count={noteCounts.total}
-                    icon={<LayoutGrid className="h-4 w-4 shrink-0 text-[var(--muted)]" />}
-                    selected={selectedCategoryId === "all"}
-                    onClick={() => selectSidebarCategory("all")}
-                  />
-                  {categories.map((c) => (
-                    <CategoryTab
-                      key={c.id}
-                      id={c.id}
-                      name={c.name}
-                      color={c.color}
-                      count={noteCounts.byCategory.get(c.id) ?? 0}
-                      selected={selectedCategoryId === c.id}
-                      onClick={() => selectSidebarCategory(c.id)}
-                      onStudyGuide={() => requestStudyGuide(c.id, c.name)}
-                      onRename={() => {
-                        const name = prompt("Rename category:", c.name);
-                        if (name?.trim()) actions.updateCategory(c.id, name.trim());
+            <div className="space-y-1">
+              <CategoryTab
+                id="all"
+                name="All Notes"
+                count={noteCounts.total}
+                icon={<LayoutGrid className="h-4 w-4 shrink-0 text-[var(--muted)]" />}
+                selected={selectedCategoryId === "all"}
+                onClick={() => selectSidebarCategory("all")}
+              />
+              <div
+                id="sidebar-categories-panel"
+                className={cn(
+                  "grid transition-[grid-template-rows] duration-300 ease-out",
+                  sidebarCategoriesCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
+                )}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div className="space-y-1 pb-0.5">
+                    {categories.map((c) => (
+                      <CategoryTab
+                        key={c.id}
+                        id={c.id}
+                        name={c.name}
+                        color={c.color}
+                        count={noteCounts.byCategory.get(c.id) ?? 0}
+                        selected={selectedCategoryId === c.id}
+                        onClick={() => selectSidebarCategory(c.id)}
+                        onStudyGuide={() => requestStudyGuide(c.id, c.name)}
+                        onRename={() => {
+                          const name = prompt("Rename category:", c.name);
+                          if (name?.trim()) actions.updateCategory(c.id, name.trim());
+                        }}
+                        onDelete={() => setDeleteCategoryModal({ id: c.id, name: c.name })}
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearCategoryError();
+                        setCreateCategoryModalOpen(true);
                       }}
-                      onDelete={() => setDeleteCategoryModal({ id: c.id, name: c.name })}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearCategoryError();
-                      setCreateCategoryModalOpen(true);
-                    }}
-                    className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
-                  >
-                    <FolderPlus className="h-4 w-4 shrink-0 text-[var(--muted)]" />
-                    Add category
-                  </button>
+                      className="flex min-h-11 w-full touch-manipulation items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-[var(--muted)] transition duration-200 hover:bg-[var(--hover-bg-subtle)] hover:text-[var(--text)]"
+                    >
+                      <FolderPlus className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+                      Add category
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
