@@ -12,19 +12,42 @@ import {
   type BillingInterval,
 } from "@/lib/pricing";
 
+const FREE_PLAN_FEATURES = [
+  "50 notes",
+  "5 categories",
+  "10 AI summarizations per month",
+  "5 AI improvements per month",
+  "20 AI Tutor messages per month",
+  "5 tutor image uploads per month",
+  "3 essay feedbacks per month (basic only)",
+  "5 citations per month",
+  "Basic flashcards and quizzes",
+  "1 multi-note study session per month",
+] as const;
+
 const PRO_FEATURES = [
   "Unlimited notes",
   "Unlimited categories",
-  "Unlimited AI summarization",
+  "Unlimited AI summarizations",
   "Unlimited AI improvements",
-  "Unlimited AI tutor messages",
+  "Unlimited AI Tutor messages",
   "Unlimited tutor image uploads",
-  "Optional: use your notes as context in the AI Tutor",
-  "AI auto-categorization",
+  "Unlimited flashcards and quizzes",
+  "Unlimited essay feedback with advanced annotations and grade estimate",
+  "Unlimited citation generation",
+  "Unlimited study guide generation",
+  "Unlimited voice transcription",
+  "Unlimited lecture slides analysis",
+  "Unlimited concept map generation",
+  "AI auto-categorization suggestions",
+  "Spaced repetition flashcard system",
+  "Study streaks and progress tracking",
   "PDF and Markdown export",
-  "Study mode with flashcards and quizzes",
-  "Priority support",
-];
+  "Note sharing via link",
+  "Document and PDF import",
+  "Multi-note study sessions",
+  "Priority AI responses",
+] as const;
 
 export function ProPlanSelector({
   value,
@@ -110,4 +133,4 @@ export function ProFeatureList({ className = "" }: { className?: string }) {
   );
 }
 
-export { PRO_FEATURES };
+export { PRO_FEATURES, FREE_PLAN_FEATURES };

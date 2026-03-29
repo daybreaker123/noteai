@@ -81,7 +81,11 @@ function BillingPageInner() {
 
           <Card className="mt-10 border-[var(--border)] bg-[var(--chrome-30)] p-6 backdrop-blur-xl sm:p-8">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">Everything in Pro</h2>
-            <div className="mt-5">
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--muted)]">
+              One subscription unlocks unlimited AI across notes, tutor, essays, citations, study guides, voice, slides,
+              and concept maps—plus spaced repetition, streaks, exports, sharing, and faster responses when models are busy.
+            </p>
+            <div className="mt-6">
               <ProFeatureList />
             </div>
           </Card>

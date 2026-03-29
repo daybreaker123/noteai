@@ -41,10 +41,6 @@ import {
 } from "@/components/voice-to-notes-control";
 import { ShareResourceModal } from "@/components/share-resource-modal";
 import { noteTemplateDefaultTitle, noteTemplateHtml, type NoteTemplateId } from "@/lib/note-templates";
-import {
-  fetchGoogleDocsClientConfig,
-  pickGoogleDocWithAccessToken,
-} from "@/lib/google-docs-import-client";
 import type { Note, Category, StudySetSummary } from "@/lib/api-types";
 import { buildStudySetTitleFromNoteTitles } from "@/lib/study-set-utils";
 import { NoteStudyProgressTrail } from "@/components/note-study-progress";
@@ -65,7 +61,6 @@ import {
   ChevronLeft,
   FlipHorizontal,
   ChevronDown,
-  Cloud,
   X,
   Download,
   BookOpen,
@@ -410,15 +405,12 @@ export function NoteApp({
   } | null>(null);
   const [deleteNoteLoading, setDeleteNoteLoading] = React.useState(false);
   const [importDocLoading, setImportDocLoading] = React.useState(false);
-  /** Shown only after a Google Doc is chosen, while the server builds the note (not during OAuth/picker). */
-  const [importGoogleDocSaving, setImportGoogleDocSaving] = React.useState(false);
   const [importDocError, setImportDocError] = React.useState<string | null>(null);
   const [slidesAnalyzeLoading, setSlidesAnalyzeLoading] = React.useState(false);
   const [slidesAnalyzeError, setSlidesAnalyzeError] = React.useState<string | null>(null);
   const [voiceNotesError, setVoiceNotesError] = React.useState<string | null>(null);
   const [importDropdownOpen, setImportDropdownOpen] = React.useState(false);
   const importDropdownRef = React.useRef<HTMLDivElement>(null);
-  const [googleDocsImportEnabled, setGoogleDocsImportEnabled] = React.useState<boolean | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
   const [sidebarCategoriesCollapsed, setSidebarCategoriesCollapsed] = React.useState(false);
   const importDocumentInputRef = React.useRef<HTMLInputElement>(null);
@@ -1685,88 +1677,6 @@ export function NoteApp({
     }
   }
 
-  async function handleImportFromGoogleDocs() {
-    setImportDropdownOpen(false);
-    setImportDocError(null);
-    if (plan !== "pro" && notes.length >= FREE_NOTE_LIMIT) {
-      setUpgradeModal({
-        show: true,
-        message: "You've reached the free limit — upgrade to Pro for unlimited notes",
-      });
-      return;
-    }
-    const cfg = await fetchGoogleDocsClientConfig();
-    setGoogleDocsImportEnabled(cfg.enabled);
-    if (!cfg.enabled) {
-      setImportDocError(
-        "Google Docs import isn’t set up yet. Add GOOGLE_PICKER_API_KEY (browser key) and GOOGLE_CLIENT_ID to your environment, and enable the Picker & Docs APIs in Google Cloud."
-      );
-      return;
-    }
-    let picked: Awaited<ReturnType<typeof pickGoogleDocWithAccessToken>>;
-    try {
-      picked = await pickGoogleDocWithAccessToken(cfg.clientId, cfg.apiKey);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Could not connect to Google";
-      setImportDocError(msg);
-      return;
-    }
-    if ("cancelled" in picked) return;
-
-    setImportGoogleDocSaving(true);
-    try {
-      const sid = selectedCategoryIdRef.current;
-      const category_id = sid && sid !== "all" ? sid : null;
-      const res = await fetch("/api/notes/import-google-doc", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${picked.accessToken}`,
-        },
-        body: JSON.stringify({ documentId: picked.documentId, category_id }),
-      });
-      const json = (await res.json()) as {
-        id?: string;
-        title?: string;
-        content?: string;
-        category_id?: string | null;
-        error?: string;
-        code?: string;
-      };
-      if (json.code === "FREE_LIMIT_NOTES" && res.status === 402) {
-        setUpgradeModal({
-          show: true,
-          message: json.error ?? "You've reached the free limit — upgrade to Pro for unlimited notes",
-        });
-        return;
-      }
-      if (!res.ok || !json.id) {
-        setImportDocError(json.error ?? "Couldn’t import that document.");
-        return;
-      }
-      consumeStreakJson(json);
-      await actions.refresh();
-      lastLoadedEditorNoteIdRef.current = null;
-      setSelectedNoteId(json.id);
-      const gdocTitle = json.title ?? "Untitled";
-      setEditTitle(gdocTitle);
-      editTitleRef.current = gdocTitle;
-      setEditContent(ensureEditorHtml(json.content ?? ""));
-      setDraftNote(null);
-      setSelectedCategoryId(json.category_id ?? "all");
-      setStudyModal(null);
-      exitGridSelection();
-      setNewNoteIds((prev) => new Set(prev).add(json.id));
-      captureAnalytics("note_created", { source: "import_google_doc", note_id: json.id });
-      setMobileSidebarOpen(false);
-    } catch {
-      setImportDocError("Something went wrong while importing. Try again.");
-    } finally {
-      setImportGoogleDocSaving(false);
-    }
-  }
-
   const handleVoiceTranscriptionSuccess = React.useCallback(
     async (json: VoiceTranscriptionSuccessPayload) => {
       console.log("[note-app] voice transcription success payload", {
@@ -2260,19 +2170,14 @@ export function NoteApp({
           type="button"
           size={isHero ? "md" : "sm"}
           variant="ghost"
-          disabled={importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading}
+          disabled={importDocLoading || slidesAnalyzeLoading}
           className={cn(
             "gap-1.5 border border-[var(--border)] bg-[var(--btn-default-bg)] text-[var(--text)] hover:bg-[var(--btn-default-hover)]",
             isHero && "min-h-11 w-full justify-center"
           )}
           aria-expanded={importDropdownOpen}
           aria-haspopup="menu"
-          onClick={() => {
-            setImportDropdownOpen((o) => !o);
-            if (googleDocsImportEnabled === null) {
-              void fetchGoogleDocsClientConfig().then((c) => setGoogleDocsImportEnabled(c.enabled));
-            }
-          }}
+          onClick={() => setImportDropdownOpen((o) => !o)}
         >
           <Upload className={isHero ? "h-4 w-4" : "h-3.5 w-3.5"} />
           Import
@@ -2316,21 +2221,6 @@ export function NoteApp({
               <Presentation className="h-4 w-4 shrink-0 text-[var(--muted)]" />
               Analyze Slides
             </button>
-            <button
-              type="button"
-              role="menuitem"
-              disabled={googleDocsImportEnabled === false}
-              title={
-                googleDocsImportEnabled === false
-                  ? "Add GOOGLE_PICKER_API_KEY and GOOGLE_CLIENT_ID to enable Google Docs import"
-                  : undefined
-              }
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--btn-default-bg)] disabled:cursor-not-allowed disabled:opacity-40"
-              onClick={() => void handleImportFromGoogleDocs()}
-            >
-              <Cloud className="h-4 w-4 shrink-0 text-[var(--muted)]" />
-              Import from Google Docs
-            </button>
           </div>
         )}
       </div>
@@ -2339,35 +2229,23 @@ export function NoteApp({
 
   return (
     <div className="relative flex h-dvh max-w-[100vw] overflow-x-hidden bg-[var(--bg)]">
-      {(importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading) && (
+      {(importDocLoading || slidesAnalyzeLoading) && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay-scrim)] p-6 backdrop-blur-sm"
           role="alertdialog"
           aria-busy="true"
           aria-live="polite"
-          aria-label={
-            slidesAnalyzeLoading
-              ? "Analyzing slides"
-              : importGoogleDocSaving
-                ? "Importing from Google Docs"
-                : "Importing document"
-          }
+          aria-label={slidesAnalyzeLoading ? "Analyzing slides" : "Importing document"}
         >
           <div className="max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--modal-surface)] px-8 py-6 text-center shadow-[var(--shadow-brand-lg)]">
             <Loader2 className="mx-auto h-9 w-9 animate-spin text-[var(--accent)]" aria-hidden />
             <p className="mt-4 text-sm font-medium text-[var(--text)]">
-              {slidesAnalyzeLoading
-                ? "Analyzing your slides…"
-                : importGoogleDocSaving
-                  ? "Importing from Google Docs…"
-                  : "Importing document…"}
+              {slidesAnalyzeLoading ? "Analyzing your slides…" : "Importing document…"}
             </p>
             <p className="mt-1.5 text-xs text-[var(--muted)]">
               {slidesAnalyzeLoading
                 ? "Extracting slide text and generating study notes with AI. This can take a minute for large decks."
-                : importGoogleDocSaving
-                  ? "Converting your Google Doc into a note — almost there."
-                  : "Extracting text — large PDFs may take a little longer."}
+                : "Extracting text — large PDFs may take a little longer."}
             </p>
           </div>
         </div>
@@ -3088,7 +2966,7 @@ export function NoteApp({
                     layout="toolbar"
                     plan={plan}
                     categoryId={selectedCategoryId === "all" ? null : selectedCategoryId}
-                    disabled={importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading}
+                    disabled={importDocLoading || slidesAnalyzeLoading}
                     onRequirePro={() => setUpgradeModal({ show: true, feature: "voiceTranscription" })}
                     onError={(m) => {
                       setVoiceNotesError(m);
@@ -3180,7 +3058,7 @@ export function NoteApp({
                     layout="hero"
                     plan={plan}
                     categoryId={selectedCategoryId === "all" ? null : selectedCategoryId}
-                    disabled={importDocLoading || importGoogleDocSaving || slidesAnalyzeLoading}
+                    disabled={importDocLoading || slidesAnalyzeLoading}
                     onRequirePro={() => setUpgradeModal({ show: true, feature: "voiceTranscription" })}
                     onError={(m) => {
                       setVoiceNotesError(m);
